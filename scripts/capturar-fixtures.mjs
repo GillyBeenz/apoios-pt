@@ -1,0 +1,248 @@
+#!/usr/bin/env node
+/**
+ * Capture real HTML and PDFs from the source sites and write them as fixtures.
+ *
+ * This exists because the development sandbox's egress proxy blocks every
+ * Portuguese government domain — fundoambiental.pt, portugal2030.pt,
+ * diariodarepublica.pt and the rest all fail to connect. GitHub Actions runners
+ * are not behind that proxy, so this script runs there and commits what it fetched
+ * back to the repo, which is the only way the extractors can be built and tested
+ * against the markup the sites actually serve.
+ *
+ * Run via .github/workflows/capturar-fixtures.yml, not locally.
+ */
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
+import { FONTES, obterFonte } from "../packages/ingest/src/sources/registo.ts";
+import { USER_AGENT } from "../packages/ingest/src/http/tipos.ts";
+
+const ATRASO_MS = 2000;
+const MAX_DETALHES = 10;
+const LIMITE_PDF_BYTES = 2 * 1024 * 1024;
+const LIMITE_TOTAL_BYTES = 20 * 1024 * 1024;
+
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function nomeSeguro(url, extensao) {
+  const hash = createHash("sha256").update(url).digest("hex").slice(0, 10);
+  const base =
+    (new URL(url).pathname.split("/").pop() ?? "pagina")
+      .replace(/\.[^.]*$/, "")
+      .replace(/[^a-zA-Z0-9-]/g, "-")
+      .slice(0, 48) || "pagina";
+  return `${base}-${hash}${extensao}`;
+}
+
+async function buscar(url) {
+  const resposta = await fetch(url, {
+    headers: {
+      "user-agent": USER_AGENT,
+      accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+      "accept-language": "pt-PT,pt;q=0.9",
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(60_000),
+  });
+  const bytes = new Uint8Array(await resposta.arrayBuffer());
+  return {
+    url: resposta.url || url,
+    status: resposta.status,
+    contentType: resposta.headers.get("content-type"),
+    etag: resposta.headers.get("etag"),
+    lastModified: resposta.headers.get("last-modified"),
+    bytes,
+  };
+}
+
+/** Respect robots.txt. These are public services, not a scraping target. */
+async function permitido(urlBase, caminho) {
+  try {
+    const r = await fetch(new URL("/robots.txt", urlBase), {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!r.ok) return true;
+    const texto = await r.text();
+
+    let emGeral = false;
+    const proibidos = [];
+    for (const linha of texto.split("\n")) {
+      const l = linha.trim().toLowerCase();
+      if (l.startsWith("user-agent:")) emGeral = l.slice(11).trim() === "*";
+      else if (emGeral && l.startsWith("disallow:")) {
+        const p = l.slice(9).trim();
+        if (p.length > 0) proibidos.push(p);
+      }
+    }
+    return !proibidos.some((p) => caminho.startsWith(p));
+  } catch {
+    return true;
+  }
+}
+
+async function capturarFonte(fonte, dirRaiz) {
+  const dir = join(dirRaiz, fonte.id, "fixtures");
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+
+  const entradas = [];
+  const resumo = [];
+  let bytesTotais = 0;
+
+  for (const url of fonte.urlsEntrada) {
+    if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
+      resumo.push(`- ${url} — IGNORADO por robots.txt`);
+      continue;
+    }
+
+    await dormir(ATRASO_MS);
+    const r = await buscar(url);
+    const html = new TextDecoder("utf-8").decode(r.bytes);
+
+    // Strip the viewstate before writing. On these ASP.NET sites it is routinely
+    // the largest thing on the page — often 100 KB+ of rotating base64 — and
+    // removing it is what makes committing real fixtures viable at all.
+    const limpo = normalizarConteudo(html);
+    const ficheiro = nomeSeguro(r.url, ".html");
+    await writeFile(join(dir, ficheiro), limpo, "utf8");
+    bytesTotais += limpo.length;
+
+    entradas.push({
+      url: r.url,
+      ficheiro,
+      status: r.status,
+      contentType: r.contentType,
+      etag: r.etag,
+      lastModified: r.lastModified,
+      capturadoEm: new Date().toISOString(),
+    });
+
+    resumo.push(
+      `- ${r.url}\n  status ${r.status}, ${limpo.length} bytes após limpeza ` +
+        `(${html.length} em bruto), etag ${r.etag ?? "—"}\n` +
+        `  \`${limpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
+    );
+
+    if (r.status !== 200) continue;
+
+    // Follow the notices this listing links to, so there is a detail document
+    // (and ideally a real PDF) to build the extraction against.
+    const candidatos = fonte
+      .extrair(html, { urlBase: fonte.urlBase, agora: new Date() })
+      .slice(0, MAX_DETALHES);
+
+    resumo.push(`  → ${candidatos.length} candidato(s) encontrado(s) pelo extractor actual`);
+
+    for (const c of candidatos) {
+      if (bytesTotais > LIMITE_TOTAL_BYTES) {
+        resumo.push("  → limite total atingido, restantes ignorados");
+        break;
+      }
+      if (!(await permitido(fonte.urlBase, new URL(c.urlDetalhe).pathname))) continue;
+
+      await dormir(ATRASO_MS);
+      try {
+        const d = await buscar(c.urlDetalhe);
+        const ehPdf =
+          /pdf/i.test(d.contentType ?? "") || /\.pdf$/i.test(new URL(d.url).pathname);
+
+        if (ehPdf) {
+          if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
+            // Too big to commit; it still reaches the artifact upload, and the
+            // manifest records where it came from.
+            resumo.push(`  - ${d.url} — PDF de ${d.bytes.byteLength} bytes, não commitado`);
+            continue;
+          }
+          const ficheiroPdf = nomeSeguro(d.url, ".pdf");
+          await writeFile(join(dir, ficheiroPdf), d.bytes);
+          bytesTotais += d.bytes.byteLength;
+          entradas.push({
+            url: d.url,
+            ficheiro: ficheiroPdf,
+            status: d.status,
+            contentType: d.contentType,
+            etag: d.etag,
+            lastModified: d.lastModified,
+            capturadoEm: new Date().toISOString(),
+          });
+          resumo.push(`  - ${d.url} — PDF, ${d.bytes.byteLength} bytes`);
+        } else {
+          const limpoDetalhe = normalizarConteudo(new TextDecoder("utf-8").decode(d.bytes));
+          const ficheiroHtml = nomeSeguro(d.url, ".html");
+          await writeFile(join(dir, ficheiroHtml), limpoDetalhe, "utf8");
+          bytesTotais += limpoDetalhe.length;
+          entradas.push({
+            url: d.url,
+            ficheiro: ficheiroHtml,
+            status: d.status,
+            contentType: d.contentType,
+            etag: d.etag,
+            lastModified: d.lastModified,
+            capturadoEm: new Date().toISOString(),
+          });
+          resumo.push(`  - ${d.url} — HTML, ${limpoDetalhe.length} bytes`);
+        }
+      } catch (erro) {
+        resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
+      }
+    }
+  }
+
+  await writeFile(
+    join(dir, "manifest.json"),
+    JSON.stringify(
+      { sourceId: fonte.id, capturadoEm: new Date().toISOString(), entradas },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  return { entradas, resumo, bytesTotais };
+}
+
+async function main() {
+  const pedidas = (process.env.FONTES ?? "").trim();
+  const fontes =
+    pedidas.length > 0
+      ? pedidas.split(",").map((id) => obterFonte(id.trim())).filter(Boolean)
+      : [...FONTES];
+
+  const dirRaiz = "packages/ingest/src/sources";
+  const linhas = ["# Captura de fixtures", "", `Executado em ${new Date().toISOString()}`, ""];
+  let total = 0;
+
+  for (const fonte of fontes) {
+    linhas.push(`## ${fonte.nome} (\`${fonte.id}\`)`, "");
+    try {
+      const r = await capturarFonte(fonte, dirRaiz);
+      linhas.push(...r.resumo, "", `**${r.entradas.length} ficheiro(s), ${r.bytesTotais} bytes.**`, "");
+      total += r.bytesTotais;
+    } catch (erro) {
+      linhas.push(`**FALHOU:** ${erro.message}`, "");
+    }
+  }
+
+  linhas.push(
+    "---",
+    "",
+    "O `__VIEWSTATE` e outros campos voláteis foram removidos antes de escrever.",
+    "Se um sítio devolveu uma página de erro em vez do conteúdo esperado, isso é",
+    "visível na pré-visualização de texto acima.",
+  );
+
+  await writeFile("RESUMO-FIXTURES.md", linhas.join("\n"), "utf8");
+  console.log(linhas.join("\n"));
+
+  if (total > LIMITE_TOTAL_BYTES) {
+    console.error(`\nTotal ${total} bytes excede o limite de ${LIMITE_TOTAL_BYTES}.`);
+    process.exit(1);
+  }
+}
+
+main().catch((erro) => {
+  console.error(erro);
+  process.exit(1);
+});

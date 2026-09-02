@@ -1,0 +1,30 @@
+{
+  "name": "apoios",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Alertas de apoios ambientais para proprietários de casa em Portugal",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "ingerir": "node --experimental-strip-types packages/ingest/src/cli.ts"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
+    "@types/node": "^22.10.2",
+    "node-html-parser": "^9.0.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "zod": "^4.4.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

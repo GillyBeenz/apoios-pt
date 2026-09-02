@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+coverage/
+.next/
+.vercel/
+
+# Captured fixtures larger than the commit threshold are uploaded as workflow
+# artifacts instead; see .github/workflows/capturar-fixtures.yml
+*.grande.pdf
+
+# Next.js
+.next/
+next-env.d.ts

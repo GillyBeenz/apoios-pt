@@ -1,0 +1,13 @@
+{
+  "name": "@apoios/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./teste": "./src/teste/construtores.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --build"
+  }
+}

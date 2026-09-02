@@ -1,0 +1,82 @@
+name: Ingerir apoios
+
+# Ingestion only. No personal data reaches this runner, and that is a deliberate
+# structural boundary rather than a convention: this repository is public, so its
+# Actions logs are public too. Alert matching reads subscriber emails and their
+# home-improvement interests, so it runs inside Supabase on pg_cron where the logs
+# are private. The credential below is a restricted Postgres role with no grants on
+# profiles, subscriptions, alerts_sent or auth.* — a stray query against a user
+# table fails loudly here instead of quietly publishing personal data.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 05:30 UTC. Deliberately not on the hour: GitHub delays top-of-hour
+    # scheduled runs most.
+    - cron: "30 5 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ingerir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODE: live
+      DATABASE_URL: ${{ secrets.APOIOS_INGEST_DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Executar pipeline
+        run: pnpm ingerir
+
+      # A failing job is the operator's first alarm: GitHub emails the repository
+      # owner on workflow failure at no cost. The independent watchdog that catches
+      # this job *not running at all* lives in Supabase, on separate infrastructure,
+      # because a check inside the job cannot detect the job never firing.
+      - name: Abrir issue se a ingestão falhou
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const titulo = "Ingestão de apoios falhou";
+            const { data: existentes } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ingestao",
+            });
+            const jaAberta = existentes.find((i) => i.title === titulo);
+            const corpo = `A execução [${context.runId}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) falhou.`;
+            if (jaAberta) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: jaAberta.number,
+                body: corpo,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: titulo,
+                body: corpo,
+                labels: ["ingestao"],
+              });
+            }

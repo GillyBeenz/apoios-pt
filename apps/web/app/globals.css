@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fundo: oklch(99% 0.004 106);
+  --color-tinta: oklch(24% 0.012 260);
+  --color-suave: oklch(52% 0.014 260);
+  --color-linha: oklch(91% 0.006 260);
+  --color-marca: oklch(48% 0.13 155);
+  --color-marca-suave: oklch(96% 0.03 155);
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-fundo);
+  color: var(--color-tinta);
+}

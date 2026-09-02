@@ -1,0 +1,74 @@
+name: Capturar fixtures
+
+# The development sandbox cannot reach any Portuguese government domain — the
+# egress proxy blocks them all. GitHub Actions runners can, so this job fetches
+# the real pages and opens a PR with them. Until it has run at least once, the
+# extractors are written against guessed markup and cannot be verified.
+
+on:
+  workflow_dispatch:
+    inputs:
+      fontes:
+        description: "IDs de fontes separados por vírgula (vazio = todas)"
+        required: false
+        default: ""
+  schedule:
+    # Weekly, at :30 rather than :00 — GitHub delays top-of-hour runs the most.
+    # This also counts as repository activity, which keeps GitHub from disabling
+    # scheduled workflows after 60 days of inactivity and silently stopping ingestion.
+    - cron: "30 4 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Capturar
+        env:
+          FONTES: ${{ inputs.fontes }}
+        run: node --experimental-strip-types scripts/capturar-fixtures.mjs
+
+      # Uploaded unconditionally, so a failure in the PR step below still leaves
+      # the captured data somewhere retrievable.
+      - name: Carregar como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtures-${{ github.run_id }}
+          path: |
+            packages/ingest/src/sources/**/fixtures/**
+            RESUMO-FIXTURES.md
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Abrir PR com as fixtures
+        uses: peter-evans/create-pull-request@v7
+        with:
+          # A PR rather than a direct push, so captured markup gets a review
+          # pass before it becomes the baseline the extractors are tuned against.
+          branch: fixtures/captura-${{ github.run_id }}
+          base: main
+          title: "Fixtures capturadas das fontes reais"
+          body-path: RESUMO-FIXTURES.md
+          commit-message: "Capturar fixtures reais das fontes de apoios"
+          add-paths: |
+            packages/ingest/src/sources/**/fixtures/**
+          delete-branch: true
