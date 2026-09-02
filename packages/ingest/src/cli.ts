@@ -6,7 +6,7 @@ import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria } from "./pipeline/armazem.ts";
 import { executarFonte } from "./pipeline/executar.ts";
 import { avaliarSaude } from "./pipeline/saude.ts";
-import { FONTES, obterFonte } from "./sources/registo.ts";
+import { FONTES, FONTES_ACTIVAS, obterFonte } from "./sources/registo.ts";
 
 const AJUDA = `
 apoios ingerir — executa o pipeline de recolha
@@ -17,7 +17,8 @@ apoios ingerir — executa o pipeline de recolha
   --dry-run         Não escreve nada nem chama o modelo
   --list            Lista as fontes conhecidas
 
-Fontes: ${FONTES.map((f) => f.id).join(", ")}
+Fontes activas: ${FONTES_ACTIVAS.map((f) => f.id).join(", ")}
+Em captura (ignoradas sem --source): ${FONTES.filter((f) => f.estado !== "activa").map((f) => f.id).join(", ")}
 `.trim();
 
 async function main(): Promise<number> {
@@ -38,17 +39,32 @@ async function main(): Promise<number> {
   }
 
   if (values.list) {
-    for (const f of FONTES) console.log(`${f.id}\t${f.nome}\t${f.urlsEntrada.length} URL(s)`);
+    for (const f of FONTES) {
+      console.log(`${f.id}\t${f.estado}\t${f.nome}\t${f.urlsEntrada.length} URL(s)`);
+    }
     return 0;
   }
 
+  // Naming a source explicitly runs it even when unverified — that is how one is
+  // developed against fresh fixtures. Running everything runs only the verified
+  // ones, so a stub extractor's empty result can never be mistaken for a live
+  // source whose selectors have broken.
   const fontes = values.source
     ? [obterFonte(values.source)].filter((f) => f !== undefined)
-    : [...FONTES];
+    : [...FONTES_ACTIVAS];
 
   if (fontes.length === 0) {
     console.error(`Fonte desconhecida: ${values.source}`);
     return 2;
+  }
+
+  for (const f of fontes) {
+    if (f.estado !== "activa") {
+      console.warn(
+        `aviso: ${f.id} está em captura — o extractor ainda não foi verificado ` +
+          `contra o markup real, por isso zero candidatos não significa nada.`,
+      );
+    }
   }
 
   const simulacao = values["dry-run"] === true;

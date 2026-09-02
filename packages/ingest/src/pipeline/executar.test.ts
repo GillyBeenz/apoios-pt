@@ -20,6 +20,7 @@ const fonte: Fonte = {
   urlsEntrada: [URL_LISTAGEM],
   tipo: "listagem",
   cadenciaHoras: 24,
+  estado: "activa",
   candidatosMin: 1,
   extrair,
 };

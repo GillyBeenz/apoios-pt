@@ -15,6 +15,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
+import { classificar } from "../packages/ingest/src/http/classificar.ts";
 import { FONTES, obterFonte } from "../packages/ingest/src/sources/registo.ts";
 import { USER_AGENT } from "../packages/ingest/src/http/tipos.ts";
 
@@ -99,15 +100,37 @@ async function capturarFonte(fonte, dirRaiz) {
 
     await dormir(ATRASO_MS);
     const r = await buscar(url);
-    const html = new TextDecoder("utf-8").decode(r.bytes);
+    const tipo = classificar(r.url, r.contentType);
 
-    // Strip the viewstate before writing. On these ASP.NET sites it is routinely
-    // the largest thing on the page — often 100 KB+ of rotating base64 — and
-    // removing it is what makes committing real fixtures viable at all.
-    const limpo = normalizarConteudo(html);
-    const ficheiro = nomeSeguro(r.url, ".html");
-    await writeFile(join(dir, ficheiro), limpo, "utf8");
-    bytesTotais += limpo.length;
+    let ficheiro;
+    let html = null;
+    if (tipo.binario) {
+      if (r.bytes.byteLength > LIMITE_PDF_BYTES) {
+        resumo.push(`- ${r.url} — ${r.bytes.byteLength} bytes, grande demais para commitar`);
+        continue;
+      }
+      ficheiro = nomeSeguro(r.url, tipo.extensao);
+      await writeFile(join(dir, ficheiro), r.bytes);
+      bytesTotais += r.bytes.byteLength;
+      resumo.push(
+        `- ${r.url}\n  status ${r.status}, ${r.bytes.byteLength} bytes ` +
+          `(${tipo.extensao}), etag ${r.etag ?? "—"}`,
+      );
+    } else {
+      const bruto = new TextDecoder("utf-8").decode(r.bytes);
+      // Strip the viewstate before writing. On these ASP.NET sites it is routinely
+      // the largest thing on the page — often 100 KB+ of rotating base64 — and
+      // removing it is what makes committing real fixtures viable at all.
+      html = tipo.normalizar ? normalizarConteudo(bruto) : bruto;
+      ficheiro = nomeSeguro(r.url, tipo.extensao);
+      await writeFile(join(dir, ficheiro), html, "utf8");
+      bytesTotais += html.length;
+      resumo.push(
+        `- ${r.url}\n  status ${r.status}, ${html.length} bytes após limpeza ` +
+          `(${bruto.length} em bruto), etag ${r.etag ?? "—"}\n` +
+          `  \`${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
+      );
+    }
 
     entradas.push({
       url: r.url,
@@ -119,13 +142,7 @@ async function capturarFonte(fonte, dirRaiz) {
       capturadoEm: new Date().toISOString(),
     });
 
-    resumo.push(
-      `- ${r.url}\n  status ${r.status}, ${limpo.length} bytes após limpeza ` +
-        `(${html.length} em bruto), etag ${r.etag ?? "—"}\n` +
-        `  \`${limpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
-    );
-
-    if (r.status !== 200) continue;
+    if (r.status !== 200 || html === null) continue;
 
     // Follow the notices this listing links to, so there is a detail document
     // (and ideally a real PDF) to build the extraction against.
@@ -145,45 +162,40 @@ async function capturarFonte(fonte, dirRaiz) {
       await dormir(ATRASO_MS);
       try {
         const d = await buscar(c.urlDetalhe);
-        const ehPdf =
-          /pdf/i.test(d.contentType ?? "") || /\.pdf$/i.test(new URL(d.url).pathname);
+        const tipoD = classificar(d.url, d.contentType);
+        let ficheiroD;
 
-        if (ehPdf) {
+        if (tipoD.binario) {
           if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
             // Too big to commit; it still reaches the artifact upload, and the
             // manifest records where it came from.
-            resumo.push(`  - ${d.url} — PDF de ${d.bytes.byteLength} bytes, não commitado`);
+            resumo.push(
+              `  - ${d.url} — ${tipoD.extensao} de ${d.bytes.byteLength} bytes, não commitado`,
+            );
             continue;
           }
-          const ficheiroPdf = nomeSeguro(d.url, ".pdf");
-          await writeFile(join(dir, ficheiroPdf), d.bytes);
+          ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+          await writeFile(join(dir, ficheiroD), d.bytes);
           bytesTotais += d.bytes.byteLength;
-          entradas.push({
-            url: d.url,
-            ficheiro: ficheiroPdf,
-            status: d.status,
-            contentType: d.contentType,
-            etag: d.etag,
-            lastModified: d.lastModified,
-            capturadoEm: new Date().toISOString(),
-          });
-          resumo.push(`  - ${d.url} — PDF, ${d.bytes.byteLength} bytes`);
+          resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${d.bytes.byteLength} bytes`);
         } else {
-          const limpoDetalhe = normalizarConteudo(new TextDecoder("utf-8").decode(d.bytes));
-          const ficheiroHtml = nomeSeguro(d.url, ".html");
-          await writeFile(join(dir, ficheiroHtml), limpoDetalhe, "utf8");
+          const brutoD = new TextDecoder("utf-8").decode(d.bytes);
+          const limpoDetalhe = tipoD.normalizar ? normalizarConteudo(brutoD) : brutoD;
+          ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+          await writeFile(join(dir, ficheiroD), limpoDetalhe, "utf8");
           bytesTotais += limpoDetalhe.length;
-          entradas.push({
-            url: d.url,
-            ficheiro: ficheiroHtml,
-            status: d.status,
-            contentType: d.contentType,
-            etag: d.etag,
-            lastModified: d.lastModified,
-            capturadoEm: new Date().toISOString(),
-          });
-          resumo.push(`  - ${d.url} — HTML, ${limpoDetalhe.length} bytes`);
+          resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${limpoDetalhe.length} bytes`);
         }
+
+        entradas.push({
+          url: d.url,
+          ficheiro: ficheiroD,
+          status: d.status,
+          contentType: d.contentType,
+          etag: d.etag,
+          lastModified: d.lastModified,
+          capturadoEm: new Date().toISOString(),
+        });
       } catch (erro) {
         resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
       }
@@ -205,6 +217,8 @@ async function capturarFonte(fonte, dirRaiz) {
 
 async function main() {
   const pedidas = (process.env.FONTES ?? "").trim();
+  // Deliberately FONTES, not FONTES_ACTIVAS: the sources that most need capturing
+  // are precisely the ones the pipeline is still skipping.
   const fontes =
     pedidas.length > 0
       ? pedidas.split(",").map((id) => obterFonte(id.trim())).filter(Boolean)
@@ -215,7 +229,7 @@ async function main() {
   let total = 0;
 
   for (const fonte of fontes) {
-    linhas.push(`## ${fonte.nome} (\`${fonte.id}\`)`, "");
+    linhas.push(`## ${fonte.nome} (\`${fonte.id}\`, ${fonte.estado})`, "");
     try {
       const r = await capturarFonte(fonte, dirRaiz);
       linhas.push(...r.resumo, "", `**${r.entradas.length} ficheiro(s), ${r.bytesTotais} bytes.**`, "");

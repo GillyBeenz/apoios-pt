@@ -14,6 +14,8 @@ export const fundoAmbientalAac: Fonte = {
   ],
   tipo: "listagem",
   cadenciaHoras: 24,
+  // Verified against markup captured from the live site.
+  estado: "activa",
   // The captured page yields 47 notices. A floor of 20 catches a total break and a
   // better-than-half collapse without tripping when a few notices are retired.
   // Placeholder 1 would have caught neither.

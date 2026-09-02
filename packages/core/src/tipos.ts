@@ -29,7 +29,13 @@ export interface Candidato {
   readonly urlCanonica: string;
   readonly referenciaLegalBruta: string | null;
   readonly dataBruta: string | null;
-  readonly tipoDocumento: "html" | "pdf" | "desconhecido";
+  /**
+   * `folha` is a spreadsheet (the annual notice plans). It is called out separately
+   * because it must never reach the model: it is already structured, so a
+   * deterministic parser reads it for free, and feeding a 400-row sheet to Claude
+   * would be both expensive and less accurate than the columns it already has.
+   */
+  readonly tipoDocumento: "html" | "pdf" | "folha" | "desconhecido";
 }
 
 /** Per-measure support terms, which vary widely within a single notice. */
