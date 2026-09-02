@@ -59,7 +59,14 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      # Opening the PR needs "Allow GitHub Actions to create and approve pull
+      # requests" (Settings → Actions → General). Without it this step fails while
+      # the branch push above still succeeds — so the capture is fine and only the
+      # PR is missing. Failing the whole job for that would leave a weekly red X on
+      # a run that actually did its work, so the outcome is reported instead.
       - name: Abrir PR com as fixtures
+        id: pr
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v7
         with:
           # A PR rather than a direct push, so captured markup gets a review
@@ -72,3 +79,20 @@ jobs:
           add-paths: |
             packages/ingest/src/sources/**/fixtures/**
           delete-branch: true
+
+      - name: Resultado
+        run: |
+          RAMO="fixtures/captura-${{ github.run_id }}"
+          if [ "${{ steps.pr.outcome }}" = "success" ]; then
+            echo "::notice::Fixtures capturadas e PR aberto."
+          else
+            echo "::warning::Fixtures capturadas e ramo publicado, mas não foi possível abrir o PR."
+            echo ""
+            echo "O ramo $RAMO foi enviado com sucesso — as fixtures estão lá."
+            echo "Abrir o PR manualmente:"
+            echo "  https://github.com/${{ github.repository }}/compare/main...$RAMO"
+            echo ""
+            echo "Para que o workflow passe a abrir o PR sozinho, ligar em"
+            echo "Settings -> Actions -> General -> Workflow permissions:"
+            echo "  \"Allow GitHub Actions to create and approve pull requests\""
+          fi

@@ -3,128 +3,107 @@ import { canonicalizarUrl, normalizarEspacos, type Candidato } from "@apoios/cor
 import type { ContextoExtraccao } from "../tipos.ts";
 
 /**
- * Words that mark a link as an actual funding notice rather than site furniture.
- * Accent-free because they are matched against the diacritic-stripped form.
+ * Notices are identified by the SHAPE OF THEIR URL, not by any CSS container.
+ *
+ * This was rewritten after seeing the real site for the first time. fundoambiental.pt
+ * has no listing page in the usual sense: every page carries the same ~550-link
+ * navigation tree, and the notices are entries within it. An earlier version looked
+ * for article/li containers and keyword-matched link text, which on the real markup
+ * happily followed a video gallery, the forms page and the 2017 archive.
+ *
+ * The path shape, by contrast, is unambiguous and stable:
+ *
+ *   apoios-2026/transicao-energetica1/032026-reforco-da-resiliencia-....aspx
+ *   apoios-prr/c13-eficiencia-energetica-em-edificios/09c13-i012025.aspx
+ *
+ * i.e. `apoios-<year>|apoios-prr` / <section> / <notice>.aspx — exactly three
+ * segments. On the captured page this takes 546 anchors down to 47 notices.
  */
-const PADRAO_AVISO =
-  /\b(aviso|avisos|aac|concurso|candidatura|candidaturas|edital|apoio|despacho)\b/i;
+const RE_CAMINHO_AVISO = /^apoios-(?:\d{4}|prr)\/[^/]+\/[^/]+\.aspx$/i;
 
 /**
- * A document kind followed, within a short span, by a reference number.
- *
- * The span is matched with an explicit "not a newline" class rather than a negated
- * letter class: under the `i` flag, `[^\dA-Z]` also excludes `a-z`, which would
- * reject the "n.º" that sits between the words and the number in virtually every
- * Portuguese notice title. `canonicalizarReferenciaLegal` reduces whatever span
- * matches here to its canonical form, so over-capturing is harmless.
+ * Sections that sit at the notice path depth but are documentation, not notices.
+ * Kept deliberately short: the path rule already does the heavy lifting.
  */
+const SECCOES_IGNORADAS = /^(documentos|documentacao|formularios|faq|legislacao)/i;
+
 const PADRAO_REFERENCIA =
-  /\b(?:aviso|aac|concurso|despacho|edital|portaria)\b[^\n]{0,40}?\b\d[\dA-Za-z]*(?:[/-][\dA-Za-z.]+)+/i;
+  /\b\d{1,2}\s*\/\s*[\dA-Za-z][\dA-Za-z.\-]*(?:\s*\/\s*\d{4})?/;
 
 const PADRAO_DATA =
   /\b\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}\b|\b\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}\b/i;
+
+/**
+ * The site serves its error page with HTTP 200.
+ *
+ * A request for a page that does not exist lands on
+ * `/wwwbase/raiz/Erro.aspx?aspxerrorpath=/avisos-2026.aspx` — status 200, 433 bytes,
+ * "Ocorreu um erro". Status-code checks therefore cannot detect a dead entry URL,
+ * and the content hash of that page is perfectly stable, so the change gate would
+ * treat it as a healthy unchanged source for ever. This is how a source silently
+ * dies while every run reports success.
+ */
+export function ehPaginaDeErro(html: string, urlFinal: string): boolean {
+  if (/aspxerrorpath=|\/Erro\.aspx/i.test(urlFinal)) return true;
+  return /<title>\s*Ocorreu um erro\s*<\/title>/i.test(html);
+}
 
 function textoLimpo(el: HTMLElement): string {
   return normalizarEspacos(el.text ?? "");
 }
 
-function resolverUrl(href: string, urlBase: string): string | null {
+function caminhoRelativo(href: string, urlBase: string): string | null {
   try {
-    return new URL(href, urlBase).toString();
+    const u = new URL(href, urlBase);
+    if (u.hostname.replace(/^www\./, "") !== new URL(urlBase).hostname.replace(/^www\./, "")) {
+      return null;
+    }
+    return u.pathname.replace(/^\//, "");
   } catch {
     return null;
   }
 }
 
-function tipoDocumento(url: string): Candidato["tipoDocumento"] {
-  const semQuery = url.split("?")[0] ?? url;
-  if (/\.pdf$/i.test(semQuery)) return "pdf";
-  if (/\.(aspx|html?|php)$/i.test(semQuery)) return "html";
-  return "desconhecido";
-}
-
-/**
- * Extract candidate notices from a Fundo Ambiental listing page.
- *
- * NOTE ON CORRECTNESS: this environment cannot reach fundoambiental.pt — the egress
- * proxy blocks every Portuguese government domain — so the selectors here have not
- * yet been checked against the site's real markup. They are therefore written
- * defensively, in layers: try the structured containers a CMS listing usually
- * produces, and fall back to scanning anchors whose text looks like a notice. Once
- * `capturar-fixtures.yml` commits real HTML, `extract.test.ts` gains a fixture case
- * and these selectors get tightened against it. The health floor (`candidatosMin`)
- * is what stops a wrong guess here from failing silently in production.
- */
 export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
+  // A dead entry URL must yield nothing rather than a plausible-looking zero, so the
+  // health floor fires instead of the source appearing quietly healthy.
+  if (ehPaginaDeErro(html, ctx.urlBase)) return [];
+
   const raiz = parse(html);
   const vistos = new Set<string>();
   const candidatos: Candidato[] = [];
 
-  const adicionar = (ancora: HTMLElement, contexto: HTMLElement): void => {
+  for (const ancora of raiz.querySelectorAll("a[href]")) {
     const href = ancora.getAttribute("href");
-    if (!href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href)) return;
+    if (!href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href)) continue;
 
-    const url = resolverUrl(href, ctx.urlBase);
-    if (!url) return;
+    const caminho = caminhoRelativo(href, ctx.urlBase);
+    if (caminho === null || !RE_CAMINHO_AVISO.test(caminho)) continue;
 
-    // Stay on the source's own domain; listings link out to unrelated portals.
-    try {
-      if (new URL(url).hostname.replace(/^www\./, "") !== new URL(ctx.urlBase).hostname.replace(/^www\./, "")) {
-        return;
-      }
-    } catch {
-      return;
-    }
+    const seccao = caminho.split("/")[1] ?? "";
+    if (SECCOES_IGNORADAS.test(seccao)) continue;
 
-    const titulo = textoLimpo(ancora) || textoLimpo(contexto);
-    if (titulo.length < 12) return;
-
+    const url = new URL(href, ctx.urlBase).toString();
     const chave = canonicalizarUrl(url);
-    if (vistos.has(chave)) return;
+    if (vistos.has(chave)) continue;
 
+    // The link text is the notice title and usually carries its reference, e.g.
+    // "09/C08-i01.01/2026 - Criação de Novas OIGP 2.0".
+    const titulo = textoLimpo(ancora);
+    if (titulo.length < 8) continue;
+
+    const contexto = ancora.parentNode ?? ancora;
     const textoContexto = textoLimpo(contexto);
-    if (!PADRAO_AVISO.test(titulo) && !PADRAO_AVISO.test(textoContexto)) return;
 
     vistos.add(chave);
     candidatos.push({
       titulo,
       urlDetalhe: url,
       urlCanonica: chave,
-      referenciaLegalBruta:
-        titulo.match(PADRAO_REFERENCIA)?.[0] ?? textoContexto.match(PADRAO_REFERENCIA)?.[0] ?? null,
+      referenciaLegalBruta: titulo.match(PADRAO_REFERENCIA)?.[0] ?? null,
       dataBruta: textoContexto.match(PADRAO_DATA)?.[0] ?? null,
-      tipoDocumento: tipoDocumento(url),
+      tipoDocumento: /\.pdf($|\?)/i.test(url) ? "pdf" : "html",
     });
-  };
-
-  // Layer 1: structured listing containers, which give us a per-item context block
-  // (title plus dates) rather than a bare link.
-  const contentores = raiz.querySelectorAll(
-    [
-      "article",
-      "li.aviso",
-      "div.aviso",
-      "div.listagem-item",
-      "div.item-listagem",
-      "div.news-item",
-      "div.noticia",
-      "tr",
-    ].join(","),
-  );
-
-  for (const contentor of contentores) {
-    for (const ancora of contentor.querySelectorAll("a[href]")) {
-      adicionar(ancora, contentor);
-    }
-  }
-
-  // Layer 2: if the structured pass found nothing, the page uses markup we did not
-  // anticipate. Fall back to every anchor that reads like a notice, using its
-  // nearest block ancestor as context.
-  if (candidatos.length === 0) {
-    for (const ancora of raiz.querySelectorAll("a[href]")) {
-      adicionar(ancora, ancora.parentNode ?? ancora);
-    }
   }
 
   return candidatos;

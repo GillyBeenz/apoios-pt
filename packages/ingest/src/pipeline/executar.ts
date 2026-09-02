@@ -86,6 +86,18 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
       continue;
     }
 
+    // A 200 that is really an error page must not be mistaken for healthy content.
+    // Caught here rather than in the extractor so it registers as a run error and
+    // trips the health rules, instead of looking like a quiet week.
+    if (
+      !resposta.naoModificado &&
+      resposta.corpo !== null &&
+      fonte.ehPaginaDeErro?.(resposta.corpo, resposta.url) === true
+    ) {
+      erro = `pagina de erro servida com HTTP ${resposta.status}: ${resposta.url}`;
+      continue;
+    }
+
     // Hash the *normalised* body: __VIEWSTATE alone would otherwise make every
     // fetch of an unchanged page look like a change.
     const corpo = resposta.naoModificado ? null : resposta.corpo;

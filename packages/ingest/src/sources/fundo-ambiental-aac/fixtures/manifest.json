@@ -1,0 +1,114 @@
+{
+  "sourceId": "fundo-ambiental-aac",
+  "capturadoEm": "2026-09-02T20:41:55.218Z",
+  "entradas": [
+    {
+      "url": "https://www.fundoambiental.pt/wwwbase/raiz/Erro.aspx?aspxerrorpath=/avisos-2026.aspx",
+      "ficheiro": "Erro-ea970ce00b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:12.796Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr.aspx",
+      "ficheiro": "apoios-prr-bd213819af.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:17.614Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/09c13-i012025.aspx",
+      "ficheiro": "09c13-i012025-89804fba8c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:21.394Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/c13-i01-02-03-apoio-a-concretizacao-de-comunidades-de-energia-renovavel-e-autoconsumo-coletivo2.aspx",
+      "ficheiro": "c13-i01-02-03-apoio-a-concretizacao-de-comunidad-3526039e62.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:25.811Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/04c13-i012023.aspx",
+      "ficheiro": "04c13-i012023-18d2121d7c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:29.474Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/01c13-i03-apoio-a-renovacao-e-aumento-do-desempenho-energetico-dos-edificios-de-servicos.aspx",
+      "ficheiro": "01c13-i03-apoio-a-renovacao-e-aumento-do-desempe-685906b25b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:32.893Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/c13-i01-02-03-apoio-a-concretizacao-de-comunidades-de-energia-renovavel-e-autoconsumo-coletivo.aspx",
+      "ficheiro": "c13-i01-02-03-apoio-a-concretizacao-de-comunidad-17be56254c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:36.453Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/avisos-anteriores/avisos-2017/apoio-a-mobilidade-eletrica-na-administracao-publica.aspx",
+      "ficheiro": "apoio-a-mobilidade-eletrica-na-administracao-pub-38f5cae7b1.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:40.588Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/avisos-anteriores/avisos-2017/apoio-as-entidades-gestoras-de-sistemas-municipais.aspx",
+      "ficheiro": "apoio-as-entidades-gestoras-de-sistemas-municipa-842fa59e23.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:44.455Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/candidaturas/formularios.aspx",
+      "ficheiro": "formularios-e87ede30e5.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:48.252Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/comunicacao/galerias/video-do-evento-ecomob-programa-de-apoio-a-mobilidade-eletrica-na-administracao-publica.aspx",
+      "ficheiro": "video-do-evento-ecomob-programa-de-apoio-a-mobil-9ec5b96f20.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:51.564Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr.aspx",
+      "ficheiro": "apoios-prr-bd213819af.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-02T20:41:55.217Z"
+    }
+  ]
+}
