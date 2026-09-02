@@ -23,6 +23,16 @@ export interface Fonte {
    */
   readonly candidatosMin: number;
   /**
+   * Detect a page the server returned with HTTP 200 that is actually an error.
+   *
+   * fundoambiental.pt does exactly this: a missing page lands on `Erro.aspx` with
+   * status 200 and stable content, so neither the status check nor the content-hash
+   * change gate would ever notice. Without this the source looks permanently healthy
+   * while producing nothing. Optional — sources that fail honestly can omit it.
+   */
+  ehPaginaDeErro?(html: string, urlFinal: string): boolean;
+
+  /**
    * Pure. No fetch, no fs, no Date.now — everything time-dependent arrives via
    * `ctx`. This is what makes every extractor unit-testable against a committed
    * fixture in an environment with no network at all.

@@ -9,8 +9,8 @@ import { extrair } from "../sources/fundo-ambiental-aac/extract.ts";
 
 const AGORA = new Date("2026-08-27T09:00:00Z");
 const BASE = "https://www.fundoambiental.pt";
-const URL_LISTAGEM = `${BASE}/avisos-2026.aspx`;
-const URL_DETALHE = `${BASE}/avisos/aviso-02-2026.aspx`;
+const URL_LISTAGEM = `${BASE}/apoios-2026.aspx`;
+const URL_DETALHE = `${BASE}/apoios-2026/transicao-energetica1/022026-solar.aspx`;
 
 const fonte: Fonte = {
   id: "fundo-ambiental-aac",
@@ -28,7 +28,7 @@ function listagem(viewstate = "AAAA"): string {
   return `<html><body>
     <input type="hidden" name="__VIEWSTATE" value="${viewstate.repeat(50)}" />
     <article>
-      <h3><a href="/avisos/aviso-02-2026.aspx">Aviso de Abertura de Concurso n.º 02/2026 — Solar</a></h3>
+      <h3><a href="/apoios-2026/transicao-energetica1/022026-solar.aspx">Aviso de Abertura de Concurso n.º 02/2026 — Solar</a></h3>
       <span>Candidaturas até 30/09/2026</span>
     </article>
   </body></html>`;
@@ -155,8 +155,8 @@ describe("executarFonte", () => {
     await executarFonte(contexto(dia1, armazem));
 
     // Same notice, same legal reference, republished at a new address.
-    const urlNovo = `${BASE}/avisos/2026/aviso-02-2026-republicado.aspx`;
-    const listagemNova = listagem().replace("/avisos/aviso-02-2026.aspx", urlNovo);
+    const urlNovo = `${BASE}/apoios-2026/transicao-energetica1/022026-solar-republicado.aspx`;
+    const listagemNova = listagem().replace("/apoios-2026/transicao-energetica1/022026-solar.aspx", urlNovo);
     const dia2 = new BuscadorMemoria()
       .definir(URL_LISTAGEM, { corpo: listagemNova })
       .definir(urlNovo, { corpo: detalhe() });
