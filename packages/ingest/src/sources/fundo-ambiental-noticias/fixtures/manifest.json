@@ -1,0 +1,60 @@
+{
+  "sourceId": "fundo-ambiental-noticias",
+  "capturadoEm": "2026-09-03T07:55:13.735Z",
+  "entradas": [
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias.aspx",
+      "ficheiro": "listagem-noticias-88db803a6c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:00.353Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/0.aspx",
+      "ficheiro": "0-f4f91276a1.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:03.036Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/aviso-de-abertura-de-concurso-n-032026-apoio-a-conversao-de-matos-em-novas-pastagens-abertura-do-periodo-de-candidaturas.aspx",
+      "ficheiro": "aviso-de-abertura-de-concurso-n-032026-apoio-a-c-50f6da4b01.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:05.703Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/candidaturas-a-medida-de-auxilio-a-custos-indiretos-do-cele-2026.aspx",
+      "ficheiro": "candidaturas-a-medida-de-auxilio-a-custos-indire-3163506dbc.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:08.382Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/fundo-azul-aviso-convite-n-01faz2026-campanhas-oceanograficas-de-suporte-ao-desenvolvimento-da-rede-nacional-de-areas-marinhas-protegidas--rececao-de-candidaturas.aspx",
+      "ficheiro": "fundo-azul-aviso-convite-n-01faz2026-campanhas-o-9f92f14f8c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:11.070Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/aviso-convite-n-09c08-i01012026-criacao-de-novas-oigp-20-para-as-areas-florestais-atingidas-pela-tempestade-kristin-primeira-republicacao.aspx",
+      "ficheiro": "aviso-convite-n-09c08-i01012026-criacao-de-novas-c82f67df7c.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:55:13.735Z"
+    }
+  ]
+}

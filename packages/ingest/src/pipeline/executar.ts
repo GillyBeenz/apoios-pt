@@ -162,6 +162,11 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
 
     if (resposta.erro !== null || resposta.naoModificado) continue;
 
+    // Spreadsheets are handled by their own deterministic parser, never here. Left
+    // to fall through, a .xlsx would be decoded as if it were text and sent to the
+    // model as mojibake — a paid call whose output could only be nonsense.
+    if (candidato.tipoDocumento === "folha") continue;
+
     const ehPdf = candidato.tipoDocumento === "pdf" || resposta.corpo === null;
     const hash = ehPdf
       ? resposta.bytes

@@ -11,10 +11,19 @@
  *
  * Run via .github/workflows/capturar-fixtures.yml, not locally.
  */
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, rm, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
+import { classificar } from "../packages/ingest/src/http/classificar.ts";
+import {
+  certificadoApresentado,
+  combinarComRaizes,
+  ehAutoAssinado,
+  ehCadeiaIncompleta,
+  normalizarParaPem,
+  urlsDoEmissor,
+} from "../packages/ingest/src/http/cadeia-tls.ts";
 import { FONTES, obterFonte } from "../packages/ingest/src/sources/registo.ts";
 import { USER_AGENT } from "../packages/ingest/src/http/tipos.ts";
 
@@ -24,6 +33,25 @@ const LIMITE_PDF_BYTES = 2 * 1024 * 1024;
 const LIMITE_TOTAL_BYTES = 20 * 1024 * 1024;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Node's fetch reports every network-layer problem as the same three words, "fetch
+ * failed", and puts the actual reason in `cause` — often nested. Reporting only the
+ * wrapper is what turned prr-candidaturas into a mystery: DNS failure, refused
+ * connection, and a rejected certificate are three very different problems with three
+ * different fixes, and they all print identically.
+ */
+function razaoCompleta(erro) {
+  const partes = [];
+  let actual = erro;
+  for (let i = 0; i < 5 && actual != null; i += 1) {
+    const codigo = actual.code ? ` (${actual.code})` : "";
+    const texto = `${actual.message ?? String(actual)}${codigo}`;
+    if (!partes.includes(texto)) partes.push(texto);
+    actual = actual.cause;
+  }
+  return partes.join(" ← ");
+}
 
 function nomeSeguro(url, extensao) {
   const hash = createHash("sha256").update(url).digest("hex").slice(0, 10);
@@ -35,7 +63,110 @@ function nomeSeguro(url, extensao) {
   return `${base}-${hash}${extensao}`;
 }
 
-async function buscar(url) {
+/**
+ * Intermediates recovered per host, so one repair serves every later request.
+ * `null` records a host we tried and could not repair — worth remembering, because
+ * re-chasing on every URL would triple the requests we make to a site that is
+ * already misconfigured.
+ */
+const intermediariosPorHost = new Map();
+
+/**
+ * What the chain actually looked like, per host, recorded so a failure can be
+ * diagnosed from the committed record instead of by guessing.
+ *
+ * Certificate metadata only — subject, issuer, and the AIA URLs. All of it is public,
+ * presented by the server to anyone who connects; no key material goes near this.
+ */
+const cadeiaObservadaPorHost = new Map();
+
+/**
+ * Fetch the intermediate certificate the server should have sent.
+ *
+ * See packages/ingest/src/http/cadeia-tls.ts for why this exists and why disabling
+ * verification instead would be the wrong trade.
+ */
+async function repararCadeia(host) {
+  if (intermediariosPorHost.has(host)) return intermediariosPorHost.get(host);
+
+  const { X509Certificate } = await import("node:crypto");
+  const pems = [];
+  const observada = [];
+  cadeiaObservadaPorHost.set(host, observada);
+
+  // Walk UP the chain, not just one step. Supplying a single intermediate turned
+  // `UNABLE_TO_VERIFY_LEAF_SIGNATURE` into `UNABLE_TO_GET_ISSUER_CERT`: the
+  // intermediate we fetched was itself missing its own issuer. Real chains are
+  // routinely two links deep, so keep climbing until a self-signed root, an
+  // exhausted AIA, or a sane depth limit.
+  let actual = await certificadoApresentado(host);
+  for (let profundidade = 0; actual != null && profundidade < 4; profundidade += 1) {
+    const emissores = urlsDoEmissor(actual.infoAccess);
+    observada.push({
+      nivel: profundidade,
+      subject: actual.subject?.replace(/\n/g, " | ") ?? null,
+      issuer: actual.issuer?.replace(/\n/g, " | ") ?? null,
+      autoAssinado: ehAutoAssinado(actual),
+      emissoresAnunciados: emissores,
+    });
+
+    if (ehAutoAssinado(actual)) break;
+
+    let seguinte = null;
+    for (const url of emissores) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+        if (!r.ok) continue;
+        const pem = normalizarParaPem(new Uint8Array(await r.arrayBuffer()));
+        pems.push(pem);
+        seguinte = new X509Certificate(pem);
+        break;
+      } catch {
+        // Try the next advertised issuer for this level.
+      }
+    }
+    if (seguinte === null) break;
+    actual = seguinte;
+  }
+
+  const resultado = pems.length > 0 ? pems : null;
+  intermediariosPorHost.set(host, resultado);
+  return resultado;
+}
+
+async function buscar(url, caExtra = undefined) {
+  if (caExtra !== undefined) {
+    // undici's OWN fetch, not the global one. Node embeds its own private copy of
+    // undici, and handing it a dispatcher built from the standalone package fails
+    // with `invalid onRequestStart method` — two implementations of the same
+    // interface that do not recognise each other's handlers.
+    const { Agent, fetch: fetchUndici } = await import("undici");
+    // Verification stays ON. The recovered intermediate is added to the trust set,
+    // so it still has to chain to a real root for this request to succeed.
+    // Roots FIRST, then what we recovered. `ca` replaces the default trust store, so
+    // omitting the roots here is what turned a one-link gap into a dead end.
+    const dispatcher = new Agent({ connect: { ca: await combinarComRaizes(caExtra) } });
+    const r = await fetchUndici(url, {
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+        "accept-language": "pt-PT,pt;q=0.9",
+      },
+      redirect: "follow",
+      dispatcher,
+      signal: AbortSignal.timeout(60_000),
+    });
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    return {
+      url: r.url || url,
+      status: r.status,
+      contentType: r.headers.get("content-type"),
+      etag: r.headers.get("etag"),
+      lastModified: r.headers.get("last-modified"),
+      bytes,
+    };
+  }
+
   const resposta = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
@@ -54,6 +185,22 @@ async function buscar(url) {
     lastModified: resposta.headers.get("last-modified"),
     bytes,
   };
+}
+
+/** `buscar`, retried once with a repaired chain when that is the actual problem. */
+async function buscarComReparo(url) {
+  try {
+    return await buscar(url);
+  } catch (erro) {
+    if (!ehCadeiaIncompleta(erro)) throw erro;
+    const host = new URL(url).hostname;
+    const pems = await repararCadeia(host);
+    if (pems === null) throw erro;
+    console.log(
+      `  (cadeia TLS de ${host} reparada com ${pems.length} certificado(s) em falta)`,
+    );
+    return await buscar(url, pems);
+  }
 }
 
 /** Respect robots.txt. These are public services, not a scraping target. */
@@ -83,128 +230,222 @@ async function permitido(urlBase, caminho) {
 }
 
 async function capturarFonte(fonte, dirRaiz) {
+  // Write into a fresh staging directory and swap it in only once the capture has
+  // actually produced something.
+  //
+  // The old code deleted `fixtures/` up front, so a capture that then failed left
+  // NOTHING behind — and with the workflow committing that directory, one bad
+  // afternoon at the far end would erase the very markup the extractors are tested
+  // against. Clearing first is right (a stale fixture must not pretend to be
+  // current); doing it before knowing the fetch works is not.
   const dir = join(dirRaiz, fonte.id, "fixtures");
-  await rm(dir, { recursive: true, force: true });
-  await mkdir(dir, { recursive: true });
+  const dirStaging = `${dir}.a-escrever`;
+  await rm(dirStaging, { recursive: true, force: true });
+  await mkdir(dirStaging, { recursive: true });
 
   const entradas = [];
   const resumo = [];
   let bytesTotais = 0;
+  let erroFatal = null;
 
-  for (const url of fonte.urlsEntrada) {
-    if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
-      resumo.push(`- ${url} — IGNORADO por robots.txt`);
-      continue;
-    }
-
-    await dormir(ATRASO_MS);
-    const r = await buscar(url);
-    const html = new TextDecoder("utf-8").decode(r.bytes);
-
-    // Strip the viewstate before writing. On these ASP.NET sites it is routinely
-    // the largest thing on the page — often 100 KB+ of rotating base64 — and
-    // removing it is what makes committing real fixtures viable at all.
-    const limpo = normalizarConteudo(html);
-    const ficheiro = nomeSeguro(r.url, ".html");
-    await writeFile(join(dir, ficheiro), limpo, "utf8");
-    bytesTotais += limpo.length;
-
-    entradas.push({
-      url: r.url,
-      ficheiro,
-      status: r.status,
-      contentType: r.contentType,
-      etag: r.etag,
-      lastModified: r.lastModified,
-      capturadoEm: new Date().toISOString(),
-    });
-
-    resumo.push(
-      `- ${r.url}\n  status ${r.status}, ${limpo.length} bytes após limpeza ` +
-        `(${html.length} em bruto), etag ${r.etag ?? "—"}\n` +
-        `  \`${limpo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
-    );
-
-    if (r.status !== 200) continue;
-
-    // Follow the notices this listing links to, so there is a detail document
-    // (and ideally a real PDF) to build the extraction against.
-    const candidatos = fonte
-      .extrair(html, { urlBase: fonte.urlBase, agora: new Date() })
-      .slice(0, MAX_DETALHES);
-
-    resumo.push(`  → ${candidatos.length} candidato(s) encontrado(s) pelo extractor actual`);
-
-    for (const c of candidatos) {
-      if (bytesTotais > LIMITE_TOTAL_BYTES) {
-        resumo.push("  → limite total atingido, restantes ignorados");
-        break;
+  try {
+    for (const url of fonte.urlsEntrada) {
+      if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
+        resumo.push(`- ${url} — IGNORADO por robots.txt`);
+        continue;
       }
-      if (!(await permitido(fonte.urlBase, new URL(c.urlDetalhe).pathname))) continue;
 
       await dormir(ATRASO_MS);
-      try {
-        const d = await buscar(c.urlDetalhe);
-        const ehPdf =
-          /pdf/i.test(d.contentType ?? "") || /\.pdf$/i.test(new URL(d.url).pathname);
+      const r = await buscarComReparo(url);
+      const tipo = classificar(r.url, r.contentType);
 
-        if (ehPdf) {
-          if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
-            // Too big to commit; it still reaches the artifact upload, and the
-            // manifest records where it came from.
-            resumo.push(`  - ${d.url} — PDF de ${d.bytes.byteLength} bytes, não commitado`);
+      // Never write a non-200 over a good fixture.
+      //
+      // The status check used to happen AFTER the file was written, so any error
+      // page became the fixture. Running this locally, where an egress proxy answers
+      // 403, replaced a real 261 KB page and a real 466 KB PDF with three 111-byte
+      // "host not in allowlist" bodies — and the next capture would have committed
+      // them as if they were the site's own content.
+      if (r.status !== 200) {
+        resumo.push(`- ${r.url}\n  status ${r.status} — não escrito`);
+        entradas.push({
+          url: r.url,
+          ficheiro: null,
+          status: r.status,
+          contentType: r.contentType,
+          etag: r.etag,
+          lastModified: r.lastModified,
+          capturadoEm: new Date().toISOString(),
+        });
+        continue;
+      }
+
+      let ficheiro;
+      let html = null;
+      if (tipo.binario) {
+        if (r.bytes.byteLength > LIMITE_PDF_BYTES) {
+          resumo.push(`- ${r.url} — ${r.bytes.byteLength} bytes, grande demais para commitar`);
+          continue;
+        }
+        ficheiro = nomeSeguro(r.url, tipo.extensao);
+        await writeFile(join(dirStaging, ficheiro), r.bytes);
+        bytesTotais += r.bytes.byteLength;
+        resumo.push(
+          `- ${r.url}\n  status ${r.status}, ${r.bytes.byteLength} bytes ` +
+            `(${tipo.extensao}), etag ${r.etag ?? "—"}`,
+        );
+      } else {
+        const bruto = new TextDecoder("utf-8").decode(r.bytes);
+        // Strip the viewstate before writing. On these ASP.NET sites it is routinely
+        // the largest thing on the page — often 100 KB+ of rotating base64 — and
+        // removing it is what makes committing real fixtures viable at all.
+        html = tipo.normalizar ? normalizarConteudo(bruto) : bruto;
+        ficheiro = nomeSeguro(r.url, tipo.extensao);
+        await writeFile(join(dirStaging, ficheiro), html, "utf8");
+        bytesTotais += html.length;
+        resumo.push(
+          `- ${r.url}\n  status ${r.status}, ${html.length} bytes após limpeza ` +
+            `(${bruto.length} em bruto), etag ${r.etag ?? "—"}\n` +
+            `  \`${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
+        );
+      }
+
+      entradas.push({
+        url: r.url,
+        ficheiro,
+        status: r.status,
+        contentType: r.contentType,
+        etag: r.etag,
+        lastModified: r.lastModified,
+        capturadoEm: new Date().toISOString(),
+      });
+
+      if (html === null) continue;
+
+      // Follow the notices this listing links to, so there is a detail document
+      // (and ideally a real PDF) to build the extraction against.
+      // Report what the extractor ACTUALLY found, then how many were followed. The
+      // earlier version counted after the cap, so a page yielding 47 notices was
+      // reported as 10 — and that number is precisely what a person reads to sanity-
+      // check a health floor.
+      const todos = fonte.extrair(html, { urlBase: fonte.urlBase, agora: new Date() });
+      const candidatos = todos.slice(0, MAX_DETALHES);
+
+      resumo.push(
+        `  → ${todos.length} candidato(s) encontrado(s) pelo extractor actual` +
+          (todos.length > candidatos.length ? `, a seguir os primeiros ${candidatos.length}` : ""),
+      );
+
+      for (const c of candidatos) {
+        if (bytesTotais > LIMITE_TOTAL_BYTES) {
+          resumo.push("  → limite total atingido, restantes ignorados");
+          break;
+        }
+        if (!(await permitido(fonte.urlBase, new URL(c.urlDetalhe).pathname))) continue;
+
+        await dormir(ATRASO_MS);
+        try {
+          const d = await buscarComReparo(c.urlDetalhe);
+          if (d.status !== 200) {
+            resumo.push(`  - ${d.url} — status ${d.status}, não escrito`);
             continue;
           }
-          const ficheiroPdf = nomeSeguro(d.url, ".pdf");
-          await writeFile(join(dir, ficheiroPdf), d.bytes);
-          bytesTotais += d.bytes.byteLength;
+          const tipoD = classificar(d.url, d.contentType);
+          let ficheiroD;
+
+          if (tipoD.binario) {
+            if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
+              // Too big to commit; it still reaches the artifact upload, and the
+              // manifest records where it came from.
+              resumo.push(
+                `  - ${d.url} — ${tipoD.extensao} de ${d.bytes.byteLength} bytes, não commitado`,
+              );
+              continue;
+            }
+            ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+            await writeFile(join(dirStaging, ficheiroD), d.bytes);
+            bytesTotais += d.bytes.byteLength;
+            resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${d.bytes.byteLength} bytes`);
+          } else {
+            const brutoD = new TextDecoder("utf-8").decode(d.bytes);
+            const limpoDetalhe = tipoD.normalizar ? normalizarConteudo(brutoD) : brutoD;
+            ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+            await writeFile(join(dirStaging, ficheiroD), limpoDetalhe, "utf8");
+            bytesTotais += limpoDetalhe.length;
+            resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${limpoDetalhe.length} bytes`);
+          }
+
           entradas.push({
             url: d.url,
-            ficheiro: ficheiroPdf,
+            ficheiro: ficheiroD,
             status: d.status,
             contentType: d.contentType,
             etag: d.etag,
             lastModified: d.lastModified,
             capturadoEm: new Date().toISOString(),
           });
-          resumo.push(`  - ${d.url} — PDF, ${d.bytes.byteLength} bytes`);
-        } else {
-          const limpoDetalhe = normalizarConteudo(new TextDecoder("utf-8").decode(d.bytes));
-          const ficheiroHtml = nomeSeguro(d.url, ".html");
-          await writeFile(join(dir, ficheiroHtml), limpoDetalhe, "utf8");
-          bytesTotais += limpoDetalhe.length;
-          entradas.push({
-            url: d.url,
-            ficheiro: ficheiroHtml,
-            status: d.status,
-            contentType: d.contentType,
-            etag: d.etag,
-            lastModified: d.lastModified,
-            capturadoEm: new Date().toISOString(),
-          });
-          resumo.push(`  - ${d.url} — HTML, ${limpoDetalhe.length} bytes`);
+        } catch (erro) {
+          resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${razaoCompleta(erro)}`);
         }
-      } catch (erro) {
-        resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
+      }
+    }
+  } catch (erro) {
+    // Record and carry on. A source that threw used to leave no directory at
+    // all, so it vanished from the resulting PR with no explanation — which is
+    // exactly what happened to prr-candidaturas and cost a round trip to find.
+    erroFatal = erro instanceof Error ? razaoCompleta(erro) : String(erro);
+    resumo.push(`- **FALHOU:** ${erroFatal}`);
+
+    // A TLS failure is only actionable once you know WHICH certificate authority is
+    // missing, so put the observed chain where a person will read it.
+    for (const [host, cadeia] of cadeiaObservadaPorHost) {
+      if (cadeia.length === 0) continue;
+      resumo.push(`  - cadeia TLS observada em \`${host}\`:`);
+      for (const n of cadeia) {
+        resumo.push(
+          `    - nível ${n.nivel}${n.autoAssinado ? " (auto-assinado, raiz)" : ""}\n` +
+            `      subject: \`${n.subject ?? "—"}\`\n` +
+            `      issuer:  \`${n.issuer ?? "—"}\`\n` +
+            `      AIA:     ${n.emissoresAnunciados.length > 0 ? n.emissoresAnunciados.map((u) => `\`${u}\``).join(", ") : "nenhum"}`,
+        );
       }
     }
   }
 
   await writeFile(
-    join(dir, "manifest.json"),
+    join(dirStaging, "manifest.json"),
     JSON.stringify(
-      { sourceId: fonte.id, capturadoEm: new Date().toISOString(), entradas },
+      {
+        sourceId: fonte.id,
+        capturadoEm: new Date().toISOString(),
+        erro: erroFatal,
+        cadeiaTls: erroFatal === null ? undefined : Object.fromEntries(cadeiaObservadaPorHost),
+        entradas,
+      },
       null,
       2,
     ),
     "utf8",
   );
 
-  return { entradas, resumo, bytesTotais };
+  // Swap in only if something real was captured. A run that fetched nothing keeps
+  // the previous fixtures rather than replacing them with an empty directory.
+  const capturouAlgo = entradas.some((e) => e.ficheiro != null);
+  if (capturouAlgo) {
+    await rm(dir, { recursive: true, force: true });
+    await rename(dirStaging, dir);
+  } else {
+    resumo.push("  - nada capturado; as fixtures anteriores ficam como estavam");
+    await rm(dirStaging, { recursive: true, force: true });
+  }
+
+  return { entradas, resumo, bytesTotais, erroFatal };
 }
 
 async function main() {
   const pedidas = (process.env.FONTES ?? "").trim();
+  // Deliberately FONTES, not FONTES_ACTIVAS: the sources that most need capturing
+  // are precisely the ones the pipeline is still skipping.
   const fontes =
     pedidas.length > 0
       ? pedidas.split(",").map((id) => obterFonte(id.trim())).filter(Boolean)
@@ -215,7 +456,7 @@ async function main() {
   let total = 0;
 
   for (const fonte of fontes) {
-    linhas.push(`## ${fonte.nome} (\`${fonte.id}\`)`, "");
+    linhas.push(`## ${fonte.nome} (\`${fonte.id}\`, ${fonte.estado})`, "");
     try {
       const r = await capturarFonte(fonte, dirRaiz);
       linhas.push(...r.resumo, "", `**${r.entradas.length} ficheiro(s), ${r.bytesTotais} bytes.**`, "");

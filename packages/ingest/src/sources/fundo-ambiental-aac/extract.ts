@@ -1,6 +1,18 @@
-import { parse, type HTMLElement } from "node-html-parser";
-import { canonicalizarUrl, normalizarEspacos, type Candidato } from "@apoios/core";
+import { parse } from "node-html-parser";
+import { canonicalizarUrl, type Candidato } from "@apoios/core";
 import type { ContextoExtraccao } from "../tipos.ts";
+import {
+  caminhoRelativo,
+  ehPaginaDeErro,
+  hrefInutil,
+  PADRAO_DATA,
+  PADRAO_REFERENCIA,
+  textoLimpo,
+} from "../comum/fundoambiental.ts";
+
+// Re-exported because it is part of this source's public surface: index.ts wires it
+// into the Fonte, and the pipeline calls it before hashing.
+export { ehPaginaDeErro };
 
 /**
  * Notices are identified by the SHAPE OF THEIR URL, not by any CSS container.
@@ -27,43 +39,6 @@ const RE_CAMINHO_AVISO = /^apoios-(?:\d{4}|prr)\/[^/]+\/[^/]+\.aspx$/i;
  */
 const SECCOES_IGNORADAS = /^(documentos|documentacao|formularios|faq|legislacao)/i;
 
-const PADRAO_REFERENCIA =
-  /\b\d{1,2}\s*\/\s*[\dA-Za-z][\dA-Za-z.\-]*(?:\s*\/\s*\d{4})?/;
-
-const PADRAO_DATA =
-  /\b\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}\b|\b\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}\b/i;
-
-/**
- * The site serves its error page with HTTP 200.
- *
- * A request for a page that does not exist lands on
- * `/wwwbase/raiz/Erro.aspx?aspxerrorpath=/avisos-2026.aspx` — status 200, 433 bytes,
- * "Ocorreu um erro". Status-code checks therefore cannot detect a dead entry URL,
- * and the content hash of that page is perfectly stable, so the change gate would
- * treat it as a healthy unchanged source for ever. This is how a source silently
- * dies while every run reports success.
- */
-export function ehPaginaDeErro(html: string, urlFinal: string): boolean {
-  if (/aspxerrorpath=|\/Erro\.aspx/i.test(urlFinal)) return true;
-  return /<title>\s*Ocorreu um erro\s*<\/title>/i.test(html);
-}
-
-function textoLimpo(el: HTMLElement): string {
-  return normalizarEspacos(el.text ?? "");
-}
-
-function caminhoRelativo(href: string, urlBase: string): string | null {
-  try {
-    const u = new URL(href, urlBase);
-    if (u.hostname.replace(/^www\./, "") !== new URL(urlBase).hostname.replace(/^www\./, "")) {
-      return null;
-    }
-    return u.pathname.replace(/^\//, "");
-  } catch {
-    return null;
-  }
-}
-
 export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
   // A dead entry URL must yield nothing rather than a plausible-looking zero, so the
   // health floor fires instead of the source appearing quietly healthy.
@@ -75,7 +50,7 @@ export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
 
   for (const ancora of raiz.querySelectorAll("a[href]")) {
     const href = ancora.getAttribute("href");
-    if (!href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href)) continue;
+    if (hrefInutil(href)) continue;
 
     const caminho = caminhoRelativo(href, ctx.urlBase);
     if (caminho === null || !RE_CAMINHO_AVISO.test(caminho)) continue;

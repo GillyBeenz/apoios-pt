@@ -14,6 +14,21 @@ export interface Fonte {
   readonly urlBase: string;
   readonly urlsEntrada: readonly string[];
   readonly tipo: "listagem" | "noticias" | "legal" | "dataset";
+  /**
+   * Has this source's extractor been verified against markup captured from the
+   * live site? `activa` yes, `em-captura` not yet.
+   *
+   * The pipeline ingests only `activa` sources; the fixture-capture workflow visits
+   * both, since capture is precisely how a source stops being `em-captura`.
+   *
+   * The distinction earns its place because of what a zero-candidate run means. For
+   * a verified source, zero means the selectors broke and the health floor must
+   * fire. For an unverified one, zero is the expected first result and means
+   * nothing. Collapsing the two would either bury real breakage in noise or fill
+   * the run log with alarms nobody can act on — and an alarm people learn to
+   * ignore is worse than no alarm.
+   */
+  readonly estado: "activa" | "em-captura";
   /** Hours between fetches. */
   readonly cadenciaHoras: number;
   /**

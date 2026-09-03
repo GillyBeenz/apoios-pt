@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import { ehPaginaDeErro, extrair } from "./extract.ts";
 
 const FIXTURES = join(import.meta.dirname, "fixtures");
+const PERMANENTES = join(import.meta.dirname, "..", "comum", "fixtures-permanentes");
 const ler = (f: string): string => readFileSync(join(FIXTURES, f), "utf8");
+/**
+ * Kept outside `fixtures/`, which the capture workflow wipes on every run. The site
+ * only served this page while an entry URL was wrong; once that was fixed the next
+ * capture deleted it, taking with it the only proof that the soft-404 detector works.
+ */
+const lerPermanente = (f: string): string => readFileSync(join(PERMANENTES, f), "utf8");
 
 const CTX = {
   urlBase: "https://www.fundoambiental.pt/apoios-prr.aspx",
@@ -71,7 +78,7 @@ describe("extrair — markup real do Fundo Ambiental", () => {
  * status check and the content-hash change gate see a perfectly healthy source.
  */
 describe("ehPaginaDeErro — o 404 disfarçado de 200", () => {
-  const erro = ler("Erro-ea970ce00b.html");
+  const erro = lerPermanente("erro-aspx-200.html");
 
   it("reconhece a página de erro pelo conteúdo", () => {
     expect(ehPaginaDeErro(erro, "https://www.fundoambiental.pt/qualquer.aspx")).toBe(true);
