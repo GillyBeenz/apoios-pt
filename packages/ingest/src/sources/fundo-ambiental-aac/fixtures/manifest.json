@@ -1,15 +1,96 @@
 {
   "sourceId": "fundo-ambiental-aac",
-  "capturadoEm": "2026-09-02T20:41:55.218Z",
+  "capturadoEm": "2026-09-03T07:54:57.599Z",
   "entradas": [
     {
-      "url": "https://www.fundoambiental.pt/wwwbase/raiz/Erro.aspx?aspxerrorpath=/avisos-2026.aspx",
-      "ficheiro": "Erro-ea970ce00b.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026.aspx",
+      "ficheiro": "apoios-2026-e572f8baaf.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:12.796Z"
+      "capturadoEm": "2026-09-03T07:52:56.187Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-2026/mitigacao-as-alteracoes-climaticas/medida-de-auxilio-a-custos-indiretos-do-cele-2026.aspx",
+      "ficheiro": "medida-de-auxilio-a-custos-indiretos-do-cele-202-ac3df4e047.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:52:59.137Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-2026/mitigacao-as-alteracoes-climaticas/incentivo-pela-aquisicao-de-veiculos-de-emissoes-nulas-ano-20252026-mobilidade-verde-passageiros-2-fase.aspx",
+      "ficheiro": "incentivo-pela-aquisicao-de-veiculos-de-emissoes-ed5feeb37b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:53:02.199Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-2026/transicao-energetica1/032026-reforco-da-resiliencia-do-sistema-eletrico-nacional.aspx",
+      "ficheiro": "032026-reforco-da-resiliencia-do-sistema-eletric-902d64b7a7.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:53:05.092Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-2026/transicao-energetica1/compensacao-aos-municipios-pela-instalacao-de-centros-eletroprodutores-2026.aspx",
+      "ficheiro": "compensacao-aos-municipios-pela-instalacao-de-ce-484c252e1b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:53:07.871Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/09c08-i01012026-criacao-de-novas-oigp-20.aspx",
+      "ficheiro": "09c08-i01012026-criacao-de-novas-oigp-20-c169d4b85b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:54:13.232Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/08c08-i012024-condominio-de-aldeia1.aspx",
+      "ficheiro": "08c08-i012024-condominio-de-aldeia1-9f20de032b.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:54:16.208Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/07c08-i01012024-constituicao-de-novas-areas-integradas-de-gestao-da-paisagem-aigp1.aspx",
+      "ficheiro": "07c08-i01012024-constituicao-de-novas-areas-inte-5cd7058c0e.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:54:19.037Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/05c08-i012023-condominio-de-aldeia1.aspx",
+      "ficheiro": "05c08-i012023-condominio-de-aldeia1-beafa1464d.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:54:22.254Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/04c08-i012023-condominio-de-aldeia1.aspx",
+      "ficheiro": "04c08-i012023-condominio-de-aldeia1-a143313b7e.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-03T07:54:25.069Z"
     },
     {
       "url": "https://www.fundoambiental.pt/apoios-prr.aspx",
@@ -18,97 +99,97 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:17.614Z"
+      "capturadoEm": "2026-09-03T07:54:27.981Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/09c13-i012025.aspx",
-      "ficheiro": "09c13-i012025-89804fba8c.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026/mitigacao-as-alteracoes-climaticas/medida-de-auxilio-a-custos-indiretos-do-cele-2026.aspx",
+      "ficheiro": "medida-de-auxilio-a-custos-indiretos-do-cele-202-ac3df4e047.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:21.394Z"
+      "capturadoEm": "2026-09-03T07:54:30.856Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/c13-i01-02-03-apoio-a-concretizacao-de-comunidades-de-energia-renovavel-e-autoconsumo-coletivo2.aspx",
-      "ficheiro": "c13-i01-02-03-apoio-a-concretizacao-de-comunidad-3526039e62.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026/mitigacao-as-alteracoes-climaticas/incentivo-pela-aquisicao-de-veiculos-de-emissoes-nulas-ano-20252026-mobilidade-verde-passageiros-2-fase.aspx",
+      "ficheiro": "incentivo-pela-aquisicao-de-veiculos-de-emissoes-ed5feeb37b.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:25.811Z"
+      "capturadoEm": "2026-09-03T07:54:33.743Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/04c13-i012023.aspx",
-      "ficheiro": "04c13-i012023-18d2121d7c.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026/transicao-energetica1/032026-reforco-da-resiliencia-do-sistema-eletrico-nacional.aspx",
+      "ficheiro": "032026-reforco-da-resiliencia-do-sistema-eletric-902d64b7a7.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:29.474Z"
+      "capturadoEm": "2026-09-03T07:54:36.629Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/01c13-i03-apoio-a-renovacao-e-aumento-do-desempenho-energetico-dos-edificios-de-servicos.aspx",
-      "ficheiro": "01c13-i03-apoio-a-renovacao-e-aumento-do-desempe-685906b25b.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026/transicao-energetica1/compensacao-aos-municipios-pela-instalacao-de-centros-eletroprodutores-2026.aspx",
+      "ficheiro": "compensacao-aos-municipios-pela-instalacao-de-ce-484c252e1b.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:32.893Z"
+      "capturadoEm": "2026-09-03T07:54:39.383Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr/c13-eficiencia-energetica-em-edificios/c13-i01-02-03-apoio-a-concretizacao-de-comunidades-de-energia-renovavel-e-autoconsumo-coletivo.aspx",
-      "ficheiro": "c13-i01-02-03-apoio-a-concretizacao-de-comunidad-17be56254c.html",
+      "url": "https://www.fundoambiental.pt/apoios-2026/conservacao-da-natureza/aviso-de-abertura-de-concurso-n-042026-programa-floresta-azul-restauro-ecologico-de-pradarias-marinhas.aspx",
+      "ficheiro": "aviso-de-abertura-de-concurso-n-042026-programa--03a61070d5.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:36.453Z"
+      "capturadoEm": "2026-09-03T07:54:42.263Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/avisos-anteriores/avisos-2017/apoio-a-mobilidade-eletrica-na-administracao-publica.aspx",
-      "ficheiro": "apoio-a-mobilidade-eletrica-na-administracao-pub-38f5cae7b1.html",
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/09c08-i01012026-criacao-de-novas-oigp-20.aspx",
+      "ficheiro": "09c08-i01012026-criacao-de-novas-oigp-20-c169d4b85b.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:40.588Z"
+      "capturadoEm": "2026-09-03T07:54:45.136Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/avisos-anteriores/avisos-2017/apoio-as-entidades-gestoras-de-sistemas-municipais.aspx",
-      "ficheiro": "apoio-as-entidades-gestoras-de-sistemas-municipa-842fa59e23.html",
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/08c08-i012024-condominio-de-aldeia1.aspx",
+      "ficheiro": "08c08-i012024-condominio-de-aldeia1-9f20de032b.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:44.455Z"
+      "capturadoEm": "2026-09-03T07:54:48.121Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/candidaturas/formularios.aspx",
-      "ficheiro": "formularios-e87ede30e5.html",
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/07c08-i01012024-constituicao-de-novas-areas-integradas-de-gestao-da-paisagem-aigp1.aspx",
+      "ficheiro": "07c08-i01012024-constituicao-de-novas-areas-inte-5cd7058c0e.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:48.252Z"
+      "capturadoEm": "2026-09-03T07:54:50.994Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/comunicacao/galerias/video-do-evento-ecomob-programa-de-apoio-a-mobilidade-eletrica-na-administracao-publica.aspx",
-      "ficheiro": "video-do-evento-ecomob-programa-de-apoio-a-mobil-9ec5b96f20.html",
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/05c08-i012023-condominio-de-aldeia1.aspx",
+      "ficheiro": "05c08-i012023-condominio-de-aldeia1-beafa1464d.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:51.564Z"
+      "capturadoEm": "2026-09-03T07:54:54.548Z"
     },
     {
-      "url": "https://www.fundoambiental.pt/apoios-prr.aspx",
-      "ficheiro": "apoios-prr-bd213819af.html",
+      "url": "https://www.fundoambiental.pt/apoios-prr/c8-florestas/04c08-i012023-condominio-de-aldeia1.aspx",
+      "ficheiro": "04c08-i012023-condominio-de-aldeia1-a143313b7e.html",
       "status": 200,
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-02T20:41:55.217Z"
+      "capturadoEm": "2026-09-03T07:54:57.599Z"
     }
   ]
 }
