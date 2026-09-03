@@ -1,0 +1,28 @@
+{
+  "sourceId": "prr-candidaturas",
+  "capturadoEm": "2026-09-03T22:05:28.851Z",
+  "erro": "fetch failed ← unable to get issuer certificate (UNABLE_TO_GET_ISSUER_CERT)",
+  "cadeiaTls": {
+    "recuperarportugal.gov.pt": [
+      {
+        "nivel": 0,
+        "subject": "C=PT | ST=Lisboa | O=Estrutura Missão Recuperar Portugal | CN=*.recuperarportugal.gov.pt",
+        "issuer": "C=GB | O=Sectigo Limited | CN=Sectigo Public Server Authentication CA OV R36",
+        "autoAssinado": false,
+        "emissoresAnunciados": [
+          "http://crt.sectigo.com/SectigoPublicServerAuthenticationCAOVR36.crt"
+        ]
+      },
+      {
+        "nivel": 1,
+        "subject": "C=GB | O=Sectigo Limited | CN=Sectigo Public Server Authentication CA OV R36",
+        "issuer": "C=GB | O=Sectigo Limited | CN=Sectigo Public Server Authentication Root R46",
+        "autoAssinado": false,
+        "emissoresAnunciados": [
+          "http://crt.sectigo.com/SectigoPublicServerAuthenticationRootR46.p7c"
+        ]
+      }
+    ]
+  },
+  "entradas": []
+}
