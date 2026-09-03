@@ -119,3 +119,20 @@ export async function certificadoApresentado(
     });
   });
 }
+
+/**
+ * Combine recovered certificates with the default trust store.
+ *
+ * Node's `ca` option REPLACES the built-in roots rather than adding to them. Passing
+ * a recovered intermediate on its own therefore deletes every public root CA from the
+ * trust set, and the chain then fails one link higher with `UNABLE_TO_GET_ISSUER_CERT`
+ * — which reads exactly like "the site's chain is still incomplete" and is in fact
+ * "we threw away the roots".
+ *
+ * That cost four rounds of misdiagnosis on recuperarportugal.gov.pt, whose chain turns
+ * out to be ordinary Sectigo: the roots were trusted all along.
+ */
+export async function combinarComRaizes(pems: readonly string[]): Promise<string[]> {
+  const { rootCertificates } = await import("node:tls");
+  return [...rootCertificates, ...pems];
+}

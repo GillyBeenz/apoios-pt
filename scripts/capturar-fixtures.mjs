@@ -18,6 +18,7 @@ import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
 import { classificar } from "../packages/ingest/src/http/classificar.ts";
 import {
   certificadoApresentado,
+  combinarComRaizes,
   ehAutoAssinado,
   ehCadeiaIncompleta,
   normalizarParaPem,
@@ -142,7 +143,9 @@ async function buscar(url, caExtra = undefined) {
     const { Agent, fetch: fetchUndici } = await import("undici");
     // Verification stays ON. The recovered intermediate is added to the trust set,
     // so it still has to chain to a real root for this request to succeed.
-    const dispatcher = new Agent({ connect: { ca: caExtra } });
+    // Roots FIRST, then what we recovered. `ca` replaces the default trust store, so
+    // omitting the roots here is what turned a one-link gap into a dead end.
+    const dispatcher = new Agent({ connect: { ca: await combinarComRaizes(caExtra) } });
     const r = await fetchUndici(url, {
       headers: {
         "user-agent": USER_AGENT,

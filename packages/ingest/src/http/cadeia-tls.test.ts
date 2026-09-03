@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  combinarComRaizes,
   derParaPem,
   ehCadeiaIncompleta,
   normalizarParaPem,
@@ -76,5 +77,26 @@ describe("normalizarParaPem", () => {
   it("deixa PEM em paz", () => {
     const pem = derParaPem(new Uint8Array(32).fill(7));
     expect(normalizarParaPem(new Uint8Array(Buffer.from(pem, "latin1")))).toBe(pem);
+  });
+});
+
+describe("combinarComRaizes", () => {
+  it("mantém as raízes por omissão e acrescenta o que foi recuperado", async () => {
+    // The whole point: Node's `ca` REPLACES the trust store. Handing it only the
+    // recovered intermediate silently removes every public root, and the chain then
+    // fails one link higher with a message that reads like the server's fault.
+    const { rootCertificates } = await import("node:tls");
+    const extra = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
+    const combinado = await combinarComRaizes([extra]);
+
+    expect(rootCertificates.length).toBeGreaterThan(50);
+    expect(combinado).toHaveLength(rootCertificates.length + 1);
+    expect(combinado.at(-1)).toBe(extra);
+    expect(combinado).toEqual(expect.arrayContaining([...rootCertificates]));
+  });
+
+  it("devolve as raízes intactas quando não há nada a acrescentar", async () => {
+    const { rootCertificates } = await import("node:tls");
+    expect(await combinarComRaizes([])).toEqual([...rootCertificates]);
   });
 });
