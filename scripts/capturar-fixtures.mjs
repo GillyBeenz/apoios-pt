@@ -18,6 +18,7 @@ import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
 import { classificar } from "../packages/ingest/src/http/classificar.ts";
 import {
   certificadoApresentado,
+  ehAutoAssinado,
   ehCadeiaIncompleta,
   normalizarParaPem,
   urlsDoEmissor,
@@ -78,21 +79,38 @@ const intermediariosPorHost = new Map();
 async function repararCadeia(host) {
   if (intermediariosPorHost.has(host)) return intermediariosPorHost.get(host);
 
-  let pem = null;
-  const cert = await certificadoApresentado(host);
-  for (const url of urlsDoEmissor(cert?.infoAccess)) {
-    try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-      if (!r.ok) continue;
-      pem = normalizarParaPem(new Uint8Array(await r.arrayBuffer()));
-      break;
-    } catch {
-      // Try the next advertised issuer.
+  const { X509Certificate } = await import("node:crypto");
+  const pems = [];
+
+  // Walk UP the chain, not just one step. Supplying a single intermediate turned
+  // `UNABLE_TO_VERIFY_LEAF_SIGNATURE` into `UNABLE_TO_GET_ISSUER_CERT`: the
+  // intermediate we fetched was itself missing its own issuer. Real chains are
+  // routinely two links deep, so keep climbing until a self-signed root, an
+  // exhausted AIA, or a sane depth limit.
+  let actual = await certificadoApresentado(host);
+  for (let profundidade = 0; actual != null && profundidade < 4; profundidade += 1) {
+    if (ehAutoAssinado(actual)) break;
+
+    let seguinte = null;
+    for (const url of urlsDoEmissor(actual.infoAccess)) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+        if (!r.ok) continue;
+        const pem = normalizarParaPem(new Uint8Array(await r.arrayBuffer()));
+        pems.push(pem);
+        seguinte = new X509Certificate(pem);
+        break;
+      } catch {
+        // Try the next advertised issuer for this level.
+      }
     }
+    if (seguinte === null) break;
+    actual = seguinte;
   }
 
-  intermediariosPorHost.set(host, pem);
-  return pem;
+  const resultado = pems.length > 0 ? pems : null;
+  intermediariosPorHost.set(host, resultado);
+  return resultado;
 }
 
 async function buscar(url, caExtra = undefined) {
@@ -153,10 +171,12 @@ async function buscarComReparo(url) {
   } catch (erro) {
     if (!ehCadeiaIncompleta(erro)) throw erro;
     const host = new URL(url).hostname;
-    const pem = await repararCadeia(host);
-    if (pem === null) throw erro;
-    console.log(`  (cadeia TLS de ${host} reparada com o intermediário em falta)`);
-    return await buscar(url, pem);
+    const pems = await repararCadeia(host);
+    if (pems === null) throw erro;
+    console.log(
+      `  (cadeia TLS de ${host} reparada com ${pems.length} certificado(s) em falta)`,
+    );
+    return await buscar(url, pems);
   }
 }
 

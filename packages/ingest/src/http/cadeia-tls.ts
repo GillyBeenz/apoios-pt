@@ -64,13 +64,30 @@ export function normalizarParaPem(bytes: Uint8Array): string {
  * root are all real problems that fetching an intermediate cannot fix, and retrying
  * them under a repaired chain would only bury the reason.
  */
+const CODIGOS_REPARAVEIS = new Set([
+  // The server sent the leaf alone.
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  // We supplied one intermediate and it was not enough — the chain has another
+  // link above it that is also missing. Real chains are routinely two deep.
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+]);
+
 export function ehCadeiaIncompleta(erro: unknown): boolean {
   for (let e: unknown = erro, i = 0; e != null && i < 5; i += 1) {
     const codigo = (e as { code?: unknown }).code;
-    if (codigo === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") return true;
+    if (typeof codigo === "string" && CODIGOS_REPARAVEIS.has(codigo)) return true;
     e = (e as { cause?: unknown }).cause;
   }
   return false;
+}
+
+/**
+ * A root certificate signs itself, and is where the walk up the chain stops. Going
+ * past it would just fetch the same certificate over and over.
+ */
+export function ehAutoAssinado(cert: { subject: string; issuer: string }): boolean {
+  return cert.subject === cert.issuer;
 }
 
 /** The certificate the host presented, read without trusting it. */
