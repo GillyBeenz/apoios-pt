@@ -97,11 +97,15 @@ async function repararCadeia(host) {
 
 async function buscar(url, caExtra = undefined) {
   if (caExtra !== undefined) {
-    const { Agent } = await import("undici");
+    // undici's OWN fetch, not the global one. Node embeds its own private copy of
+    // undici, and handing it a dispatcher built from the standalone package fails
+    // with `invalid onRequestStart method` — two implementations of the same
+    // interface that do not recognise each other's handlers.
+    const { Agent, fetch: fetchUndici } = await import("undici");
     // Verification stays ON. The recovered intermediate is added to the trust set,
     // so it still has to chain to a real root for this request to succeed.
     const dispatcher = new Agent({ connect: { ca: caExtra } });
-    const r = await fetch(url, {
+    const r = await fetchUndici(url, {
       headers: {
         "user-agent": USER_AGENT,
         accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
@@ -247,11 +251,17 @@ async function capturarFonte(fonte, dirRaiz) {
 
       // Follow the notices this listing links to, so there is a detail document
       // (and ideally a real PDF) to build the extraction against.
-      const candidatos = fonte
-        .extrair(html, { urlBase: fonte.urlBase, agora: new Date() })
-        .slice(0, MAX_DETALHES);
+      // Report what the extractor ACTUALLY found, then how many were followed. The
+      // earlier version counted after the cap, so a page yielding 47 notices was
+      // reported as 10 — and that number is precisely what a person reads to sanity-
+      // check a health floor.
+      const todos = fonte.extrair(html, { urlBase: fonte.urlBase, agora: new Date() });
+      const candidatos = todos.slice(0, MAX_DETALHES);
 
-      resumo.push(`  → ${candidatos.length} candidato(s) encontrado(s) pelo extractor actual`);
+      resumo.push(
+        `  → ${todos.length} candidato(s) encontrado(s) pelo extractor actual` +
+          (todos.length > candidatos.length ? `, a seguir os primeiros ${candidatos.length}` : ""),
+      );
 
       for (const c of candidatos) {
         if (bytesTotais > LIMITE_TOTAL_BYTES) {
