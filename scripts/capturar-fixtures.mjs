@@ -16,6 +16,12 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
 import { classificar } from "../packages/ingest/src/http/classificar.ts";
+import {
+  certificadoApresentado,
+  ehCadeiaIncompleta,
+  normalizarParaPem,
+  urlsDoEmissor,
+} from "../packages/ingest/src/http/cadeia-tls.ts";
 import { FONTES, obterFonte } from "../packages/ingest/src/sources/registo.ts";
 import { USER_AGENT } from "../packages/ingest/src/http/tipos.ts";
 
@@ -55,7 +61,67 @@ function nomeSeguro(url, extensao) {
   return `${base}-${hash}${extensao}`;
 }
 
-async function buscar(url) {
+/**
+ * Intermediates recovered per host, so one repair serves every later request.
+ * `null` records a host we tried and could not repair — worth remembering, because
+ * re-chasing on every URL would triple the requests we make to a site that is
+ * already misconfigured.
+ */
+const intermediariosPorHost = new Map();
+
+/**
+ * Fetch the intermediate certificate the server should have sent.
+ *
+ * See packages/ingest/src/http/cadeia-tls.ts for why this exists and why disabling
+ * verification instead would be the wrong trade.
+ */
+async function repararCadeia(host) {
+  if (intermediariosPorHost.has(host)) return intermediariosPorHost.get(host);
+
+  let pem = null;
+  const cert = await certificadoApresentado(host);
+  for (const url of urlsDoEmissor(cert?.infoAccess)) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+      if (!r.ok) continue;
+      pem = normalizarParaPem(new Uint8Array(await r.arrayBuffer()));
+      break;
+    } catch {
+      // Try the next advertised issuer.
+    }
+  }
+
+  intermediariosPorHost.set(host, pem);
+  return pem;
+}
+
+async function buscar(url, caExtra = undefined) {
+  if (caExtra !== undefined) {
+    const { Agent } = await import("undici");
+    // Verification stays ON. The recovered intermediate is added to the trust set,
+    // so it still has to chain to a real root for this request to succeed.
+    const dispatcher = new Agent({ connect: { ca: caExtra } });
+    const r = await fetch(url, {
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+        "accept-language": "pt-PT,pt;q=0.9",
+      },
+      redirect: "follow",
+      dispatcher,
+      signal: AbortSignal.timeout(60_000),
+    });
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    return {
+      url: r.url || url,
+      status: r.status,
+      contentType: r.headers.get("content-type"),
+      etag: r.headers.get("etag"),
+      lastModified: r.headers.get("last-modified"),
+      bytes,
+    };
+  }
+
   const resposta = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
@@ -74,6 +140,20 @@ async function buscar(url) {
     lastModified: resposta.headers.get("last-modified"),
     bytes,
   };
+}
+
+/** `buscar`, retried once with a repaired chain when that is the actual problem. */
+async function buscarComReparo(url) {
+  try {
+    return await buscar(url);
+  } catch (erro) {
+    if (!ehCadeiaIncompleta(erro)) throw erro;
+    const host = new URL(url).hostname;
+    const pem = await repararCadeia(host);
+    if (pem === null) throw erro;
+    console.log(`  (cadeia TLS de ${host} reparada com o intermediário em falta)`);
+    return await buscar(url, pem);
+  }
 }
 
 /** Respect robots.txt. These are public services, not a scraping target. */
@@ -120,7 +200,7 @@ async function capturarFonte(fonte, dirRaiz) {
       }
 
       await dormir(ATRASO_MS);
-      const r = await buscar(url);
+      const r = await buscarComReparo(url);
       const tipo = classificar(r.url, r.contentType);
 
       let ficheiro;
@@ -182,7 +262,7 @@ async function capturarFonte(fonte, dirRaiz) {
 
         await dormir(ATRASO_MS);
         try {
-          const d = await buscar(c.urlDetalhe);
+          const d = await buscarComReparo(c.urlDetalhe);
           const tipoD = classificar(d.url, d.contentType);
           let ficheiroD;
 
