@@ -30,9 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` on purpose. The version lives in `packageManager` in the root
+      # package.json, which Vercel also reads — and pnpm/action-setup fails outright
+      # if both declare one. One authority, so CI and the deploy cannot drift apart.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
