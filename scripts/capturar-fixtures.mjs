@@ -91,128 +91,137 @@ async function capturarFonte(fonte, dirRaiz) {
   const entradas = [];
   const resumo = [];
   let bytesTotais = 0;
+  let erroFatal = null;
 
-  for (const url of fonte.urlsEntrada) {
-    if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
-      resumo.push(`- ${url} — IGNORADO por robots.txt`);
-      continue;
-    }
-
-    await dormir(ATRASO_MS);
-    const r = await buscar(url);
-    const tipo = classificar(r.url, r.contentType);
-
-    let ficheiro;
-    let html = null;
-    if (tipo.binario) {
-      if (r.bytes.byteLength > LIMITE_PDF_BYTES) {
-        resumo.push(`- ${r.url} — ${r.bytes.byteLength} bytes, grande demais para commitar`);
+  try {
+    for (const url of fonte.urlsEntrada) {
+      if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
+        resumo.push(`- ${url} — IGNORADO por robots.txt`);
         continue;
       }
-      ficheiro = nomeSeguro(r.url, tipo.extensao);
-      await writeFile(join(dir, ficheiro), r.bytes);
-      bytesTotais += r.bytes.byteLength;
-      resumo.push(
-        `- ${r.url}\n  status ${r.status}, ${r.bytes.byteLength} bytes ` +
-          `(${tipo.extensao}), etag ${r.etag ?? "—"}`,
-      );
-    } else {
-      const bruto = new TextDecoder("utf-8").decode(r.bytes);
-      // Strip the viewstate before writing. On these ASP.NET sites it is routinely
-      // the largest thing on the page — often 100 KB+ of rotating base64 — and
-      // removing it is what makes committing real fixtures viable at all.
-      html = tipo.normalizar ? normalizarConteudo(bruto) : bruto;
-      ficheiro = nomeSeguro(r.url, tipo.extensao);
-      await writeFile(join(dir, ficheiro), html, "utf8");
-      bytesTotais += html.length;
-      resumo.push(
-        `- ${r.url}\n  status ${r.status}, ${html.length} bytes após limpeza ` +
-          `(${bruto.length} em bruto), etag ${r.etag ?? "—"}\n` +
-          `  \`${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
-      );
-    }
-
-    entradas.push({
-      url: r.url,
-      ficheiro,
-      status: r.status,
-      contentType: r.contentType,
-      etag: r.etag,
-      lastModified: r.lastModified,
-      capturadoEm: new Date().toISOString(),
-    });
-
-    if (r.status !== 200 || html === null) continue;
-
-    // Follow the notices this listing links to, so there is a detail document
-    // (and ideally a real PDF) to build the extraction against.
-    const candidatos = fonte
-      .extrair(html, { urlBase: fonte.urlBase, agora: new Date() })
-      .slice(0, MAX_DETALHES);
-
-    resumo.push(`  → ${candidatos.length} candidato(s) encontrado(s) pelo extractor actual`);
-
-    for (const c of candidatos) {
-      if (bytesTotais > LIMITE_TOTAL_BYTES) {
-        resumo.push("  → limite total atingido, restantes ignorados");
-        break;
-      }
-      if (!(await permitido(fonte.urlBase, new URL(c.urlDetalhe).pathname))) continue;
 
       await dormir(ATRASO_MS);
-      try {
-        const d = await buscar(c.urlDetalhe);
-        const tipoD = classificar(d.url, d.contentType);
-        let ficheiroD;
+      const r = await buscar(url);
+      const tipo = classificar(r.url, r.contentType);
 
-        if (tipoD.binario) {
-          if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
-            // Too big to commit; it still reaches the artifact upload, and the
-            // manifest records where it came from.
-            resumo.push(
-              `  - ${d.url} — ${tipoD.extensao} de ${d.bytes.byteLength} bytes, não commitado`,
-            );
-            continue;
-          }
-          ficheiroD = nomeSeguro(d.url, tipoD.extensao);
-          await writeFile(join(dir, ficheiroD), d.bytes);
-          bytesTotais += d.bytes.byteLength;
-          resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${d.bytes.byteLength} bytes`);
-        } else {
-          const brutoD = new TextDecoder("utf-8").decode(d.bytes);
-          const limpoDetalhe = tipoD.normalizar ? normalizarConteudo(brutoD) : brutoD;
-          ficheiroD = nomeSeguro(d.url, tipoD.extensao);
-          await writeFile(join(dir, ficheiroD), limpoDetalhe, "utf8");
-          bytesTotais += limpoDetalhe.length;
-          resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${limpoDetalhe.length} bytes`);
+      let ficheiro;
+      let html = null;
+      if (tipo.binario) {
+        if (r.bytes.byteLength > LIMITE_PDF_BYTES) {
+          resumo.push(`- ${r.url} — ${r.bytes.byteLength} bytes, grande demais para commitar`);
+          continue;
         }
+        ficheiro = nomeSeguro(r.url, tipo.extensao);
+        await writeFile(join(dir, ficheiro), r.bytes);
+        bytesTotais += r.bytes.byteLength;
+        resumo.push(
+          `- ${r.url}\n  status ${r.status}, ${r.bytes.byteLength} bytes ` +
+            `(${tipo.extensao}), etag ${r.etag ?? "—"}`,
+        );
+      } else {
+        const bruto = new TextDecoder("utf-8").decode(r.bytes);
+        // Strip the viewstate before writing. On these ASP.NET sites it is routinely
+        // the largest thing on the page — often 100 KB+ of rotating base64 — and
+        // removing it is what makes committing real fixtures viable at all.
+        html = tipo.normalizar ? normalizarConteudo(bruto) : bruto;
+        ficheiro = nomeSeguro(r.url, tipo.extensao);
+        await writeFile(join(dir, ficheiro), html, "utf8");
+        bytesTotais += html.length;
+        resumo.push(
+          `- ${r.url}\n  status ${r.status}, ${html.length} bytes após limpeza ` +
+            `(${bruto.length} em bruto), etag ${r.etag ?? "—"}\n` +
+            `  \`${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180)}…\``,
+        );
+      }
 
-        entradas.push({
-          url: d.url,
-          ficheiro: ficheiroD,
-          status: d.status,
-          contentType: d.contentType,
-          etag: d.etag,
-          lastModified: d.lastModified,
-          capturadoEm: new Date().toISOString(),
-        });
-      } catch (erro) {
-        resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
+      entradas.push({
+        url: r.url,
+        ficheiro,
+        status: r.status,
+        contentType: r.contentType,
+        etag: r.etag,
+        lastModified: r.lastModified,
+        capturadoEm: new Date().toISOString(),
+      });
+
+      if (r.status !== 200 || html === null) continue;
+
+      // Follow the notices this listing links to, so there is a detail document
+      // (and ideally a real PDF) to build the extraction against.
+      const candidatos = fonte
+        .extrair(html, { urlBase: fonte.urlBase, agora: new Date() })
+        .slice(0, MAX_DETALHES);
+
+      resumo.push(`  → ${candidatos.length} candidato(s) encontrado(s) pelo extractor actual`);
+
+      for (const c of candidatos) {
+        if (bytesTotais > LIMITE_TOTAL_BYTES) {
+          resumo.push("  → limite total atingido, restantes ignorados");
+          break;
+        }
+        if (!(await permitido(fonte.urlBase, new URL(c.urlDetalhe).pathname))) continue;
+
+        await dormir(ATRASO_MS);
+        try {
+          const d = await buscar(c.urlDetalhe);
+          const tipoD = classificar(d.url, d.contentType);
+          let ficheiroD;
+
+          if (tipoD.binario) {
+            if (d.bytes.byteLength > LIMITE_PDF_BYTES) {
+              // Too big to commit; it still reaches the artifact upload, and the
+              // manifest records where it came from.
+              resumo.push(
+                `  - ${d.url} — ${tipoD.extensao} de ${d.bytes.byteLength} bytes, não commitado`,
+              );
+              continue;
+            }
+            ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+            await writeFile(join(dir, ficheiroD), d.bytes);
+            bytesTotais += d.bytes.byteLength;
+            resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${d.bytes.byteLength} bytes`);
+          } else {
+            const brutoD = new TextDecoder("utf-8").decode(d.bytes);
+            const limpoDetalhe = tipoD.normalizar ? normalizarConteudo(brutoD) : brutoD;
+            ficheiroD = nomeSeguro(d.url, tipoD.extensao);
+            await writeFile(join(dir, ficheiroD), limpoDetalhe, "utf8");
+            bytesTotais += limpoDetalhe.length;
+            resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${limpoDetalhe.length} bytes`);
+          }
+
+          entradas.push({
+            url: d.url,
+            ficheiro: ficheiroD,
+            status: d.status,
+            contentType: d.contentType,
+            etag: d.etag,
+            lastModified: d.lastModified,
+            capturadoEm: new Date().toISOString(),
+          });
+        } catch (erro) {
+          resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
+        }
       }
     }
+  } catch (erro) {
+    // Record and carry on. A source that threw used to leave no directory at
+    // all, so it vanished from the resulting PR with no explanation — which is
+    // exactly what happened to prr-candidaturas and cost a round trip to find.
+    erroFatal = erro instanceof Error ? erro.message : String(erro);
+    resumo.push(`- **FALHOU:** ${erroFatal}`);
   }
 
   await writeFile(
     join(dir, "manifest.json"),
     JSON.stringify(
-      { sourceId: fonte.id, capturadoEm: new Date().toISOString(), entradas },
+      { sourceId: fonte.id, capturadoEm: new Date().toISOString(), erro: erroFatal, entradas },
       null,
       2,
     ),
     "utf8",
   );
 
-  return { entradas, resumo, bytesTotais };
+  return { entradas, resumo, bytesTotais, erroFatal };
 }
 
 async function main() {

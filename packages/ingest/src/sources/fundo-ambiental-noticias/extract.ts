@@ -35,6 +35,18 @@ export { ehPaginaDeErro };
 const RE_CAMINHO_NOTICIA = /^listagem-noticias\/[^/]+\.aspx$/i;
 
 /**
+ * Pagination, not a notice.
+ *
+ * The real listing links to `listagem-noticias/0.aspx`, which has exactly the shape
+ * of a notice URL and is the "next page" control. Followed, it costs a detail fetch
+ * and — once this source goes live — a paid extraction of a listing page, whose
+ * output could only be nonsense.
+ *
+ * A notice slug is derived from its title and is never just a number.
+ */
+const RE_SLUG_PAGINACAO = /^\d+$/;
+
+/**
  * Recurring administrative posts that are never a funding notice.
  *
  * Deliberately a NEGATIVE list, not a positive keyword allowlist. A title we fail to
@@ -62,6 +74,9 @@ export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
 
     const caminho = caminhoRelativo(href, ctx.urlBase);
     if (caminho === null || !RE_CAMINHO_NOTICIA.test(caminho)) continue;
+
+    const slug = caminho.slice("listagem-noticias/".length).replace(/\.aspx$/i, "");
+    if (RE_SLUG_PAGINACAO.test(slug)) continue;
 
     const url = new URL(href, ctx.urlBase).toString();
     const chave = canonicalizarUrl(url);

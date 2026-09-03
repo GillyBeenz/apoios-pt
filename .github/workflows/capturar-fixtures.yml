@@ -79,6 +79,7 @@ jobs:
           commit-message: "Capturar fixtures reais das fontes de apoios"
           add-paths: |
             packages/ingest/src/sources/**/fixtures/**
+            RESUMO-FIXTURES.md
           delete-branch: true
 
       - name: Resultado

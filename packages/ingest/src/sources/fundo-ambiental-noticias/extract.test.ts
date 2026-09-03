@@ -3,70 +3,53 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { extrair } from "./extract.ts";
 
+const FIXTURES = join(import.meta.dirname, "fixtures");
+const ler = (f: string): string => readFileSync(join(FIXTURES, f), "utf8");
+
 const CTX = {
   urlBase: "https://www.fundoambiental.pt/listagem-noticias.aspx",
-  agora: new Date("2026-09-02T00:00:00Z"),
+  agora: new Date("2026-09-03T00:00:00Z"),
 };
 
 /**
- * The news listing template has NOT been captured yet — the notice pages already in
- * fixtures link to `listagem-noticias.aspx` and nowhere below it. So these tests
- * exercise the identification rule rather than claiming to exercise real markup.
+ * Against markup captured from the live site, not anything invented.
  *
- * That is worth doing because the rule is deliberately template-independent: it keys
- * on the shape of the href, which a CMS reskin does not change. The URLs below are
- * real ones from the live site, not invented.
+ * The captured listing carries ten notice-shaped links: four real notices, five
+ * monthly payment reports, and one pagination control. Getting from ten to four is
+ * the entire job of this extractor, and each of the two exclusions is worth a test
+ * because each was a real defect or a real cost.
  */
-const PAGINA = `
-<html><body>
-  <nav>
-    <a href="/index.aspx">Início</a>
-    <a href="https://www.fundoambiental.pt/listagem-noticias.aspx">Notícias</a>
-    <a href="/apoios-2026/transicao-energetica1/032026-reforco.aspx">Aviso 03/2026</a>
-  </nav>
-  <ul>
-    <li><a href="/listagem-noticias/aviso-de-abertura-de-concurso-n-02-2026-apoio-a-realizacao-de-investimentos.aspx">
-      Aviso de Abertura de Concurso N.º 02 /2026 - «Apoio à realização de investimentos» - Segunda Republicação</a>
-      <span>02-09-2026</span></li>
-    <li><a href="/listagem-noticias/programa-de-apoio-a-edificios-mais-sustentaveis-2023-1-aviso-1-republicacao-.aspx">
-      Programa de Apoio a Edifícios mais Sustentáveis 2023 (1º AVISO) - 1ª Republicação</a></li>
-    <li><a href="/listagem-noticias/pagamentos-do-fundo-ambiental-abril-de-2025.aspx">
-      Pagamentos do Fundo Ambiental - Abril de 2025</a></li>
-    <li><a href="/listagem-noticias/pagamentos-do-fundo-ambiental-1-trimestre-de-2025.aspx">
-      Pagamentos do Fundo Ambiental - 1.º Trimestre de 2025</a></li>
-    <li><a href="/listagem-noticias/aviso-de-abertura-de-concurso-n-02-2026-apoio-a-realizacao-de-investimentos.aspx">
-      Aviso de Abertura de Concurso N.º 02 /2026 - duplicado na paginação</a></li>
-  </ul>
-</body></html>`;
+describe("extrair — notícias, markup real", () => {
+  const candidatos = extrair(ler("listagem-noticias-88db803a6c.html"), CTX);
+  const caminhos = candidatos.map((c) => new URL(c.urlDetalhe).pathname);
 
-describe("extrair — notícias do Fundo Ambiental", () => {
-  const candidatos = extrair(PAGINA, CTX);
+  it("encontra as notícias de avisos reais", () => {
+    expect(candidatos).toHaveLength(4);
+    expect(caminhos.join("\n")).toContain("aviso-de-abertura-de-concurso-n-032026");
+    expect(caminhos.join("\n")).toContain("fundo-azul-aviso-convite-n-01faz2026");
+    expect(caminhos.join("\n")).toContain("aviso-convite-n-09c08-i01012026");
+  });
 
-  it("segue apenas ligações com a forma de notícia", () => {
-    // The listing page links to itself and to notice pages; neither has the shape
-    // `listagem-noticias/<slug>.aspx`, so neither may be followed.
-    for (const c of candidatos) {
-      expect(new URL(c.urlDetalhe).pathname).toMatch(/^\/listagem-noticias\/[^/]+\.aspx$/);
-    }
-    expect(candidatos.map((c) => c.titulo)).toEqual([
-      expect.stringContaining("Aviso de Abertura de Concurso N.º 02 /2026"),
-      expect.stringContaining("Edifícios mais Sustentáveis"),
-    ]);
+  it("não segue a paginação", () => {
+    // `listagem-noticias/0.aspx` has exactly the shape of a notice URL. Followed, it
+    // would spend a paid extraction on a listing page.
+    expect(caminhos).not.toContain("/listagem-noticias/0.aspx");
   });
 
   it("descarta os relatórios de pagamentos", () => {
-    // Published monthly and quarterly, and never a funding opportunity. Left in,
-    // they would be the largest single line on the extraction bill.
-    expect(candidatos.some((c) => /pagamentos/i.test(c.titulo))).toBe(false);
+    // Five of the ten links on this page — published monthly, never a funding
+    // opportunity, and the single largest avoidable line on the extraction bill.
+    expect(caminhos.join("\n")).not.toMatch(/pagamentos/i);
   });
 
-  it("não repete uma notícia ligada duas vezes", () => {
+  it("lê a referência legal do título quando existe", () => {
+    const comReferencia = candidatos.filter((c) => c.referenciaLegalBruta !== null);
+    expect(comReferencia.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("não repete uma notícia ligada de dois sítios", () => {
     const urls = candidatos.map((c) => c.urlCanonica);
     expect(new Set(urls).size).toBe(urls.length);
-  });
-
-  it("lê a referência legal a partir do título", () => {
-    expect(candidatos[0]?.referenciaLegalBruta).toContain("02");
   });
 
   it("devolve zero na página de erro servida com HTTP 200", () => {

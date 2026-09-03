@@ -12,13 +12,14 @@ export const fundoAmbientalNoticias: Fonte = {
   // a budget reinforcement on the day it is announced, which is exactly when the
   // remaining application window is shortest.
   cadenciaHoras: 12,
-  // The extractor is written against the site's confirmed URL shape, but the news
-  // listing template itself has not been captured yet — the notice pages already in
-  // fixtures link to `listagem-noticias.aspx` and nowhere below it. Until a capture
-  // confirms how many items that page actually carries, a health floor would be a
-  // number invented rather than measured.
-  estado: "em-captura",
-  candidatosMin: 0,
+  // Verified against the captured listing.
+  estado: "activa",
+  // The captured page carries ten notice-shaped links: four real notices, five
+  // monthly payment reports, one pagination control. A floor of 2 is deliberately
+  // low, because news volume genuinely varies — a quiet fortnight is normal here in
+  // a way it is not for the notice listings. It still catches a total break, which
+  // is the failure that silently stops every alert.
+  candidatosMin: 2,
   ehPaginaDeErro,
   extrair,
 };
