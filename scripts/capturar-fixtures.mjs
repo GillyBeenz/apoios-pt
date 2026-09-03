@@ -11,7 +11,7 @@
  *
  * Run via .github/workflows/capturar-fixtures.yml, not locally.
  */
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, rm, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { normalizarConteudo } from "../packages/ingest/src/http/normalizar.ts";
@@ -230,9 +230,18 @@ async function permitido(urlBase, caminho) {
 }
 
 async function capturarFonte(fonte, dirRaiz) {
+  // Write into a fresh staging directory and swap it in only once the capture has
+  // actually produced something.
+  //
+  // The old code deleted `fixtures/` up front, so a capture that then failed left
+  // NOTHING behind — and with the workflow committing that directory, one bad
+  // afternoon at the far end would erase the very markup the extractors are tested
+  // against. Clearing first is right (a stale fixture must not pretend to be
+  // current); doing it before knowing the fetch works is not.
   const dir = join(dirRaiz, fonte.id, "fixtures");
-  await rm(dir, { recursive: true, force: true });
-  await mkdir(dir, { recursive: true });
+  const dirStaging = `${dir}.a-escrever`;
+  await rm(dirStaging, { recursive: true, force: true });
+  await mkdir(dirStaging, { recursive: true });
 
   const entradas = [];
   const resumo = [];
@@ -250,6 +259,27 @@ async function capturarFonte(fonte, dirRaiz) {
       const r = await buscarComReparo(url);
       const tipo = classificar(r.url, r.contentType);
 
+      // Never write a non-200 over a good fixture.
+      //
+      // The status check used to happen AFTER the file was written, so any error
+      // page became the fixture. Running this locally, where an egress proxy answers
+      // 403, replaced a real 261 KB page and a real 466 KB PDF with three 111-byte
+      // "host not in allowlist" bodies — and the next capture would have committed
+      // them as if they were the site's own content.
+      if (r.status !== 200) {
+        resumo.push(`- ${r.url}\n  status ${r.status} — não escrito`);
+        entradas.push({
+          url: r.url,
+          ficheiro: null,
+          status: r.status,
+          contentType: r.contentType,
+          etag: r.etag,
+          lastModified: r.lastModified,
+          capturadoEm: new Date().toISOString(),
+        });
+        continue;
+      }
+
       let ficheiro;
       let html = null;
       if (tipo.binario) {
@@ -258,7 +288,7 @@ async function capturarFonte(fonte, dirRaiz) {
           continue;
         }
         ficheiro = nomeSeguro(r.url, tipo.extensao);
-        await writeFile(join(dir, ficheiro), r.bytes);
+        await writeFile(join(dirStaging, ficheiro), r.bytes);
         bytesTotais += r.bytes.byteLength;
         resumo.push(
           `- ${r.url}\n  status ${r.status}, ${r.bytes.byteLength} bytes ` +
@@ -271,7 +301,7 @@ async function capturarFonte(fonte, dirRaiz) {
         // removing it is what makes committing real fixtures viable at all.
         html = tipo.normalizar ? normalizarConteudo(bruto) : bruto;
         ficheiro = nomeSeguro(r.url, tipo.extensao);
-        await writeFile(join(dir, ficheiro), html, "utf8");
+        await writeFile(join(dirStaging, ficheiro), html, "utf8");
         bytesTotais += html.length;
         resumo.push(
           `- ${r.url}\n  status ${r.status}, ${html.length} bytes após limpeza ` +
@@ -290,7 +320,7 @@ async function capturarFonte(fonte, dirRaiz) {
         capturadoEm: new Date().toISOString(),
       });
 
-      if (r.status !== 200 || html === null) continue;
+      if (html === null) continue;
 
       // Follow the notices this listing links to, so there is a detail document
       // (and ideally a real PDF) to build the extraction against.
@@ -316,6 +346,10 @@ async function capturarFonte(fonte, dirRaiz) {
         await dormir(ATRASO_MS);
         try {
           const d = await buscarComReparo(c.urlDetalhe);
+          if (d.status !== 200) {
+            resumo.push(`  - ${d.url} — status ${d.status}, não escrito`);
+            continue;
+          }
           const tipoD = classificar(d.url, d.contentType);
           let ficheiroD;
 
@@ -329,14 +363,14 @@ async function capturarFonte(fonte, dirRaiz) {
               continue;
             }
             ficheiroD = nomeSeguro(d.url, tipoD.extensao);
-            await writeFile(join(dir, ficheiroD), d.bytes);
+            await writeFile(join(dirStaging, ficheiroD), d.bytes);
             bytesTotais += d.bytes.byteLength;
             resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${d.bytes.byteLength} bytes`);
           } else {
             const brutoD = new TextDecoder("utf-8").decode(d.bytes);
             const limpoDetalhe = tipoD.normalizar ? normalizarConteudo(brutoD) : brutoD;
             ficheiroD = nomeSeguro(d.url, tipoD.extensao);
-            await writeFile(join(dir, ficheiroD), limpoDetalhe, "utf8");
+            await writeFile(join(dirStaging, ficheiroD), limpoDetalhe, "utf8");
             bytesTotais += limpoDetalhe.length;
             resumo.push(`  - ${d.url} — ${tipoD.extensao}, ${limpoDetalhe.length} bytes`);
           }
@@ -379,7 +413,7 @@ async function capturarFonte(fonte, dirRaiz) {
   }
 
   await writeFile(
-    join(dir, "manifest.json"),
+    join(dirStaging, "manifest.json"),
     JSON.stringify(
       {
         sourceId: fonte.id,
@@ -393,6 +427,17 @@ async function capturarFonte(fonte, dirRaiz) {
     ),
     "utf8",
   );
+
+  // Swap in only if something real was captured. A run that fetched nothing keeps
+  // the previous fixtures rather than replacing them with an empty directory.
+  const capturouAlgo = entradas.some((e) => e.ficheiro != null);
+  if (capturouAlgo) {
+    await rm(dir, { recursive: true, force: true });
+    await rename(dirStaging, dir);
+  } else {
+    resumo.push("  - nada capturado; as fixtures anteriores ficam como estavam");
+    await rm(dirStaging, { recursive: true, force: true });
+  }
 
   return { entradas, resumo, bytesTotais, erroFatal };
 }
