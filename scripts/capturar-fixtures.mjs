@@ -71,6 +71,15 @@ function nomeSeguro(url, extensao) {
 const intermediariosPorHost = new Map();
 
 /**
+ * What the chain actually looked like, per host, recorded so a failure can be
+ * diagnosed from the committed record instead of by guessing.
+ *
+ * Certificate metadata only — subject, issuer, and the AIA URLs. All of it is public,
+ * presented by the server to anyone who connects; no key material goes near this.
+ */
+const cadeiaObservadaPorHost = new Map();
+
+/**
  * Fetch the intermediate certificate the server should have sent.
  *
  * See packages/ingest/src/http/cadeia-tls.ts for why this exists and why disabling
@@ -81,6 +90,8 @@ async function repararCadeia(host) {
 
   const { X509Certificate } = await import("node:crypto");
   const pems = [];
+  const observada = [];
+  cadeiaObservadaPorHost.set(host, observada);
 
   // Walk UP the chain, not just one step. Supplying a single intermediate turned
   // `UNABLE_TO_VERIFY_LEAF_SIGNATURE` into `UNABLE_TO_GET_ISSUER_CERT`: the
@@ -89,10 +100,19 @@ async function repararCadeia(host) {
   // exhausted AIA, or a sane depth limit.
   let actual = await certificadoApresentado(host);
   for (let profundidade = 0; actual != null && profundidade < 4; profundidade += 1) {
+    const emissores = urlsDoEmissor(actual.infoAccess);
+    observada.push({
+      nivel: profundidade,
+      subject: actual.subject?.replace(/\n/g, " | ") ?? null,
+      issuer: actual.issuer?.replace(/\n/g, " | ") ?? null,
+      autoAssinado: ehAutoAssinado(actual),
+      emissoresAnunciados: emissores,
+    });
+
     if (ehAutoAssinado(actual)) break;
 
     let seguinte = null;
-    for (const url of urlsDoEmissor(actual.infoAccess)) {
+    for (const url of emissores) {
       try {
         const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
         if (!r.ok) continue;
@@ -338,12 +358,33 @@ async function capturarFonte(fonte, dirRaiz) {
     // exactly what happened to prr-candidaturas and cost a round trip to find.
     erroFatal = erro instanceof Error ? razaoCompleta(erro) : String(erro);
     resumo.push(`- **FALHOU:** ${erroFatal}`);
+
+    // A TLS failure is only actionable once you know WHICH certificate authority is
+    // missing, so put the observed chain where a person will read it.
+    for (const [host, cadeia] of cadeiaObservadaPorHost) {
+      if (cadeia.length === 0) continue;
+      resumo.push(`  - cadeia TLS observada em \`${host}\`:`);
+      for (const n of cadeia) {
+        resumo.push(
+          `    - nível ${n.nivel}${n.autoAssinado ? " (auto-assinado, raiz)" : ""}\n` +
+            `      subject: \`${n.subject ?? "—"}\`\n` +
+            `      issuer:  \`${n.issuer ?? "—"}\`\n` +
+            `      AIA:     ${n.emissoresAnunciados.length > 0 ? n.emissoresAnunciados.map((u) => `\`${u}\``).join(", ") : "nenhum"}`,
+        );
+      }
+    }
   }
 
   await writeFile(
     join(dir, "manifest.json"),
     JSON.stringify(
-      { sourceId: fonte.id, capturadoEm: new Date().toISOString(), erro: erroFatal, entradas },
+      {
+        sourceId: fonte.id,
+        capturadoEm: new Date().toISOString(),
+        erro: erroFatal,
+        cadeiaTls: erroFatal === null ? undefined : Object.fromEntries(cadeiaObservadaPorHost),
+        entradas,
+      },
       null,
       2,
     ),
