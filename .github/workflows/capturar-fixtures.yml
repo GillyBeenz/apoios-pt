@@ -72,7 +72,12 @@ jobs:
         with:
           # A PR rather than a direct push, so captured markup gets a review
           # pass before it becomes the baseline the extractors are tuned against.
-          branch: fixtures/captura-${{ github.run_id }}
+          #
+          # A STABLE branch name, deliberately. With the run id in it, every run
+          # opened a fresh pull request and left the previous one behind — nine of
+          # them accumulated in a single day of iterating on one source, which buries
+          # the one that matters. A fixed name makes each run update the same PR.
+          branch: fixtures/captura
           base: main
           title: "Fixtures capturadas das fontes reais"
           body-path: RESUMO-FIXTURES.md
@@ -84,7 +89,7 @@ jobs:
 
       - name: Resultado
         run: |
-          RAMO="fixtures/captura-${{ github.run_id }}"
+          RAMO="fixtures/captura"
           if [ "${{ steps.pr.outcome }}" = "success" ]; then
             echo "::notice::Fixtures capturadas e PR aberto."
           else
