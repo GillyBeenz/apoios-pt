@@ -11,10 +11,12 @@ export const pt2030PlanoAnualAvisos: Fonte = {
   // The plan is revised a few times a year, not daily. Weekly is frequent enough to
   // catch a revision while it still describes something in the future.
   cadenciaHoras: 168,
-  // The link-finding rule keys on the href extension, so it does not depend on the
-  // page's markup — but nothing here is verified until a capture proves the file is
-  // reachable and the sheet's columns are what they are assumed to be.
-  estado: "em-captura",
-  candidatosMin: 0,
+  // Verified: the capture found the .xlsx on the first try, and folha.ts reads all
+  // 211 planned notices out of it.
+  estado: "activa",
+  // Exactly one file is expected. There is no partial-break mode here — either the
+  // download link is on the page or it is not — so 1 is a meaningful floor, unlike
+  // on a listing where it would hide a collapse from forty entries to one.
+  candidatosMin: 1,
   extrair,
 };

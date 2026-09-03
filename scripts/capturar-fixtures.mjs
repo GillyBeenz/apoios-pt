@@ -26,6 +26,25 @@ const LIMITE_TOTAL_BYTES = 20 * 1024 * 1024;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Node's fetch reports every network-layer problem as the same three words, "fetch
+ * failed", and puts the actual reason in `cause` — often nested. Reporting only the
+ * wrapper is what turned prr-candidaturas into a mystery: DNS failure, refused
+ * connection, and a rejected certificate are three very different problems with three
+ * different fixes, and they all print identically.
+ */
+function razaoCompleta(erro) {
+  const partes = [];
+  let actual = erro;
+  for (let i = 0; i < 5 && actual != null; i += 1) {
+    const codigo = actual.code ? ` (${actual.code})` : "";
+    const texto = `${actual.message ?? String(actual)}${codigo}`;
+    if (!partes.includes(texto)) partes.push(texto);
+    actual = actual.cause;
+  }
+  return partes.join(" ← ");
+}
+
 function nomeSeguro(url, extensao) {
   const hash = createHash("sha256").update(url).digest("hex").slice(0, 10);
   const base =
@@ -199,7 +218,7 @@ async function capturarFonte(fonte, dirRaiz) {
             capturadoEm: new Date().toISOString(),
           });
         } catch (erro) {
-          resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${erro.message}`);
+          resumo.push(`  - ${c.urlDetalhe} — FALHOU: ${razaoCompleta(erro)}`);
         }
       }
     }
@@ -207,7 +226,7 @@ async function capturarFonte(fonte, dirRaiz) {
     // Record and carry on. A source that threw used to leave no directory at
     // all, so it vanished from the resulting PR with no explanation — which is
     // exactly what happened to prr-candidaturas and cost a round trip to find.
-    erroFatal = erro instanceof Error ? erro.message : String(erro);
+    erroFatal = erro instanceof Error ? razaoCompleta(erro) : String(erro);
     resumo.push(`- **FALHOU:** ${erroFatal}`);
   }
 

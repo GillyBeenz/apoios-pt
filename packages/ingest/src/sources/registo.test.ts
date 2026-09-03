@@ -49,9 +49,11 @@ describe("registo de fontes", () => {
   it("exige um piso de saúde a quem está activa, e nenhum a quem não está", () => {
     for (const f of FONTES) {
       if (f.estado === "activa") {
-        // A floor of 0 or 1 cannot detect a partial break, which is the failure
-        // mode that actually happens.
-        expect(f.candidatosMin, f.id).toBeGreaterThan(1);
+        // On a listing, a floor of 1 cannot detect a partial break — a collapse from
+        // forty entries to one would pass — so it has to be higher. A dataset source
+        // is different in kind: it expects a single file, and 1 genuinely means "the
+        // download link is still there".
+        expect(f.candidatosMin, f.id).toBeGreaterThan(f.tipo === "dataset" ? 0 : 1);
       } else {
         // Any other number would be invented rather than measured.
         expect(f.candidatosMin, f.id).toBe(0);
