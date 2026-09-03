@@ -44,6 +44,16 @@ describe("classificar", () => {
     expect(r.normalizar).toBe(false);
   });
 
+  it("trata JSON como texto, sem normalização de HTML", () => {
+    // A source reached through an API, not a page. Saving it as .html and stripping
+    // viewstate fields out of it would be wrong twice over.
+    const r = classificar(
+      "https://recuperarportugal.gov.pt/wp-json/wp/v2/pages/20182",
+      "application/json; charset=UTF-8",
+    );
+    expect(r).toEqual({ binario: false, extensao: ".json", normalizar: false });
+  });
+
   it("trata HTML como texto normalizável", () => {
     const r = classificar("https://www.fundoambiental.pt/apoios-2026.aspx", "text/html; charset=utf-8");
     expect(r).toEqual({ binario: false, extensao: ".html", normalizar: true });

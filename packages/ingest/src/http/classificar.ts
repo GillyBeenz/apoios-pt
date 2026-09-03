@@ -41,5 +41,12 @@ export function classificar(
   if (ct.includes("csv") || extensaoUrl === "csv") {
     return { binario: false, extensao: ".csv", normalizar: false };
   }
+  // Same for JSON. Some sources are reached through an API rather than a page —
+  // recuperarportugal.gov.pt renders its notices client-side, so its WordPress REST
+  // endpoint is the only static representation there is. Saving that as `.html` and
+  // running HTML normalisation over it would be wrong twice over.
+  if (ct.includes("json") || extensaoUrl === "json") {
+    return { binario: false, extensao: ".json", normalizar: false };
+  }
   return { binario: false, extensao: ".html", normalizar: true };
 }
