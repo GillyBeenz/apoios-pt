@@ -1,0 +1,25 @@
+{
+  "sourceId": "prr-candidaturas",
+  "capturadoEm": "2026-09-03T22:21:31.567Z",
+  "erro": null,
+  "entradas": [
+    {
+      "url": "https://recuperarportugal.gov.pt/candidaturas-prr/",
+      "ficheiro": "pagina-3ee105669d.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": "\"c503-65a9518e36429\"",
+      "lastModified": "Thu, 03 Sep 2026 14:37:54 GMT",
+      "capturadoEm": "2026-09-03T22:21:27.200Z"
+    },
+    {
+      "url": "https://recuperarportugal.gov.pt/wp-content/uploads/ap/plano-de-avisos.pdf",
+      "ficheiro": "plano-de-avisos-8a53b77dc1.pdf",
+      "status": 200,
+      "contentType": "application/pdf",
+      "etag": "\"71c39-65254904364fb-gzip\"",
+      "lastModified": "Thu, 21 May 2026 14:16:51 GMT",
+      "capturadoEm": "2026-09-03T22:21:31.567Z"
+    }
+  ]
+}
