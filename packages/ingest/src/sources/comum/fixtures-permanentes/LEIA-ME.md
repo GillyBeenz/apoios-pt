@@ -15,3 +15,11 @@ Mas é exactamente ela que prova que o `ehPaginaDeErro` funciona — e sem esse 
 uma fonte morta parece saudável para sempre, porque nem o código de estado nem o hash
 mudam. Perder a fixture seria perder a única prova do salvaguarda mais valioso do
 pipeline, precisamente por o bug que o motivou ter sido corrigido.
+
+`prr-pagina-20182-vazia.json` é a resposta REST do WordPress para a página de
+candidaturas do PRR. Guardada porque prova uma ausência: `content.rendered` tem
+zero bytes e `acf` é uma lista vazia. A página não tem conteúdo nenhum no CMS — a
+listagem inteira é montada no browser.
+
+Sem isto, a tentação de voltar a tentar o endpoint volta de cada vez que alguém
+olha para a fonte e vê que ela não produz nada.
