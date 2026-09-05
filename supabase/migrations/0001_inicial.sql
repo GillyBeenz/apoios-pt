@@ -332,6 +332,7 @@ alter table alerts_sent         enable row level security;
 alter table alerts_outbox       enable row level security;
 alter table unsubscribe_tokens  enable row level security;
 alter table funds               enable row level security;
+alter table fund_slugs          enable row level security;
 alter table fund_events         enable row level security;
 alter table sources             enable row level security;
 alter table snapshots           enable row level security;
@@ -371,6 +372,22 @@ create policy eventos_publicados on fund_events
 create policy fontes_publicas on sources
   for select to anon, authenticated
   using (true);
+
+-- Old slugs resolve for the same funds the catalogue shows, and no others.
+--
+-- This table was left out of the RLS block above until Supabase's advisor caught it
+-- against the live project. The anon key ships in the browser by design; what makes
+-- that safe is RLS, and here there was none — so anyone holding it could repoint a
+-- retired Apoios URL at a different fund, or delete the mapping and break every
+-- shared link. No personal data, but this product's whole claim is that a link takes
+-- you to the right notice.
+--
+-- Read-only for anon: writes belong to the ingestion role and service_role.
+create policy slugs_publicados on fund_slugs
+  for select to anon, authenticated
+  using (exists (
+    select 1 from funds f where f.id = fund_slugs.fund_id and f.publicado
+  ));
 
 -- alerts_outbox, unsubscribe_tokens, snapshots, fund_identities,
 -- fund_extractions, ingest_runs and source_health get NO policy, so RLS denies
