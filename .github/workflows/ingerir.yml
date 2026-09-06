@@ -27,7 +27,11 @@ jobs:
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_MODE: live
-      DATABASE_URL: ${{ secrets.APOIOS_INGEST_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      # A JWT carrying `role: apoios_ingest`, never the service_role key. PostgREST
+      # reads the role out of the token, so the restriction described above is
+      # enforced by the database rather than promised by this file.
+      SUPABASE_INGEST_KEY: ${{ secrets.SUPABASE_INGEST_KEY }}
 
     steps:
       - uses: actions/checkout@v4

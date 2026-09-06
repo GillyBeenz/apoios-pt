@@ -3,7 +3,8 @@ import { parseArgs } from "node:util";
 import { Extractor } from "@apoios/extraction";
 import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
-import { ArmazemMemoria } from "./pipeline/armazem.ts";
+import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
+import { ArmazemSupabase } from "./pipeline/armazem-supabase.ts";
 import { executarFonte } from "./pipeline/executar.ts";
 import { avaliarSaude } from "./pipeline/saude.ts";
 import { FONTES, FONTES_ACTIVAS, obterFonte } from "./sources/registo.ts";
@@ -20,6 +21,43 @@ apoios ingerir — executa o pipeline de recolha
 Fontes activas: ${FONTES_ACTIVAS.map((f) => f.id).join(", ")}
 Em captura (ignoradas sem --source): ${FONTES.filter((f) => f.estado !== "activa").map((f) => f.id).join(", ")}
 `.trim();
+
+/**
+ * Pick the store, and refuse to guess.
+ *
+ * This used to be an unconditional `new ArmazemMemoria()`, including on the
+ * scheduled run. The job fetched every source, paid the model to extract each
+ * notice, wrote the results into a Map and exited — green, with a log full of
+ * candidates found and extractions succeeded, and an empty database. Nothing
+ * failed, so nothing ever said so.
+ *
+ * A missing credential now stops the run. Falling back to memory would reproduce
+ * exactly that failure, and an ingestion job that silently discards its work is
+ * worse than one that does not start: the catalogue stays empty either way, but
+ * only the second tells anybody.
+ */
+function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
+  if (simulacao) {
+    const memoria = new ArmazemMemoria();
+    return () => memoria;
+  }
+
+  const url = process.env.SUPABASE_URL;
+  const chave = process.env.SUPABASE_INGEST_KEY;
+
+  if (url === undefined || chave === undefined) {
+    throw new Error(
+      "Faltam credenciais: SUPABASE_URL e SUPABASE_INGEST_KEY. " +
+        "A chave é um JWT com `role: apoios_ingest` — nunca a service_role, que " +
+        "ignora o RLS e leria dados pessoais para um log público. " +
+        "Para correr sem escrever nada, use --dry-run.",
+    );
+  }
+
+  // One store per source: `snapshots.source_id` and `funds.source_id` are both
+  // `not null`, and the Armazem interface carries no source argument.
+  return (fonteId) => ArmazemSupabase.de(url, chave, fonteId);
+}
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -69,9 +107,10 @@ async function main(): Promise<number> {
 
   const simulacao = values["dry-run"] === true;
   const buscador = values.fixtures ? new BuscadorReplay(values.fixtures) : new BuscadorHttp();
-  const armazem = new ArmazemMemoria();
   const extractor = new Extractor();
   const agora = new Date();
+
+  const armazemDe = escolherArmazem(simulacao);
 
   let houveCritico = false;
 
@@ -81,7 +120,7 @@ async function main(): Promise<number> {
     const r = await executarFonte({
       fonte,
       buscador,
-      armazem,
+      armazem: armazemDe(fonte.id),
       extractor,
       agora,
       simulacao,
