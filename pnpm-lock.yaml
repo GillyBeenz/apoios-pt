@@ -81,6 +81,9 @@ importers:
       '@apoios/extraction':
         specifier: workspace:*
         version: link:../extraction
+      '@supabase/supabase-js':
+        specifier: ^2.115.0
+        version: 2.115.0
 
 packages:
 

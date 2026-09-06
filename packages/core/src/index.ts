@@ -7,3 +7,4 @@ export * from "./identidade.ts";
 export * from "./diferencas.ts";
 export * from "./varrimento.ts";
 export * from "./correspondencia.ts";
+export * from "./linha.ts";
