@@ -77,46 +77,89 @@ export function ordenarApoios(apoios: readonly Apoio[]): Apoio[] {
   });
 }
 
-const LISTA = (v: string | undefined): string[] =>
-  (v ?? "").split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+/**
+ * Read one filter's values from the query string.
+ *
+ * Two shapes have to work. Links produce `estado=aberto,previsto`; a GET form
+ * with checkboxes produces `estado=aberto&estado=previsto`, which Next hands over
+ * as an array. Reading only the first of that array — as this did — silently
+ * dropped every box after the first, so ticking three states filtered by one.
+ */
+function valores(bruto: string | string[] | undefined): string[] {
+  const partes = Array.isArray(bruto) ? bruto : [bruto ?? ""];
+  return partes
+    .flatMap((p) => p.split(","))
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
 /**
  * Read filters from the URL query string.
  *
  * Filters live in the URL so a search is shareable, bookmarkable and indexable —
  * search visibility is a meaningful acquisition channel for a product like this.
+ *
+ * The defaults apply only when a parameter is ABSENT. Present-but-empty means the
+ * user cleared it, and must be honoured: treating it as absent re-applied the
+ * default, so unticking the last state left the page looking exactly as before
+ * and the checkbox appeared not to work at all.
  */
 export function filtrosDaQuery(
   params: Record<string, string | string[] | undefined>,
 ): FiltrosApoio {
+  const presente = (k: string): boolean => params[k] !== undefined;
+
   const um = (k: string): string | undefined => {
     const v = params[k];
     return Array.isArray(v) ? v[0] : v;
   };
 
-  const medidas = LISTA(um("medida")) as Medida[];
-  const estados = LISTA(um("estado")) as EstadoApoio[];
-  const beneficiarios = LISTA(um("beneficiario")) as TipoBeneficiario[];
-  const concelho = um("concelho") ?? null;
+  const concelho = (um("concelho") ?? "").trim();
 
   return {
-    medidas,
-    estados: estados.length > 0 ? estados : FILTROS_PREDEFINIDOS.estados,
-    // An explicit `beneficiario=` (empty) clears the default rather than
-    // re-applying it, so "show me everything" is actually reachable.
-    beneficiarios:
-      um("beneficiario") === undefined ? FILTROS_PREDEFINIDOS.beneficiarios : beneficiarios,
-    concelho: concelho !== null && concelho.length > 0 ? concelho : null,
+    medidas: valores(params["medida"]) as Medida[],
+    estados: presente("estado")
+      ? (valores(params["estado"]) as EstadoApoio[])
+      : FILTROS_PREDEFINIDOS.estados,
+    beneficiarios: presente("beneficiario")
+      ? (valores(params["beneficiario"]) as TipoBeneficiario[])
+      : FILTROS_PREDEFINIDOS.beneficiarios,
+    concelho: concelho.length > 0 ? concelho : null,
     incluirPorRever: um("rever") === "1",
   };
 }
 
+/**
+ * Serialise filters back to a query string.
+ *
+ * `estado` and `beneficiario` are always written, even when empty, because an
+ * empty value is a real state — "no constraint" — and dropping the key would be
+ * read back as "unset" and silently restore the default.
+ */
 export function queryDosFiltros(f: FiltrosApoio): string {
   const p = new URLSearchParams();
   if (f.medidas.length > 0) p.set("medida", f.medidas.join(","));
-  if (f.estados.length > 0) p.set("estado", f.estados.join(","));
+  p.set("estado", f.estados.join(","));
   p.set("beneficiario", f.beneficiarios.join(","));
-  if (f.concelho) p.set("concelho", f.concelho);
+  if (f.concelho !== null) p.set("concelho", f.concelho);
   if (f.incluirPorRever) p.set("rever", "1");
   return p.toString();
+}
+
+/** The catalogue URL for a set of filters. */
+export function urlDosFiltros(f: FiltrosApoio): string {
+  const q = queryDosFiltros(f);
+  return q.length > 0 ? `/apoios?${q}` : "/apoios";
+}
+
+/** True when nothing has been changed from the homeowner default view. */
+export function ehPredefinicao(f: FiltrosApoio): boolean {
+  return queryDosFiltros(f) === queryDosFiltros(FILTROS_PREDEFINIDOS);
+}
+
+/** Toggle one value in a filter list, for building a link that flips a checkbox. */
+export function alternar<T extends string>(actuais: readonly T[], valor: T): T[] {
+  return actuais.includes(valor)
+    ? actuais.filter((v) => v !== valor)
+    : [...actuais, valor];
 }

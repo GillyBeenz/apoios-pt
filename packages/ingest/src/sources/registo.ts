@@ -12,10 +12,16 @@ import { pt2030PlanoAnualAvisos } from "./pt2030-plano-anual-avisos/index.ts";
  * identity, trust gating, dedup, the eligibility rule — lives in the pipeline rather
  * than in any single adapter. Phase 2 adds breadth on top of that proven spine.
  *
- * Only `fundo-ambiental-aac` is `activa`. The rest are `em-captura`: their entry
- * URLs are confirmed, but no extractor here has met their real markup, and this
- * sandbox cannot reach the domains to look. They are visited by
- * capturar-fixtures.yml and skipped by the pipeline until that has happened.
+ * A source is `activa` once its extractor has been run against markup captured
+ * from the live site; until then it is `em-captura`, visited by
+ * capturar-fixtures.yml and skipped by the pipeline. Only `prr-candidaturas` is
+ * still in that state, and for a reason that will not resolve itself: its
+ * listing is rendered client-side, so there is no markup for a pure extractor
+ * to read (see prr-candidaturas/index.ts).
+ *
+ * The distinction is what lets the health floor work. For a verified source zero
+ * candidates means the selectors broke; for an unverified one zero is simply the
+ * expected first result.
  */
 export const FONTES: readonly Fonte[] = [
   fundoAmbientalAac,

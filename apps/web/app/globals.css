@@ -1,19 +1,181 @@
 @import "tailwindcss";
 
-@theme {
-  --color-fundo: oklch(99% 0.004 106);
-  --color-tinta: oklch(24% 0.012 260);
-  --color-suave: oklch(52% 0.014 260);
-  --color-linha: oklch(91% 0.006 260);
-  --color-marca: oklch(48% 0.13 155);
-  --color-marca-suave: oklch(96% 0.03 155);
-}
+/*
+ * Two layers, deliberately.
+ *
+ * `--app-*` below are the raw palette and they change with the colour scheme.
+ * `@theme inline` then maps them onto Tailwind's token names WITHOUT inlining
+ * their values, so `text-suave` emits `color: var(--color-suave)`, which resolves
+ * through to `--app-suave` at paint time and follows the media query. A plain
+ * `@theme` would bake the light value into the stylesheet and dark mode would
+ * silently do nothing.
+ *
+ * Never put a bare custom property in square brackets after a utility prefix.
+ * Tailwind 4 dropped that shorthand: it now compiles to the property name as a
+ * literal value, which is invalid CSS, so browsers drop the declaration and the
+ * text just renders in the inherited colour with nothing warning you. Use the
+ * generated utilities — `text-suave`, `border-linha` — or the parenthesised form
+ * for a genuine one-off. `estilos.test.ts` fails the build if it comes back.
+ */
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+
+  --app-fundo: oklch(98.6% 0.004 106);
+  --app-superficie: oklch(100% 0 0);
+  --app-elevado: oklch(100% 0 0);
+  --app-tinta: oklch(22% 0.014 260);
+  --app-suave: oklch(50% 0.016 260);
+  --app-tenue: oklch(64% 0.014 260);
+  --app-linha: oklch(90% 0.006 260);
+  --app-linha-forte: oklch(84% 0.008 260);
+
+  --app-marca: oklch(46% 0.115 158);
+  --app-marca-forte: oklch(38% 0.105 158);
+  --app-marca-suave: oklch(96.5% 0.028 158);
+  --app-marca-linha: oklch(88% 0.055 158);
+
+  --app-aberto: oklch(56% 0.135 152);
+  --app-previsto: oklch(56% 0.115 250);
+  --app-suspenso: oklch(70% 0.15 75);
+  --app-encerrado: oklch(70% 0.008 260);
+
+  --app-urgente: oklch(52% 0.19 25);
+  --app-urgente-suave: oklch(96% 0.02 25);
+  --app-aviso-suave: oklch(96.5% 0.04 85);
+  --app-aviso-tinta: oklch(42% 0.09 70);
+  --app-ok-suave: oklch(96% 0.04 152);
+  --app-ok-tinta: oklch(38% 0.09 155);
+
+  --app-sombra: 0 1px 2px oklch(22% 0.014 260 / 0.05),
+                0 1px 3px oklch(22% 0.014 260 / 0.04);
+  --app-sombra-alta: 0 2px 4px oklch(22% 0.014 260 / 0.05),
+                     0 8px 24px oklch(22% 0.014 260 / 0.08);
 }
 
-body {
-  background: var(--color-fundo);
-  color: var(--color-tinta);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-fundo: oklch(17% 0.012 260);
+    --app-superficie: oklch(21% 0.014 260);
+    --app-elevado: oklch(24% 0.015 260);
+    --app-tinta: oklch(95% 0.006 260);
+    --app-suave: oklch(72% 0.012 260);
+    --app-tenue: oklch(58% 0.012 260);
+    --app-linha: oklch(30% 0.014 260);
+    --app-linha-forte: oklch(38% 0.016 260);
+
+    --app-marca: oklch(76% 0.14 158);
+    --app-marca-forte: oklch(86% 0.13 158);
+    --app-marca-suave: oklch(27% 0.045 158);
+    --app-marca-linha: oklch(38% 0.07 158);
+
+    --app-aberto: oklch(72% 0.16 152);
+    --app-previsto: oklch(70% 0.13 250);
+    --app-suspenso: oklch(78% 0.15 75);
+    --app-encerrado: oklch(48% 0.01 260);
+
+    --app-urgente: oklch(74% 0.16 25);
+    --app-urgente-suave: oklch(26% 0.06 25);
+    --app-aviso-suave: oklch(27% 0.05 80);
+    --app-aviso-tinta: oklch(85% 0.09 85);
+    --app-ok-suave: oklch(26% 0.05 152);
+    --app-ok-tinta: oklch(85% 0.1 155);
+
+    --app-sombra: 0 1px 2px oklch(0% 0 0 / 0.4);
+    --app-sombra-alta: 0 2px 4px oklch(0% 0 0 / 0.35),
+                       0 8px 24px oklch(0% 0 0 / 0.45);
+  }
+}
+
+@theme inline {
+  --color-fundo: var(--app-fundo);
+  --color-superficie: var(--app-superficie);
+  --color-elevado: var(--app-elevado);
+  --color-tinta: var(--app-tinta);
+  --color-suave: var(--app-suave);
+  --color-tenue: var(--app-tenue);
+  --color-linha: var(--app-linha);
+  --color-linha-forte: var(--app-linha-forte);
+
+  --color-marca: var(--app-marca);
+  --color-marca-forte: var(--app-marca-forte);
+  --color-marca-suave: var(--app-marca-suave);
+  --color-marca-linha: var(--app-marca-linha);
+
+  --color-aberto: var(--app-aberto);
+  --color-previsto: var(--app-previsto);
+  --color-suspenso: var(--app-suspenso);
+  --color-encerrado: var(--app-encerrado);
+
+  --color-urgente: var(--app-urgente);
+  --color-urgente-suave: var(--app-urgente-suave);
+  --color-aviso-suave: var(--app-aviso-suave);
+  --color-aviso-tinta: var(--app-aviso-tinta);
+  --color-ok-suave: var(--app-ok-suave);
+  --color-ok-tinta: var(--app-ok-tinta);
+
+  --shadow-cartao: var(--app-sombra);
+  --shadow-alta: var(--app-sombra-alta);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    "Noto Sans", sans-serif;
+}
+
+@layer base {
+  html {
+    /* The header is sticky, so anchored jumps must clear it. */
+    scroll-padding-top: 5rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--color-fundo);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    /* Standalone PWA: paint the safe areas with the app's own background rather
+       than leaving the browser's white showing under the notch. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /*
+   * One focus ring for the whole app, on :focus-visible only.
+   * Filters are keyboard-operated by anyone who does not use a mouse, and an
+   * invisible focus ring makes the catalogue unusable for them.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-marca);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * The disclosure only exists for narrow screens; from `md` up there is a sidebar
+ * and nothing to collapse, so the toggle is hidden. The panel is opened by
+ * PainelFiltros rather than by CSS — see the note there for why forcing a closed
+ * `<details>` visible from a stylesheet is not portable.
+ */
+@media (min-width: 48rem) {
+  details.filtros > summary {
+    display: none;
+  }
 }

@@ -33,7 +33,7 @@ export default async function DetalheApoio({ params }: Props) {
 
   return (
     <article className="max-w-3xl space-y-6">
-      <div className="text-sm text-[--color-suave]">
+      <div className="text-sm text-suave">
         {ETIQUETAS_ESTADO[apoio.estado]}
         {apoio.programaPai !== null && ` · ${apoio.programaPai}`}
         {apoio.referenciaLegal !== null && ` · ${apoio.referenciaLegal}`}
@@ -48,7 +48,7 @@ export default async function DetalheApoio({ params }: Props) {
       {apoio.needsReview && (
         <div className="rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm">
           <p className="font-medium">Informação por rever</p>
-          <p className="mt-1 text-[--color-suave]">
+          <p className="mt-1 text-suave">
             A leitura automática deste aviso não atingiu o nível de confiança que
             exigimos, por isso não geramos alertas a partir dele. Confirme os dados
             no aviso oficial.
@@ -68,39 +68,39 @@ export default async function DetalheApoio({ params }: Props) {
 
       {apoio.resumo !== null && <p className="leading-relaxed">{apoio.resumo}</p>}
 
-      <dl className="grid gap-4 sm:grid-cols-2 rounded-lg border border-[--color-linha] p-5 text-sm">
+      <dl className="grid gap-4 sm:grid-cols-2 rounded-lg border border-linha p-5 text-sm">
         <div>
-          <dt className="text-xs text-[--color-suave]">Abertura</dt>
+          <dt className="text-xs text-suave">Abertura</dt>
           <dd>
             {formatarPrazo(apoio.abreEm)}
             {precisaoAbertura !== null && (
-              <span className="ml-1 text-xs text-[--color-suave]">({precisaoAbertura})</span>
+              <span className="ml-1 text-xs text-suave">({precisaoAbertura})</span>
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[--color-suave]">Encerramento</dt>
+          <dt className="text-xs text-suave">Encerramento</dt>
           <dd>
             {formatarPrazo(apoio.fechaEm)}
             {precisaoFecho !== null && (
-              <span className="ml-1 text-xs text-[--color-suave]">({precisaoFecho})</span>
+              <span className="ml-1 text-xs text-suave">({precisaoFecho})</span>
             )}
           </dd>
         </div>
         {apoio.apoioMaxEur !== null && (
           <div>
-            <dt className="text-xs text-[--color-suave]">Apoio máximo</dt>
+            <dt className="text-xs text-suave">Apoio máximo</dt>
             <dd>{formatarEuros(apoio.apoioMaxEur)}</dd>
           </div>
         )}
         {apoio.dotacaoTotalEur !== null && (
           <div>
-            <dt className="text-xs text-[--color-suave]">Dotação global</dt>
+            <dt className="text-xs text-suave">Dotação global</dt>
             <dd>{formatarEuros(apoio.dotacaoTotalEur)}</dd>
           </div>
         )}
         <div className="sm:col-span-2">
-          <dt className="text-xs text-[--color-suave]">Beneficiários</dt>
+          <dt className="text-xs text-suave">Beneficiários</dt>
           <dd>
             {apoio.beneficiarios.length > 0
               ? apoio.beneficiarios.map((b) => ETIQUETAS_BENEFICIARIO[b]).join(", ")
@@ -115,25 +115,25 @@ export default async function DetalheApoio({ params }: Props) {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="text-left text-xs text-[--color-suave]">
-                  <th className="border-b border-[--color-linha] py-2 pr-4">Medida</th>
-                  <th className="border-b border-[--color-linha] py-2 pr-4">Comparticipação</th>
-                  <th className="border-b border-[--color-linha] py-2">Limite</th>
+                <tr className="text-left text-xs text-suave">
+                  <th className="border-b border-linha py-2 pr-4">Medida</th>
+                  <th className="border-b border-linha py-2 pr-4">Comparticipação</th>
+                  <th className="border-b border-linha py-2">Limite</th>
                 </tr>
               </thead>
               <tbody>
                 {apoio.detalheApoios.map((d, i) => (
                   <tr key={`${d.medida}-${i}`}>
-                    <td className="border-b border-[--color-linha] py-2 pr-4">
+                    <td className="border-b border-linha py-2 pr-4">
                       {ETIQUETAS_MEDIDAS[d.medida]}
                     </td>
-                    <td className="border-b border-[--color-linha] py-2 pr-4">
+                    <td className="border-b border-linha py-2 pr-4">
                       {d.percentagemApoio !== null ? `${d.percentagemApoio}%` : "—"}
                     </td>
-                    <td className="border-b border-[--color-linha] py-2">
+                    <td className="border-b border-linha py-2">
                       {formatarEuros(d.valorMaxEur) ?? "—"}
                       {d.unidade !== null && (
-                        <span className="text-[--color-suave]"> {d.unidade}</span>
+                        <span className="text-suave"> {d.unidade}</span>
                       )}
                     </td>
                   </tr>
@@ -145,9 +145,9 @@ export default async function DetalheApoio({ params }: Props) {
       )}
 
       {/* In the same card as the content, never relegated to the footer. */}
-      <section className="rounded-lg border border-[--color-linha] bg-[--color-marca-suave]/40 p-5 text-sm">
+      <section className="rounded-lg border border-linha bg-marca-suave/40 p-5 text-sm">
         <p className="font-medium">Fonte oficial</p>
-        <p className="mt-1 text-[--color-suave]">
+        <p className="mt-1 text-suave">
           Informação recolhida em {formatarData(apoio.vistoPelaUltimaVez)} a partir de{" "}
           {apoio.entidadeGestora ?? "fonte pública"}. Os termos do aviso oficial
           prevalecem sobre o que consta desta página.
@@ -156,7 +156,7 @@ export default async function DetalheApoio({ params }: Props) {
           href={apoio.urlOficial}
           target="_blank"
           rel="noreferrer noopener"
-          className="mt-3 inline-block rounded-md bg-[--color-marca] px-4 py-2 font-medium text-white"
+          className="mt-3 inline-block rounded-md bg-marca px-4 py-2 font-medium text-white"
         >
           Ver aviso oficial ↗
         </a>

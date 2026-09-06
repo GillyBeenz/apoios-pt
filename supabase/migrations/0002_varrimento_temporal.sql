@@ -12,7 +12,10 @@
 --     and a job that never fires also never runs its own health checks.
 
 create extension if not exists pg_cron;
-create extension if not exists pg_net;
+-- pg_net is not relocatable, so it has to be put in `extensions` at creation:
+-- `alter extension ... set schema` is refused outright, and by then the only fix
+-- is dropping it, which would discard anything queued in its request table.
+create extension if not exists pg_net with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Fingerprint, mirroring packages/core/src/diferencas.ts.
@@ -26,6 +29,10 @@ create or replace function impressao_evento(
 ) returns text
 language sql
 immutable
+-- digest() comes from pgcrypto, which Supabase installs in `extensions`, not in
+-- `public`. Pinning the path here rather than inheriting the caller's means the
+-- fingerprint cannot change meaning depending on who calls it.
+set search_path = public, extensions
 as $$
   select encode(
     digest(p_fund_id::text || ' ' || p_tipo || ' ' || p_definidor::text, 'sha256'),
@@ -41,11 +48,12 @@ create or replace function sweep_eventos_temporais()
 returns int
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_inseridos int := 0;
   v_limiar    int;
+  v_lote      int;
   v_agora     timestamptz := now();
 begin
   -- fecha_em_breve, tightest threshold first so a fund three days out is told
@@ -78,7 +86,10 @@ begin
       and f.fecha_em <= v_agora + make_interval(days => v_limiar)
     on conflict (impressao) do nothing;
 
-    get diagnostics v_inseridos = row_count;
+    -- Accumulate. Assigning row_count straight into v_inseridos would leave the
+    -- function reporting only the last threshold's insertions.
+    get diagnostics v_lote = row_count;
+    v_inseridos := v_inseridos + v_lote;
   end loop;
 
   -- Announced programmes routinely slip their stated opening date, so the clock
@@ -173,3 +184,17 @@ end;
 $$;
 
 select cron.schedule('vigia-ingestao', '17 * * * *', $$select vigiar_ingestao()$$);
+
+-- ---------------------------------------------------------------------------
+-- Fechar as funções à API pública
+--
+-- PostgREST exposes every function in `public` as an RPC endpoint. Both of these
+-- are SECURITY DEFINER, so without this anyone holding the anon key — which ships
+-- in the browser by design — could POST /rest/v1/rpc/sweep_eventos_temporais and
+-- mint alert events, or hammer the watchdog. pg_cron runs them as the job owner
+-- and is unaffected.
+-- ---------------------------------------------------------------------------
+
+revoke execute on function impressao_evento(uuid, text, jsonb) from anon, authenticated, public;
+revoke execute on function sweep_eventos_temporais()           from anon, authenticated, public;
+revoke execute on function vigiar_ingestao()                   from anon, authenticated, public;

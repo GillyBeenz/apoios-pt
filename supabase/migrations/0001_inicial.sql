@@ -12,7 +12,11 @@
 --    duplicates erode trust faster than the occasional miss.
 
 create extension if not exists pgcrypto;
-create extension if not exists pg_trgm;
+-- Supabase keeps extensions out of `public`, where their objects can collide
+-- with application ones; its advisor reports `extension_in_public` otherwise.
+-- `extensions` is already on the default search_path, so gin_trgm_ops below
+-- still resolves and funds_titulo_trgm stays valid.
+create extension if not exists pg_trgm with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Enums. Values are pt-PT because they are rendered to users, and because
@@ -332,6 +336,7 @@ alter table alerts_sent         enable row level security;
 alter table alerts_outbox       enable row level security;
 alter table unsubscribe_tokens  enable row level security;
 alter table funds               enable row level security;
+alter table fund_slugs          enable row level security;
 alter table fund_events         enable row level security;
 alter table sources             enable row level security;
 alter table snapshots           enable row level security;
@@ -372,6 +377,22 @@ create policy fontes_publicas on sources
   for select to anon, authenticated
   using (true);
 
+-- Old slugs resolve for the same funds the catalogue shows, and no others.
+--
+-- This table was left out of the RLS block above until Supabase's advisor caught it
+-- against the live project. The anon key ships in the browser by design; what makes
+-- that safe is RLS, and here there was none — so anyone holding it could repoint a
+-- retired Apoios URL at a different fund, or delete the mapping and break every
+-- shared link. No personal data, but this product's whole claim is that a link takes
+-- you to the right notice.
+--
+-- Read-only for anon: writes belong to the ingestion role and service_role.
+create policy slugs_publicados on fund_slugs
+  for select to anon, authenticated
+  using (exists (
+    select 1 from funds f where f.id = fund_slugs.fund_id and f.publicado
+  ));
+
 -- alerts_outbox, unsubscribe_tokens, snapshots, fund_identities,
 -- fund_extractions, ingest_runs and source_health get NO policy, so RLS denies
 -- everything to anon and authenticated. They are reached only by service_role or
@@ -389,6 +410,8 @@ create policy fontes_publicas on sources
 -- ---------------------------------------------------------------------------
 
 do $$
+declare
+  t text;
 begin
   if exists (select 1 from pg_roles where rolname = 'apoios_ingest') then
     execute 'grant usage on schema public to apoios_ingest';
@@ -399,6 +422,25 @@ begin
     execute 'grant usage, select on all sequences in schema public to apoios_ingest';
     -- Deliberately absent: profiles, subscriptions, alerts_sent, alerts_outbox,
     -- unsubscribe_tokens, and everything in auth.
+
+    -- Grants alone are not enough, and the way they fail is quiet. RLS is on for
+    -- all nine tables, apoios_ingest has no BYPASSRLS and owns none of them, so
+    -- with no policy naming it every select returns zero rows and every insert
+    -- is rejected — ingestion would look like it ran and found nothing.
+    --
+    -- The role's security boundary stays the grant list above. These policies
+    -- only stop RLS from shadow-blocking a role that is already fenced in; they
+    -- cannot widen that fence, because where there is no grant there is nothing
+    -- for a policy to unlock.
+    foreach t in array array[
+      'sources', 'snapshots', 'funds', 'fund_slugs', 'fund_identities',
+      'fund_extractions', 'fund_events', 'ingest_runs', 'source_health'
+    ]
+    loop
+      execute format(
+        'create policy ingestao_%s on %I for all to apoios_ingest '
+        'using (true) with check (true)', t, t);
+    end loop;
   end if;
 end
 $$;

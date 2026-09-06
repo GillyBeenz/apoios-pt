@@ -25,7 +25,7 @@ export default function Sobre() {
         informação estruturada de cada um. Cada apoio mostra a data de recolha e liga
         ao aviso oficial, que prevalece sempre sobre o que consta aqui.
       </p>
-      <p className="text-sm text-[--color-suave] pt-2">
+      <p className="text-sm text-suave pt-2">
         Contacto: <em>a definir antes do lançamento público</em>.
       </p>
     </div>
