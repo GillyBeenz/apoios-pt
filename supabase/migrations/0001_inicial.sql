@@ -420,6 +420,16 @@ begin
                fund_extractions, fund_events, ingest_runs, source_health
              to apoios_ingest';
     execute 'grant usage, select on all sequences in schema public to apoios_ingest';
+
+    -- PostgREST authenticates as `authenticator` and then SET ROLEs to whatever
+    -- the JWT's `role` claim names. That only works if `authenticator` is a
+    -- member of the target role. Supabase grants anon, authenticated and
+    -- service_role out of the box; a role created by hand needs this line.
+    --
+    -- Without it the ingestion credential is simply refused, every request, and
+    -- the first anyone hears of it is a failed job at 05:30 UTC. It weakens
+    -- nothing: `authenticator` gains only what the grants above already allow.
+    execute 'grant apoios_ingest to authenticator';
     -- Deliberately absent: profiles, subscriptions, alerts_sent, alerts_outbox,
     -- unsubscribe_tokens, and everything in auth.
 
