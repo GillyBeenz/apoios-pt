@@ -8,6 +8,46 @@ import {
 
 export const metadata: Metadata = { title: "Preferências" };
 
+const FREQUENCIAS = [
+  ["diaria", "Resumo diário", "Recomendado. Uma mensagem por dia, só se houver algo."],
+  ["semanal", "Resumo semanal", "Uma mensagem à segunda-feira com tudo o que abriu."],
+  ["imediata", "Assim que houver novidades", "Uma mensagem por cada aviso novo."],
+] as const;
+
+function Caixa({
+  nome,
+  valor,
+  marcada,
+  children,
+  descricao,
+}: {
+  nome: string;
+  valor: string;
+  marcada?: boolean;
+  children: React.ReactNode;
+  descricao?: string;
+}) {
+  return (
+    <label className="flex gap-3 rounded-lg border border-linha bg-superficie p-3 opacity-70">
+      <input
+        type="checkbox"
+        name={nome}
+        value={valor}
+        defaultChecked={marcada}
+        disabled
+        aria-describedby="aviso-por-ligar"
+        className="mt-0.5 size-4 shrink-0 accent-marca"
+      />
+      <span>
+        <span className="block">{children}</span>
+        {descricao !== undefined && (
+          <span className="mt-0.5 block text-xs text-tenue">{descricao}</span>
+        )}
+      </span>
+    </label>
+  );
+}
+
 /**
  * Subscription UI.
  *
@@ -15,80 +55,84 @@ export const metadata: Metadata = { title: "Preferências" };
  * constant's second consumer, and drift between the two would silently break
  * matching for whichever measure diverged.
  *
- * Not yet persisted: there is no Supabase project, so this renders the real shape
- * of the form without pretending to save. Wiring it up is part of the auth work.
+ * Every control is `disabled` and says why. There is a database now, but no way to
+ * sign in, so nothing here has anywhere to be saved to. An enabled form that threw
+ * the answers away would be worse than no form: someone would set their measures,
+ * believe they were subscribed, and hear nothing when their funding opened.
  */
 export default function Preferencias() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Preferências de alerta</h1>
-        <p className="mt-2 text-sm text-[--color-suave]">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Preferências de alerta
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-suave">
           Escolha o que quer melhorar em casa. Avisamos quando abrir financiamento a
           que se possa candidatar — e só nesse caso.
         </p>
       </div>
 
-      <div className="rounded-lg border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Ainda não é possível guardar preferências: falta ligar a base de dados e o
-        início de sessão. O formulário abaixo mostra as opções que existirão.
-      </div>
+      <p
+        id="aviso-por-ligar"
+        role="status"
+        className="rounded-xl border border-aviso-tinta/25 bg-aviso-suave px-4 py-3 text-sm text-aviso-tinta"
+      >
+        Ainda não é possível guardar preferências: falta o início de sessão. O
+        formulário abaixo mostra, desativado, as opções que existirão.
+      </p>
 
-      <section>
-        <h2 className="font-medium">Medidas a seguir</h2>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2 text-sm">
+      <fieldset className="border-0 p-0">
+        <legend className="font-semibold tracking-tight">Medidas a seguir</legend>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           {TAXONOMIA_MEDIDAS.map((m) => (
-            <li key={m}>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" name="medida" value={m} disabled />
-                <span>{ETIQUETAS_MEDIDAS[m]}</span>
-              </label>
-            </li>
+            <Caixa key={m} nome="medida" valor={m}>
+              {ETIQUETAS_MEDIDAS[m]}
+            </Caixa>
           ))}
-        </ul>
-      </section>
+        </div>
+      </fieldset>
 
-      <section>
-        <h2 className="font-medium">Candidata-se como</h2>
-        <ul className="mt-3 space-y-2 text-sm">
+      <fieldset className="border-0 p-0">
+        <legend className="font-semibold tracking-tight">Candidata-se como</legend>
+        <div className="mt-3 space-y-2 text-sm">
           {BENEFICIARIOS_PROPRIETARIO.map((b) => (
-            <li key={b}>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" name="beneficiario" value={b} defaultChecked disabled />
-                <span>{ETIQUETAS_BENEFICIARIO[b]}</span>
-              </label>
-            </li>
+            <Caixa key={b} nome="beneficiario" valor={b} marcada>
+              {ETIQUETAS_BENEFICIARIO[b]}
+            </Caixa>
           ))}
-        </ul>
-      </section>
+        </div>
+      </fieldset>
 
-      <section>
-        <h2 className="font-medium">Frequência</h2>
-        <ul className="mt-3 space-y-2 text-sm">
-          {[
-            ["diaria", "Resumo diário (recomendado)"],
-            ["semanal", "Resumo semanal"],
-            ["imediata", "Assim que houver novidades"],
-          ].map(([valor, etiqueta]) => (
-            <li key={valor}>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="frequencia"
-                  value={valor}
-                  defaultChecked={valor === "diaria"}
-                  disabled
-                />
-                <span>{etiqueta}</span>
-              </label>
-            </li>
+      <fieldset className="border-0 p-0">
+        <legend className="font-semibold tracking-tight">Frequência</legend>
+        <div className="mt-3 space-y-2 text-sm">
+          {FREQUENCIAS.map(([valor, etiqueta, detalhe]) => (
+            <label
+              key={valor}
+              className="flex gap-3 rounded-lg border border-linha bg-superficie p-3 opacity-70"
+            >
+              <input
+                type="radio"
+                name="frequencia"
+                value={valor}
+                defaultChecked={valor === "diaria"}
+                disabled
+                aria-describedby="aviso-por-ligar"
+                className="mt-0.5 size-4 shrink-0 accent-marca"
+              />
+              <span>
+                <span className="block">{etiqueta}</span>
+                <span className="mt-0.5 block text-xs text-tenue">{detalhe}</span>
+              </span>
+            </label>
           ))}
-        </ul>
-        <p className="mt-2 text-xs text-[--color-suave]">
+        </div>
+        <p className="mt-3 text-xs text-tenue">
           Independentemente da frequência escolhida, avisos urgentes — como a dotação
           esgotar-se — são enviados de imediato.
         </p>
-      </section>
+      </fieldset>
     </div>
   );
 }

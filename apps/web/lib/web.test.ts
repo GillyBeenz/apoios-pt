@@ -8,9 +8,13 @@ import {
 import { apoioDe, apoioSoParaEntidades } from "@apoios/core/teste";
 import {
   FILTROS_PREDEFINIDOS,
+  alternar,
   correspondeAosFiltros,
+  ehPredefinicao,
   filtrosDaQuery,
   ordenarApoios,
+  queryDosFiltros,
+  urlDosFiltros,
 } from "./dados/filtros.ts";
 import { elegibilidade } from "./elegibilidade.ts";
 import { diasRestantes, etiquetaPrecisao, formatarEuros, formatarPrazo } from "./formatar.ts";
@@ -150,6 +154,110 @@ describe("filtrosDaQuery", () => {
   it("lê listas separadas por vírgulas", () => {
     const f = filtrosDaQuery({ medida: "janelas,bomba_calor" });
     expect(f.medidas).toEqual(["janelas", "bomba_calor"]);
+  });
+
+  /**
+   * A GET form with checkboxes repeats the key — `estado=aberto&estado=previsto` —
+   * and Next hands that over as an array. Reading only the first element dropped
+   * every box after the first, so ticking three states filtered by one.
+   */
+  it("lê o mesmo parâmetro repetido, como um formulário o envia", () => {
+    const f = filtrosDaQuery({ estado: ["aberto", "previsto", "encerrado"] });
+    expect(f.estados).toEqual(["aberto", "previsto", "encerrado"]);
+  });
+
+  it("aceita a forma mista, repetida e com vírgulas", () => {
+    const f = filtrosDaQuery({ medida: ["janelas,bomba_calor", "isolamento"] });
+    expect(f.medidas).toEqual(["janelas", "bomba_calor", "isolamento"]);
+  });
+
+  /**
+   * The bug this is here for: `estado=` (present, empty) used to fall through to
+   * the default, so unticking the last state restored "aberto, previsto" and the
+   * checkbox looked broken. Absent still means default; present-but-empty means
+   * the user cleared it.
+   */
+  it("distingue um estado por definir de um estado limpo", () => {
+    expect(filtrosDaQuery({}).estados).toEqual(["aberto", "previsto"]);
+    expect(filtrosDaQuery({ estado: "" }).estados).toEqual([]);
+  });
+
+  it("um concelho só de espaços não é um filtro", () => {
+    expect(filtrosDaQuery({ concelho: "   " }).concelho).toBeNull();
+  });
+
+  /**
+   * `Apoio.municipios` holds DICOFRE codes, not names, so the parameter only ever
+   * matches a code — which is what the alerting path passes off the user profile.
+   * There is deliberately no concelho box in the UI until a code-to-name table
+   * exists: a text field here would match nothing anyone would type, and an empty
+   * catalogue reads as "no funding for me" rather than "wrong kind of value".
+   *
+   * This pins that as a known limit rather than a silent one.
+   */
+  it("o concelho é um código DICOFRE, não um nome", () => {
+    const porCodigo = { ...FILTROS_PREDEFINIDOS, concelho: "1106" };
+    const porNome = { ...FILTROS_PREDEFINIDOS, concelho: "Lisboa" };
+    const municipal = apoioDe({ ambito: "municipio", municipios: ["1106"] });
+
+    expect(correspondeAosFiltros(municipal, porCodigo)).toBe(true);
+    expect(correspondeAosFiltros(municipal, porNome)).toBe(false);
+  });
+
+  it("ignora um valor vazio no meio de uma lista", () => {
+    expect(filtrosDaQuery({ estado: "aberto,,previsto" }).estados).toEqual([
+      "aberto",
+      "previsto",
+    ]);
+  });
+});
+
+describe("ida e volta dos filtros", () => {
+  /**
+   * Serialising has to keep `estado` and `beneficiario` even when empty. Dropping
+   * an empty key would be read back as "never set" and silently restore the
+   * default, which is the same defect from the other direction.
+   */
+  it("um filtro limpo sobrevive à serialização", () => {
+    const limpo = { ...FILTROS_PREDEFINIDOS, estados: [], beneficiarios: [] };
+    const q = Object.fromEntries(new URLSearchParams(queryDosFiltros(limpo)));
+    expect(filtrosDaQuery(q).estados).toEqual([]);
+    expect(filtrosDaQuery(q).beneficiarios).toEqual([]);
+  });
+
+  it("os filtros predefinidos dão a volta inalterados", () => {
+    const q = Object.fromEntries(new URLSearchParams(queryDosFiltros(FILTROS_PREDEFINIDOS)));
+    expect(filtrosDaQuery(q)).toEqual(FILTROS_PREDEFINIDOS);
+  });
+
+  it("reconhece a vista predefinida, venha ela do URL ou não", () => {
+    expect(ehPredefinicao(FILTROS_PREDEFINIDOS)).toBe(true);
+    expect(ehPredefinicao(filtrosDaQuery({}))).toBe(true);
+    expect(ehPredefinicao({ ...FILTROS_PREDEFINIDOS, incluirPorRever: true })).toBe(false);
+  });
+
+  it("uma alteração preserva tudo o resto", () => {
+    // A ligação "mostrar todos os beneficiários" apontava para /apoios?beneficiario=
+    // fixo, deitando fora medidas, estados, concelho e o "por rever" de quem lá
+    // chegasse com filtros postos.
+    const postos = {
+      ...FILTROS_PREDEFINIDOS,
+      medidas: ["janelas"] as const,
+      concelho: "Braga",
+      incluirPorRever: true,
+    };
+    const url = urlDosFiltros({ ...postos, beneficiarios: [] });
+    const q = Object.fromEntries(new URLSearchParams(url.split("?")[1]));
+    const lido = filtrosDaQuery(q);
+    expect(lido.beneficiarios).toEqual([]);
+    expect(lido.medidas).toEqual(["janelas"]);
+    expect(lido.concelho).toBe("Braga");
+    expect(lido.incluirPorRever).toBe(true);
+  });
+
+  it("alternar liga e desliga sem tocar no resto", () => {
+    expect(alternar(["aberto", "previsto"], "previsto")).toEqual(["aberto"]);
+    expect(alternar(["aberto"], "previsto")).toEqual(["aberto", "previsto"]);
   });
 });
 
