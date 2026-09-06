@@ -12,7 +12,11 @@
 --    duplicates erode trust faster than the occasional miss.
 
 create extension if not exists pgcrypto;
-create extension if not exists pg_trgm;
+-- Supabase keeps extensions out of `public`, where their objects can collide
+-- with application ones; its advisor reports `extension_in_public` otherwise.
+-- `extensions` is already on the default search_path, so gin_trgm_ops below
+-- still resolves and funds_titulo_trgm stays valid.
+create extension if not exists pg_trgm with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Enums. Values are pt-PT because they are rendered to users, and because
@@ -406,6 +410,8 @@ create policy slugs_publicados on fund_slugs
 -- ---------------------------------------------------------------------------
 
 do $$
+declare
+  t text;
 begin
   if exists (select 1 from pg_roles where rolname = 'apoios_ingest') then
     execute 'grant usage on schema public to apoios_ingest';
@@ -416,6 +422,25 @@ begin
     execute 'grant usage, select on all sequences in schema public to apoios_ingest';
     -- Deliberately absent: profiles, subscriptions, alerts_sent, alerts_outbox,
     -- unsubscribe_tokens, and everything in auth.
+
+    -- Grants alone are not enough, and the way they fail is quiet. RLS is on for
+    -- all nine tables, apoios_ingest has no BYPASSRLS and owns none of them, so
+    -- with no policy naming it every select returns zero rows and every insert
+    -- is rejected — ingestion would look like it ran and found nothing.
+    --
+    -- The role's security boundary stays the grant list above. These policies
+    -- only stop RLS from shadow-blocking a role that is already fenced in; they
+    -- cannot widen that fence, because where there is no grant there is nothing
+    -- for a policy to unlock.
+    foreach t in array array[
+      'sources', 'snapshots', 'funds', 'fund_slugs', 'fund_identities',
+      'fund_extractions', 'fund_events', 'ingest_runs', 'source_health'
+    ]
+    loop
+      execute format(
+        'create policy ingestao_%s on %I for all to apoios_ingest '
+        'using (true) with check (true)', t, t);
+    end loop;
   end if;
 end
 $$;
