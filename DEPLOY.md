@@ -46,3 +46,28 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 A `service_role` **nunca** vai para a Vercel — só o pipeline de recolha (GitHub
 Actions, com o papel restrito `apoios_ingest`) e as funções dentro do Supabase
 precisam de escrever.
+
+## Ligar ao Supabase
+
+Projecto: `mlchfviehchzoolneibo`, região **eu-west-1 (Irlanda)** — é isto que permite à
+política de privacidade afirmar residência de dados na UE sem mentir.
+
+Duas variáveis na Vercel, ambas públicas por natureza:
+
+```
+NEXT_PUBLIC_SUPABASE_URL       https://mlchfviehchzoolneibo.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY  (Supabase → Settings → API → anon public)
+```
+
+A chave `anon` vai para o browser de qualquer maneira; o que a torna segura é o RLS,
+não o segredo. A política `apoios_publicados` é `using (publicado = true)`, por isso um
+apoio não publicado **não chega sequer a sair da base de dados** — não depende de um
+filtro que alguém se possa esquecer de escrever.
+
+Com as duas variáveis ausentes, a app corre sobre os dados de exemplo e não precisa de
+credencial nenhuma. Com **uma só** delas, arranca a rebentar de propósito: recorrer aos
+dados de exemplo num URL de produção serviria sete apoios inventados como se fossem
+reais, que é exactamente o dano que este produto existe para evitar.
+
+A `service_role` nunca vai para a Vercel. Só o pipeline de recolha (Actions, com o papel
+restrito `apoios_ingest`) e as funções dentro do Supabase escrevem.
