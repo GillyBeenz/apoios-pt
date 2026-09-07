@@ -5,6 +5,7 @@ import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
 import { ArmazemSupabase } from "./pipeline/armazem-supabase.ts";
+import { problemaComToken } from "./pipeline/token-ingestao.ts";
 import { executarFonte } from "./pipeline/executar.ts";
 import { avaliarSaude } from "./pipeline/saude.ts";
 import { FONTES, FONTES_ACTIVAS, obterFonte } from "./sources/registo.ts";
@@ -65,6 +66,12 @@ function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
         "Para correr sem escrever nada, use --dry-run.",
     );
   }
+
+  // Checked here rather than discovered on the first request: the shape is
+  // knowable locally, and a bad token otherwise surfaces as a PostgREST error
+  // that names neither the variable nor the cause.
+  const problema = problemaComToken(token);
+  if (problema !== null) throw new Error(problema);
 
   // One store per source: `snapshots.source_id` and `funds.source_id` are both
   // `not null`, and the Armazem interface carries no source argument.
