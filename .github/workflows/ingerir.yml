@@ -27,24 +27,24 @@ jobs:
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_MODE: live
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      # Public by design — it ships in the browser. It is here because Supabase's
-      # API gateway validates the `apikey` header against the project's own issued
-      # keys before PostgREST sees the request; a self-signed JWT is not one of
-      # them, and the gateway answers 401 "Invalid API key".
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      # A JWT carrying `role: apoios_ingest`, never the service_role key. PostgREST
-      # reads the role out of the token, so the restriction described above is
-      # enforced by the database rather than promised by this file.
-      SUPABASE_INGEST_KEY: ${{ secrets.SUPABASE_INGEST_KEY }}
-      # Optional, and the way out of minting tokens by hand. Set this to the
-      # project's legacy JWT secret (Settings → JWT Keys) and the run signs its
-      # own `role: apoios_ingest` token, valid for fifteen minutes. When it is
-      # set it takes precedence over SUPABASE_INGEST_KEY above, so a wrong value
-      # pasted there stops mattering. It is the more powerful credential — it
-      # signs anything, service_role included — which is why the pasted-token
-      # path stays supported and this one stays opt-in.
-      SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+      # A direct Postgres connection as the `apoios_ingest` role.
+      #
+      # This replaced a PostgREST client and three separate Supabase credentials.
+      # PostgREST takes the role from a JWT claim, and will only trust a signature
+      # it can verify against the project's key set — which is asymmetric. An
+      # HS256 token signed with a shared secret has no matching key there and is
+      # refused with PGRST301, whatever secret signs it, and Supabase does not
+      # hand out the private half of an asymmetric key. So there was no token this
+      # workflow could mint that PostgREST would accept for a custom role.
+      #
+      # Connecting as the role itself has no such problem, and the boundary gets
+      # stronger rather than weaker: the restriction is enforced against the
+      # connection by the database, not against a claim inside a token. The role
+      # holds grants on nine tables and none on profiles, subscriptions,
+      # alerts_sent, alerts_outbox, unsubscribe_tokens or anything in auth, so a
+      # stray query against a user table fails loudly here instead of quietly
+      # printing somebody's email into a public build log.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - uses: actions/checkout@v4

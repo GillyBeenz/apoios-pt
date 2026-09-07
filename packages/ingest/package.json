@@ -9,6 +9,9 @@
   "dependencies": {
     "@apoios/core": "workspace:*",
     "@apoios/extraction": "workspace:*",
-    "@supabase/supabase-js": "^2.115.0"
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
   }
 }
