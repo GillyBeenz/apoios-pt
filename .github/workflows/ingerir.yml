@@ -28,6 +28,11 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_MODE: live
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      # Public by design — it ships in the browser. It is here because Supabase's
+      # API gateway validates the `apikey` header against the project's own issued
+      # keys before PostgREST sees the request; a self-signed JWT is not one of
+      # them, and the gateway answers 401 "Invalid API key".
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       # A JWT carrying `role: apoios_ingest`, never the service_role key. PostgREST
       # reads the role out of the token, so the restriction described above is
       # enforced by the database rather than promised by this file.

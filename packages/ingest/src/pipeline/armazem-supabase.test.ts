@@ -105,6 +105,35 @@ describe("a ingestão escreve mesmo", () => {
     }
   });
 
+  /**
+   * The two credentials are not interchangeable, and getting it wrong produces a
+   * bare 401 "Invalid API key" that names neither header.
+   *
+   * Supabase's API gateway validates `apikey` against the keys the project
+   * actually issued, before PostgREST is reached. A self-signed JWT is not one
+   * of them. So the publishable key goes in `apikey` (via createClient's second
+   * argument) and the ingestion JWT goes in `Authorization` (via accessToken).
+   * Passing the JWT as both — `createClient(url, token)` — is what failed run #5.
+   */
+  it("separa a chave do gateway do token do papel", () => {
+    const armazem = semComentarios(
+      ler("packages/ingest/src/pipeline/armazem-supabase.ts"),
+    );
+
+    // The publishable key is the client's second argument: the `apikey` header.
+    expect(armazem).toMatch(/createClient\(\s*url,\s*chavePublicavel/);
+    // The role token rides in Authorization, which is what accessToken sets.
+    expect(armazem).toMatch(/accessToken:\s*async\s*\(\)\s*=>\s*tokenIngestao/);
+    // And never the other way round.
+    expect(armazem).not.toMatch(/createClient\(\s*url,\s*tokenIngestao/);
+  });
+
+  it("exige as três variáveis, nomeando as que faltam", () => {
+    for (const v of ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_INGEST_KEY"]) {
+      expect(cli, `${v} não é exigida`).toContain(v);
+    }
+  });
+
   it("não usa a service_role", () => {
     // service_role bypasses RLS entirely and would read subscriber emails into a
     // public Actions log. The restricted role is the whole design.
