@@ -14,11 +14,18 @@ export function problemaComToken(token: string): string | null {
   const partes = token.split(".");
 
   if (partes.length !== 3) {
+    // The three ways this goes wrong, in the order they actually happened.
     const pista = token.startsWith("sb_publishable_")
       ? " Isto parece a chave publicável — essa vai em SUPABASE_PUBLISHABLE_KEY."
       : token.startsWith("sb_secret_")
         ? " Isto parece uma chave secreta do projecto, que ignora o RLS. Não a use aqui."
-        : "";
+        : // A JWT starts with `eyJ` — base64 de `{"`. Um valor sem pontos e sem esse
+          // prefixo é quase de certeza o próprio JWT secret, copiado do painel. Esse é
+          // o que *entra* no script, não o que sai dele: assina qualquer token,
+          // incluindo um que se declare service_role, e por isso nunca deve estar aqui.
+          " Se isto for o JWT secret do painel: esse é o que entra no script de" +
+          " assinatura, não o que sai. O token que sai começa por `eyJ` e tem dois" +
+          " pontos.";
 
     return (
       `SUPABASE_INGEST_KEY não é um JWT: esperava 3 partes separadas por ponto, ` +

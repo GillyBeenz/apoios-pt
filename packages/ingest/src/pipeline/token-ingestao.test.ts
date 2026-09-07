@@ -31,6 +31,17 @@ describe("problemaComToken", () => {
     expect(p).toContain("assinar-token-ingestao");
   });
 
+  /**
+   * The failure of run #7. The value had no dots and no `sb_` prefix — almost
+   * certainly the JWT secret copied straight out of the dashboard, which is the
+   * script's *input*, not its output. The first message did not cover it.
+   */
+  it("reconhece o JWT secret copiado do painel", () => {
+    const p = problemaComToken("super-secret-value-com-40-e-tal-caracteres");
+    expect(p).toContain("entra no script");
+    expect(p).toContain("eyJ");
+  });
+
   it("reconhece uma chave secreta do projecto", () => {
     expect(problemaComToken("sb_secret_qualquercoisa")).toContain("ignora o RLS");
   });
