@@ -37,6 +37,14 @@ jobs:
       # reads the role out of the token, so the restriction described above is
       # enforced by the database rather than promised by this file.
       SUPABASE_INGEST_KEY: ${{ secrets.SUPABASE_INGEST_KEY }}
+      # Optional, and the way out of minting tokens by hand. Set this to the
+      # project's legacy JWT secret (Settings → JWT Keys) and the run signs its
+      # own `role: apoios_ingest` token, valid for fifteen minutes. When it is
+      # set it takes precedence over SUPABASE_INGEST_KEY above, so a wrong value
+      # pasted there stops mattering. It is the more powerful credential — it
+      # signs anything, service_role included — which is why the pasted-token
+      # path stays supported and this one stays opt-in.
+      SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
