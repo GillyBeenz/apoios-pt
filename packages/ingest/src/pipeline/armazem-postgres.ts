@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { rootCertificates } from "node:tls";
 import { Pool } from "pg";
 import {
   COLUNAS_APOIO,
@@ -11,6 +13,25 @@ import {
 } from "@apoios/core";
 
 import { gerarSlug, type Armazem, type EstadoSnapshot } from "./armazem.ts";
+
+/**
+ * Supabase's root certificate, committed rather than fetched.
+ *
+ * A root CA is public by definition — it is the half everyone is meant to have —
+ * so there is nothing here to keep secret. It lives in the repository so that
+ * verification does not depend on a download succeeding at the exact moment a
+ * scheduled run starts; a CA fetched at runtime is a CA an attacker gets to
+ * influence, and a build that reaches the network to learn who to trust has
+ * already lost the argument.
+ *
+ * Subject and issuer are the same (`CN = Supabase Root 2021 CA`), valid until
+ * 2031. The test alongside pins its SHA-256 fingerprint, so replacing this file
+ * with another certificate fails the suite rather than silently widening trust.
+ */
+const CA_SUPABASE = readFileSync(
+  new URL("../../certs/supabase-root-2021.crt", import.meta.url),
+  "utf8",
+);
 
 /**
  * The pipeline's store, speaking Postgres directly.
@@ -48,18 +69,29 @@ export class ArmazemPostgres implements Armazem {
   /**
    * One pool for the whole run, shared by every per-source store.
    *
-   * `rejectUnauthorized` stays on. A connection string carrying `sslmode=require`
-   * would otherwise turn certificate verification off — `require` means "encrypt"
-   * and says nothing about trusting the peer — and an unverified TLS session to a
-   * database holding subscriber emails is not a trade worth making for a shorter
-   * setup. The Supavisor pooler presents a publicly-trusted certificate, so this
-   * verifies without any extra configuration; if it ever does not, the fix is to
-   * supply the CA, never to stop checking.
+   * `rejectUnauthorized` stays on, and the CA is supplied rather than the check
+   * being dropped. Execução #13 failed here with `SELF_SIGNED_CERT_IN_CHAIN`:
+   * the connection reached Supabase and the handshake completed, but the pooler
+   * presents a chain signed by *Supabase Root 2021 CA*, which is not in Node's
+   * default trust store. The advice one finds for this is `rejectUnauthorized:
+   * false`, and it is the wrong trade — it makes every certificate acceptable,
+   * including one presented by whoever is in the middle, on a connection to a
+   * database holding subscriber emails.
+   *
+   * `sslmode=require` in a connection string is the same mistake wearing a
+   * standard's clothes: it means "encrypt" and says nothing about *whom* you are
+   * encrypting to. What is wanted is trust in exactly one more root than the
+   * system already trusts, which is what this does — Supabase's root plus the
+   * public ones, so a connection string pointing anywhere else still verifies
+   * normally.
    */
   static poolDe(connectionString: string): Pool {
     return new Pool({
       connectionString,
-      ssl: { rejectUnauthorized: true },
+      ssl: {
+        rejectUnauthorized: true,
+        ca: [CA_SUPABASE, ...rootCertificates],
+      },
       // The workflow is a short batch job, not a server. A small pool keeps well
       // clear of the pooler's client limit while still overlapping IO.
       max: 4,

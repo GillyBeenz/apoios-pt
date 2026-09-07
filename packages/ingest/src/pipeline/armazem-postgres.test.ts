@@ -1,3 +1,4 @@
+import { X509Certificate } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -128,15 +129,51 @@ describe("a ingestão escreve mesmo", () => {
     expect(cli).not.toMatch(/process\.env\.[A-Z_]*SERVICE_ROLE/i);
   });
 
-  it("verifica o certificado do servidor", () => {
-    // `sslmode=require` in a connection string means "encrypt" and says nothing
-    // about trusting the peer. Turning verification off for a database holding
-    // subscriber emails is not a trade worth making for a shorter setup.
+  it("verifica o certificado do servidor, fornecendo a CA em vez de desligar a verificação", () => {
+    // Execução #13 falhou aqui com SELF_SIGNED_CERT_IN_CHAIN. A resposta que se
+    // encontra por toda a parte é `rejectUnauthorized: false`, e é a troca
+    // errada: aceitaria qualquer certificado, incluindo o de quem estivesse no
+    // meio, numa ligação a uma base de dados com emails de subscritores.
     const armazem = semComentarios(
       ler("packages/ingest/src/pipeline/armazem-postgres.ts"),
     );
     expect(armazem).toMatch(/rejectUnauthorized:\s*true/);
     expect(armazem).not.toMatch(/rejectUnauthorized:\s*false/);
+    expect(armazem, "a CA tem de ser fornecida").toMatch(/ca:\s*\[CA_SUPABASE/);
+    // As públicas continuam lá: confiar na raiz do Supabase não substitui o
+    // arquivo do sistema, acrescenta-lhe uma entrada.
+    expect(armazem).toContain("rootCertificates");
+    expect(armazem).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/);
+  });
+});
+
+/**
+ * The certificate is committed, so it is exactly as auditable as any other file
+ * in the repository — and exactly as replaceable. Pinning the fingerprint is
+ * what makes a swap show up as a failing test instead of as silently wider
+ * trust.
+ */
+describe("a CA do Supabase", () => {
+  const certificado = new X509Certificate(
+    readFileSync(join(RAIZ, "packages/ingest/certs/supabase-root-2021.crt")),
+  );
+
+  it("é a raiz que se espera", () => {
+    expect(certificado.fingerprint256).toBe(
+      "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+    );
+    expect(certificado.subject).toContain("Supabase Root 2021 CA");
+  });
+
+  it("é uma raiz auto-assinada, não um certificado de servidor", () => {
+    expect(certificado.issuer).toBe(certificado.subject);
+    expect(certificado.ca).toBe(true);
+  });
+
+  it("ainda não expirou", () => {
+    // Expira a 2031-04-26. Este teste começa a falhar bem antes de a ingestão
+    // parar sozinha numa manhã qualquer.
+    expect(new Date(certificado.validTo).getTime()).toBeGreaterThan(Date.now());
   });
 });
 
