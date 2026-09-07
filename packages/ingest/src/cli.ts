@@ -5,6 +5,7 @@ import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
 import { ArmazemSupabase } from "./pipeline/armazem-supabase.ts";
+import { assinarTokenIngestao } from "./pipeline/assinar-token.ts";
 import { problemaComToken } from "./pipeline/token-ingestao.ts";
 import { executarFonte } from "./pipeline/executar.ts";
 import { avaliarSaude } from "./pipeline/saude.ts";
@@ -45,12 +46,24 @@ function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
 
   const url = process.env.SUPABASE_URL;
   const chavePublicavel = process.env.SUPABASE_PUBLISHABLE_KEY;
-  const token = process.env.SUPABASE_INGEST_KEY;
+
+  // Two ways to arrive at the same token, and the derived one wins.
+  //
+  // SUPABASE_JWT_SECRET is the project's legacy JWT secret; given it, the token
+  // is computed here and is correct by construction. SUPABASE_INGEST_KEY is a
+  // token someone minted earlier and pasted in — which is where every failure so
+  // far came from. When both are present the secret takes precedence, so adding
+  // it fixes a bad pasted token without anyone having to remember to delete it.
+  const segredo = process.env.SUPABASE_JWT_SECRET;
+  const token =
+    segredo !== undefined && segredo.length > 0
+      ? assinarTokenIngestao(segredo)
+      : process.env.SUPABASE_INGEST_KEY;
 
   const emFalta = [
     url === undefined ? "SUPABASE_URL" : null,
     chavePublicavel === undefined ? "SUPABASE_PUBLISHABLE_KEY" : null,
-    token === undefined ? "SUPABASE_INGEST_KEY" : null,
+    token === undefined ? "SUPABASE_INGEST_KEY (ou SUPABASE_JWT_SECRET)" : null,
   ].filter((v) => v !== null);
 
   if (url === undefined || chavePublicavel === undefined || token === undefined) {
@@ -63,13 +76,17 @@ function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
         "`Authorization`, e é dele que o PostgREST tira o papel. Nunca a " +
         "service_role, que ignora o RLS e leria dados pessoais para um log " +
         "público.\n" +
+        "SUPABASE_JWT_SECRET é o JWT secret legado do projecto (Settings → JWT " +
+        "Keys). Se o definir, o token acima é assinado aqui a cada execução e " +
+        "expira em 15 minutos — não é preciso gerar nem colar nada.\n" +
         "Para correr sem escrever nada, use --dry-run.",
     );
   }
 
   // Checked here rather than discovered on the first request: the shape is
   // knowable locally, and a bad token otherwise surfaces as a PostgREST error
-  // that names neither the variable nor the cause.
+  // that names neither the variable nor the cause. A minted token always passes;
+  // this guard exists for the pasted one.
   const problema = problemaComToken(token);
   if (problema !== null) throw new Error(problema);
 
