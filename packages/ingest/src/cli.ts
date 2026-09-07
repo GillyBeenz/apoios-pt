@@ -4,9 +4,8 @@ import { Extractor } from "@apoios/extraction";
 import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
-import { ArmazemSupabase } from "./pipeline/armazem-supabase.ts";
-import { assinarTokenIngestao } from "./pipeline/assinar-token.ts";
-import { problemaComToken } from "./pipeline/token-ingestao.ts";
+import { ArmazemPostgres } from "./pipeline/armazem-postgres.ts";
+import { problemaComLigacao } from "./pipeline/ligacao.ts";
 import { executarFonte } from "./pipeline/executar.ts";
 import { avaliarSaude } from "./pipeline/saude.ts";
 import { FONTES, FONTES_ACTIVAS, obterFonte } from "./sources/registo.ts";
@@ -21,7 +20,11 @@ apoios ingerir — executa o pipeline de recolha
   --list            Lista as fontes conhecidas
 
 Fontes activas: ${FONTES_ACTIVAS.map((f) => f.id).join(", ")}
-Em captura (ignoradas sem --source): ${FONTES.filter((f) => f.estado !== "activa").map((f) => f.id).join(", ")}
+Em captura (ignoradas sem --source): ${FONTES.filter(
+  (f) => f.estado !== "activa",
+)
+  .map((f) => f.id)
+  .join(", ")}
 `.trim();
 
 /**
@@ -38,61 +41,44 @@ Em captura (ignoradas sem --source): ${FONTES.filter((f) => f.estado !== "activa
  * worse than one that does not start: the catalogue stays empty either way, but
  * only the second tells anybody.
  */
-function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
+interface Armazenamento {
+  /** One store per source: `snapshots.source_id` and `funds.source_id` are both
+   * `not null`, and the Armazem interface carries no source argument. */
+  de(fonteId: string): Armazem;
+  fechar(): Promise<void>;
+}
+
+function escolherArmazem(simulacao: boolean): Armazenamento {
   if (simulacao) {
     const memoria = new ArmazemMemoria();
-    return () => memoria;
+    return { de: () => memoria, fechar: async () => {} };
   }
 
-  const url = process.env.SUPABASE_URL;
-  const chavePublicavel = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const url = process.env.DATABASE_URL;
 
-  // Two ways to arrive at the same token, and the derived one wins.
-  //
-  // SUPABASE_JWT_SECRET is the project's legacy JWT secret; given it, the token
-  // is computed here and is correct by construction. SUPABASE_INGEST_KEY is a
-  // token someone minted earlier and pasted in — which is where every failure so
-  // far came from. When both are present the secret takes precedence, so adding
-  // it fixes a bad pasted token without anyone having to remember to delete it.
-  const segredo = process.env.SUPABASE_JWT_SECRET;
-  const token =
-    segredo !== undefined && segredo.length > 0
-      ? assinarTokenIngestao(segredo)
-      : process.env.SUPABASE_INGEST_KEY;
-
-  const emFalta = [
-    url === undefined ? "SUPABASE_URL" : null,
-    chavePublicavel === undefined ? "SUPABASE_PUBLISHABLE_KEY" : null,
-    token === undefined ? "SUPABASE_INGEST_KEY (ou SUPABASE_JWT_SECRET)" : null,
-  ].filter((v) => v !== null);
-
-  if (url === undefined || chavePublicavel === undefined || token === undefined) {
+  if (url === undefined || url.length === 0) {
     throw new Error(
-      `Faltam credenciais: ${emFalta.join(", ")}.\n` +
-        "SUPABASE_PUBLISHABLE_KEY é a chave publicável do projecto — vai no " +
-        "cabeçalho `apikey`, que o gateway do Supabase valida antes de o pedido " +
-        "chegar ao PostgREST. Não é segredo: viaja no browser.\n" +
-        "SUPABASE_INGEST_KEY é um JWT com `role: apoios_ingest` — vai no " +
-        "`Authorization`, e é dele que o PostgREST tira o papel. Nunca a " +
-        "service_role, que ignora o RLS e leria dados pessoais para um log " +
-        "público.\n" +
-        "SUPABASE_JWT_SECRET é o JWT secret legado do projecto (Settings → JWT " +
-        "Keys). Se o definir, o token acima é assinado aqui a cada execução e " +
-        "expira em 15 minutos — não é preciso gerar nem colar nada.\n" +
+      "Falta DATABASE_URL.\n" +
+        "É a ligação directa ao Postgres, com o papel `apoios_ingest` — que tem " +
+        "grants em nove tabelas e nenhum em `profiles`, `subscriptions`, " +
+        "`alerts_sent`, `alerts_outbox`, `unsubscribe_tokens` ou em `auth`. " +
+        "Nunca a do utilizador `postgres`: essa é dona do esquema e leria dados " +
+        "pessoais para um log público.\n" +
+        "Copie a string do painel do Supabase (Connect → Session pooler) e troque " +
+        "o utilizador e a palavra-passe pelos do papel:\n" +
+        "  postgresql://apoios_ingest.<ref>:<palavra-passe>@<host>.pooler.supabase.com:5432/postgres\n" +
         "Para correr sem escrever nada, use --dry-run.",
     );
   }
 
-  // Checked here rather than discovered on the first request: the shape is
-  // knowable locally, and a bad token otherwise surfaces as a PostgREST error
-  // that names neither the variable nor the cause. A minted token always passes;
-  // this guard exists for the pasted one.
-  const problema = problemaComToken(token);
+  const problema = problemaComLigacao(url);
   if (problema !== null) throw new Error(problema);
 
-  // One store per source: `snapshots.source_id` and `funds.source_id` are both
-  // `not null`, and the Armazem interface carries no source argument.
-  return (fonteId) => ArmazemSupabase.de(url, chavePublicavel, token, fonteId);
+  const pool = ArmazemPostgres.poolDe(url);
+  return {
+    de: (fonteId) => new ArmazemPostgres(pool, fonteId),
+    fechar: () => pool.end(),
+  };
 }
 
 async function main(): Promise<number> {
@@ -114,7 +100,9 @@ async function main(): Promise<number> {
 
   if (values.list) {
     for (const f of FONTES) {
-      console.log(`${f.id}\t${f.estado}\t${f.nome}\t${f.urlsEntrada.length} URL(s)`);
+      console.log(
+        `${f.id}\t${f.estado}\t${f.nome}\t${f.urlsEntrada.length} URL(s)`,
+      );
     }
     return 0;
   }
@@ -142,70 +130,86 @@ async function main(): Promise<number> {
   }
 
   const simulacao = values["dry-run"] === true;
-  const buscador = values.fixtures ? new BuscadorReplay(values.fixtures) : new BuscadorHttp();
+  const buscador = values.fixtures
+    ? new BuscadorReplay(values.fixtures)
+    : new BuscadorHttp();
   const extractor = new Extractor();
   const agora = new Date();
 
-  const armazemDe = escolherArmazem(simulacao);
+  const armazenamento = escolherArmazem(simulacao);
 
   let houveCritico = false;
 
-  for (const fonte of fontes) {
-    console.log(`\n=== ${fonte.nome} ===`);
+  try {
+    for (const fonte of fontes) {
+      console.log(`\n=== ${fonte.nome} ===`);
 
-    const r = await executarFonte({
-      fonte,
-      buscador,
-      armazem: armazemDe(fonte.id),
-      extractor,
-      agora,
-      simulacao,
-    });
+      const r = await executarFonte({
+        fonte,
+        buscador,
+        armazem: armazenamento.de(fonte.id),
+        extractor,
+        agora,
+        simulacao,
+      });
 
-    const m = r.metricas;
-    console.log(
-      `candidatos=${m.candidatos} (com data: ${m.candidatosComData})  ` +
-        `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao}  ` +
-        `chamadas-modelo=${m.chamadasModelo}  cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
-    );
-
-    if (r.saltouPorNaoModificado) console.log("listagem inalterada desde a última execução");
-    if (m.erro) console.log(`erro: ${m.erro}`);
-
-    for (const apoio of r.apoiosNovos) {
+      const m = r.metricas;
       console.log(
-        `  + NOVO  ${apoio.titulo}\n` +
-          `          estado=${apoio.estado} fecha=${apoio.fechaEm.iso ?? "?"} (${apoio.fechaEm.precisao})\n` +
-          `          particulares=${apoio.admiteParticulares} alertável=${apoio.alertavel} ` +
-          `medidas=${apoio.medidas.join(",") || "—"}`,
+        `candidatos=${m.candidatos} (com data: ${m.candidatosComData})  ` +
+          `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao}  ` +
+          `chamadas-modelo=${m.chamadasModelo}  cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
       );
-      if (apoio.needsReview) console.log(`          por rever: ${apoio.motivoRevisao.join(", ")}`);
-    }
 
-    for (const apoio of r.apoiosActualizados) {
-      console.log(`  ~ ACTUALIZADO  ${apoio.titulo}`);
-    }
+      if (r.saltouPorNaoModificado)
+        console.log("listagem inalterada desde a última execução");
+      if (m.erro) console.log(`erro: ${m.erro}`);
 
-    for (const evento of r.eventos) {
-      console.log(`  ! EVENTO  ${evento.tipo}  alertável=${evento.alertavel}`);
-    }
+      for (const apoio of r.apoiosNovos) {
+        console.log(
+          `  + NOVO  ${apoio.titulo}\n` +
+            `          estado=${apoio.estado} fecha=${apoio.fechaEm.iso ?? "?"} (${apoio.fechaEm.precisao})\n` +
+            `          particulares=${apoio.admiteParticulares} alertável=${apoio.alertavel} ` +
+            `medidas=${apoio.medidas.join(",") || "—"}`,
+        );
+        if (apoio.needsReview)
+          console.log(`          por rever: ${apoio.motivoRevisao.join(", ")}`);
+      }
 
-    for (const conflito of r.conflitos) {
-      console.log(`  ? CONFLITO DE IDENTIDADE  ${conflito}`);
-    }
+      for (const apoio of r.apoiosActualizados) {
+        console.log(`  ~ ACTUALIZADO  ${apoio.titulo}`);
+      }
 
-    // Health is evaluated with an empty history here; in production the trailing
-    // median comes from `source_health` and catches the partial-break cases too.
-    const alarmes = avaliarSaude(
-      m,
-      { candidatosRecentes: [], falhasConsecutivas: m.erro ? 1 : 0, horasDesdeMudancaConteudo: null },
-      fonte.candidatosMin,
-      fonte.cadenciaHoras,
-    );
-    for (const a of alarmes) {
-      console.log(`  [${a.gravidade.toUpperCase()}] ${a.regra}: ${a.mensagem}`);
-      if (a.gravidade === "critico") houveCritico = true;
+      for (const evento of r.eventos) {
+        console.log(
+          `  ! EVENTO  ${evento.tipo}  alertável=${evento.alertavel}`,
+        );
+      }
+
+      for (const conflito of r.conflitos) {
+        console.log(`  ? CONFLITO DE IDENTIDADE  ${conflito}`);
+      }
+
+      // Health is evaluated with an empty history here; in production the trailing
+      // median comes from `source_health` and catches the partial-break cases too.
+      const alarmes = avaliarSaude(
+        m,
+        {
+          candidatosRecentes: [],
+          falhasConsecutivas: m.erro ? 1 : 0,
+          horasDesdeMudancaConteudo: null,
+        },
+        fonte.candidatosMin,
+        fonte.cadenciaHoras,
+      );
+      for (const a of alarmes) {
+        console.log(
+          `  [${a.gravidade.toUpperCase()}] ${a.regra}: ${a.mensagem}`,
+        );
+        if (a.gravidade === "critico") houveCritico = true;
+      }
     }
+  } finally {
+    await armazenamento.fechar();
   }
 
   // A non-zero exit fails the Actions job, which is how the operator finds out —
