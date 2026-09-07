@@ -1,6 +1,7 @@
 {
   "sourceId": "pt2030-avisos",
-  "capturadoEm": "2026-09-03T07:55:20.087Z",
+  "capturadoEm": "2026-09-07T09:33:55.461Z",
+  "erro": null,
   "entradas": [
     {
       "url": "https://portugal2030.pt/category/avisos/",
@@ -9,7 +10,61 @@
       "contentType": "text/html; charset=UTF-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-03T07:55:20.087Z"
+      "capturadoEm": "2026-09-07T09:33:32.511Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2026/08/10/norte-2030-apoia-capacitacao-e-promocao-de-rotas-de-patrimonio-cultural-na-regiao/",
+      "ficheiro": "pagina-c238d182a9.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:36.183Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2025/10/30/candidaturas-abertas-a-edicao-2026-das-summer-winter-schools-em-areas-prioritarias-do-portugal-2030/",
+      "ficheiro": "pagina-8295cee2bc.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:39.775Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2024/09/09/centro-2030-apoia-diversificacao-da-base-produtiva-regional/",
+      "ficheiro": "pagina-cedd5dbe91.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:43.311Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2024/07/26/apoio-para-investigacao-cientifica-e-desenvolvimento-tecnologico-nos-acores/",
+      "ficheiro": "pagina-3229f24976.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:46.985Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2024/07/24/apoio-para-execucao-da-estrategia-de-desenvolvimento-local-do-litoral-alentejano/",
+      "ficheiro": "pagina-3e13160beb.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:50.728Z"
+    },
+    {
+      "url": "https://portugal2030.pt/2024/07/23/apoio-para-acoes-coletivas-de-qualificacao-de-base-local-na-regiao-norte/",
+      "ficheiro": "pagina-2b8df0a212.html",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-07T09:33:55.461Z"
     }
   ]
 }
