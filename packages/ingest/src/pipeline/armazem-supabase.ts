@@ -41,14 +41,36 @@ export class ArmazemSupabase implements Armazem {
   }
 
   /**
-   * `chave` is a JWT carrying `role: apoios_ingest`, not an anon or service key.
-   * PostgREST reads the role out of the token, so the database enforces the
-   * restriction rather than this code promising to respect it.
+   * Two credentials, and they are not interchangeable.
+   *
+   * `chavePublicavel` is the project's publishable key. It goes in the `apikey`
+   * header, which Supabase's API gateway checks *before* the request reaches
+   * PostgREST — the gateway only recognises keys the project actually issued.
+   * It is public by design; it ships in the browser and grants nothing on its
+   * own, because RLS is what decides what the request may see.
+   *
+   * `tokenIngestao` is a JWT carrying `role: apoios_ingest`, signed with the
+   * project's JWT secret. It goes in `Authorization: Bearer`, where PostgREST
+   * reads the role and SET ROLEs to it, so the database enforces the restriction
+   * rather than this code promising to respect it.
+   *
+   * Sending the custom JWT as both — which is what `createClient(url, token)`
+   * does — fails at the gateway with a bare "Invalid API key" and a 401, before
+   * any of the role machinery is consulted. The error names neither header, so
+   * it reads like a broken token rather than a misplaced one.
    */
-  static de(url: string, chave: string, fonteId: string): ArmazemSupabase {
+  static de(
+    url: string,
+    chavePublicavel: string,
+    tokenIngestao: string,
+    fonteId: string,
+  ): ArmazemSupabase {
     return new ArmazemSupabase(
-      createClient(url, chave, {
-        auth: { persistSession: false, autoRefreshToken: false },
+      createClient(url, chavePublicavel, {
+        // Supplying `accessToken` disables the client's own auth methods, which
+        // this store never uses. It is the documented way to drive PostgREST
+        // with a token minted outside Supabase Auth.
+        accessToken: async () => tokenIngestao,
       }),
       fonteId,
     );

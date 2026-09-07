@@ -43,20 +43,32 @@ function escolherArmazem(simulacao: boolean): (fonteId: string) => Armazem {
   }
 
   const url = process.env.SUPABASE_URL;
-  const chave = process.env.SUPABASE_INGEST_KEY;
+  const chavePublicavel = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const token = process.env.SUPABASE_INGEST_KEY;
 
-  if (url === undefined || chave === undefined) {
+  const emFalta = [
+    url === undefined ? "SUPABASE_URL" : null,
+    chavePublicavel === undefined ? "SUPABASE_PUBLISHABLE_KEY" : null,
+    token === undefined ? "SUPABASE_INGEST_KEY" : null,
+  ].filter((v) => v !== null);
+
+  if (url === undefined || chavePublicavel === undefined || token === undefined) {
     throw new Error(
-      "Faltam credenciais: SUPABASE_URL e SUPABASE_INGEST_KEY. " +
-        "A chave é um JWT com `role: apoios_ingest` — nunca a service_role, que " +
-        "ignora o RLS e leria dados pessoais para um log público. " +
+      `Faltam credenciais: ${emFalta.join(", ")}.\n` +
+        "SUPABASE_PUBLISHABLE_KEY é a chave publicável do projecto — vai no " +
+        "cabeçalho `apikey`, que o gateway do Supabase valida antes de o pedido " +
+        "chegar ao PostgREST. Não é segredo: viaja no browser.\n" +
+        "SUPABASE_INGEST_KEY é um JWT com `role: apoios_ingest` — vai no " +
+        "`Authorization`, e é dele que o PostgREST tira o papel. Nunca a " +
+        "service_role, que ignora o RLS e leria dados pessoais para um log " +
+        "público.\n" +
         "Para correr sem escrever nada, use --dry-run.",
     );
   }
 
   // One store per source: `snapshots.source_id` and `funds.source_id` are both
   // `not null`, and the Armazem interface carries no source argument.
-  return (fonteId) => ArmazemSupabase.de(url, chave, fonteId);
+  return (fonteId) => ArmazemSupabase.de(url, chavePublicavel, token, fonteId);
 }
 
 async function main(): Promise<number> {
