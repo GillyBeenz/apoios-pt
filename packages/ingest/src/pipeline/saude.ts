@@ -7,6 +7,10 @@ export interface MetricasFonte {
   readonly candidatosComData: number;
   readonly extraccoesOk: number;
   readonly extraccoesRevisao: number;
+  /** Model calls that returned nothing usable — a failed request, not a judgement. */
+  readonly extraccoesFalhadas: number;
+  /** Distinct error messages behind those failures, for the log. */
+  readonly errosExtraccao: readonly string[];
   readonly provasFalhadas: number;
   readonly tokensCacheLidos: number;
   readonly chamadasModelo: number;
@@ -103,6 +107,26 @@ export function avaliarSaude(
       regra: "conteudo_congelado",
       gravidade: "aviso",
       mensagem: `${m.sourceId}: sem alteração de conteúdo há ${Math.round(historico.horasDesdeMudancaConteudo)}h.`,
+    });
+  }
+
+  // A failed call is not a cautious extraction, and counting it as one is how a
+  // run in which *every* paid call failed came back green. The model was called
+  // 34 times, nothing was written, and the only trace was a review-rate warning
+  // that reads like the notices were simply hard to parse.
+  if (m.extraccoesFalhadas > 0) {
+    const todas = m.extraccoesFalhadas === m.chamadasModelo;
+    alarmes.push({
+      regra: "extraccoes_falhadas",
+      // All of them failing is never a content problem: the pipeline is broken or
+      // the API is refusing the request, and the run must not exit 0.
+      gravidade: todas ? "critico" : "aviso",
+      mensagem:
+        `${m.sourceId}: ${m.extraccoesFalhadas}/${m.chamadasModelo} chamadas ao ` +
+        `modelo sem resultado utilizável` +
+        (m.errosExtraccao.length > 0
+          ? `: ${m.errosExtraccao.join("; ")}`
+          : "."),
     });
   }
 
