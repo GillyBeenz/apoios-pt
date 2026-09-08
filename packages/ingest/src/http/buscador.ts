@@ -52,7 +52,8 @@ export class BuscadorHttp implements Buscador {
       "accept-language": "pt-PT,pt;q=0.9",
     };
     if (pedido.etag) cabecalhos["if-none-match"] = pedido.etag;
-    if (pedido.lastModified) cabecalhos["if-modified-since"] = pedido.lastModified;
+    if (pedido.lastModified)
+      cabecalhos["if-modified-since"] = pedido.lastModified;
 
     const vazio = {
       url: pedido.url,

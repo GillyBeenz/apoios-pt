@@ -1,4 +1,9 @@
-import type { Apoio, ApoioNovo, ChaveIdentidade, EventoApoio } from "@apoios/core";
+import type {
+  Apoio,
+  ApoioNovo,
+  ChaveIdentidade,
+  EventoApoio,
+} from "@apoios/core";
 
 export interface EstadoSnapshot {
   readonly hashConteudo: string;
@@ -16,7 +21,11 @@ export interface EstadoSnapshot {
  */
 export interface Armazem {
   snapshotAnterior(url: string): Promise<EstadoSnapshot | null>;
-  guardarSnapshot(url: string, estado: EstadoSnapshot, conteudo: Uint8Array): Promise<void>;
+  guardarSnapshot(
+    url: string,
+    estado: EstadoSnapshot,
+    conteudo: Uint8Array,
+  ): Promise<void>;
   /**
    * The stored body of the last snapshot.
    *
@@ -28,11 +37,19 @@ export interface Armazem {
   conteudoSnapshot(url: string): Promise<Uint8Array | null>;
 
   /** Resolve identity keys to fund ids in one lookup. */
-  procurarIdentidades(valores: readonly string[]): Promise<ReadonlyMap<string, string>>;
-  registarIdentidades(fundId: string, chaves: readonly ChaveIdentidade[]): Promise<void>;
+  procurarIdentidades(
+    valores: readonly string[],
+  ): Promise<ReadonlyMap<string, string>>;
+  registarIdentidades(
+    fundId: string,
+    chaves: readonly ChaveIdentidade[],
+  ): Promise<void>;
 
   obterApoio(fundId: string): Promise<Apoio | null>;
-  criarApoio(novo: ApoioNovo, chaves: readonly ChaveIdentidade[]): Promise<Apoio>;
+  criarApoio(
+    novo: ApoioNovo,
+    chaves: readonly ChaveIdentidade[],
+  ): Promise<Apoio>;
   actualizarApoio(fundId: string, novo: ApoioNovo): Promise<Apoio>;
 
   /** Must be idempotent on `impressao` — this is what suppresses duplicate alerts. */
@@ -52,7 +69,11 @@ export class ArmazemMemoria implements Armazem {
     return this.snapshots.get(url) ?? null;
   }
 
-  async guardarSnapshot(url: string, estado: EstadoSnapshot, conteudo: Uint8Array): Promise<void> {
+  async guardarSnapshot(
+    url: string,
+    estado: EstadoSnapshot,
+    conteudo: Uint8Array,
+  ): Promise<void> {
     this.snapshots.set(url, estado);
     this.conteudos.set(url, conteudo);
   }
@@ -61,7 +82,9 @@ export class ArmazemMemoria implements Armazem {
     return this.conteudos.get(url) ?? null;
   }
 
-  async procurarIdentidades(valores: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  async procurarIdentidades(
+    valores: readonly string[],
+  ): Promise<ReadonlyMap<string, string>> {
     const encontrados = new Map<string, string>();
     for (const v of valores) {
       const id = this.identidades.get(v);
@@ -70,7 +93,10 @@ export class ArmazemMemoria implements Armazem {
     return encontrados;
   }
 
-  async registarIdentidades(fundId: string, chaves: readonly ChaveIdentidade[]): Promise<void> {
+  async registarIdentidades(
+    fundId: string,
+    chaves: readonly ChaveIdentidade[],
+  ): Promise<void> {
     for (const c of chaves) {
       // Mirrors the `primary key (tipo, valor)` constraint: a key already claimed
       // by another fund is never silently reassigned.
@@ -82,7 +108,10 @@ export class ArmazemMemoria implements Armazem {
     return this.apoios.get(fundId) ?? null;
   }
 
-  async criarApoio(novo: ApoioNovo, chaves: readonly ChaveIdentidade[]): Promise<Apoio> {
+  async criarApoio(
+    novo: ApoioNovo,
+    chaves: readonly ChaveIdentidade[],
+  ): Promise<Apoio> {
     const id = `fund-${this.#proximoId++}`;
     const agora = new Date().toISOString();
     const apoio: Apoio = {

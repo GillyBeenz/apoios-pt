@@ -23,7 +23,9 @@ describe("extrair — avisos do Portugal 2030, markup real", () => {
   it("encontra os avisos do arquivo", () => {
     expect(candidatos).toHaveLength(6);
     for (const c of candidatos) {
-      expect(new URL(c.urlDetalhe).pathname).toMatch(/^\/\d{4}\/\d{2}\/\d{2}\/[^/]+\/$/);
+      expect(new URL(c.urlDetalhe).pathname).toMatch(
+        /^\/\d{4}\/\d{2}\/\d{2}\/[^/]+\/$/,
+      );
     }
   });
 

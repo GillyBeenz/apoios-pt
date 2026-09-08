@@ -1,5 +1,9 @@
 import { parse } from "node-html-parser";
-import { canonicalizarUrl, normalizarEspacos, type Candidato } from "@apoios/core";
+import {
+  canonicalizarUrl,
+  normalizarEspacos,
+  type Candidato,
+} from "@apoios/core";
 import type { ContextoExtraccao } from "../tipos.ts";
 
 /**
@@ -38,7 +42,10 @@ const PADRAO_DATA_PUBLICACAO =
 function caminhoDe(href: string, urlBase: string): string | null {
   try {
     const u = new URL(href, urlBase);
-    if (u.hostname.replace(/^www\./, "") !== new URL(urlBase).hostname.replace(/^www\./, "")) {
+    if (
+      u.hostname.replace(/^www\./, "") !==
+      new URL(urlBase).hostname.replace(/^www\./, "")
+    ) {
       return null;
     }
     return u.pathname.replace(/^\//, "");
@@ -72,7 +79,9 @@ export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
     const titulo = normalizarEspacos(ancora.text ?? "");
     if (titulo.length < 8) continue;
 
-    const publicado = normalizarEspacos(artigo.querySelector(".published")?.text ?? "");
+    const publicado = normalizarEspacos(
+      artigo.querySelector(".published")?.text ?? "",
+    );
 
     vistos.add(chave);
     candidatos.push({

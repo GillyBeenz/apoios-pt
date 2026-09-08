@@ -53,12 +53,20 @@ describe("elegibilidadeDe", () => {
     // category reaches a sole trader is settled by the notice, not by this sheet —
     // so it is `desconhecido`, which blocks alerts exactly as `nao` does.
     expect(elegibilidadeDe("Privada").admiteParticulares).toBe("desconhecido");
-    expect(elegibilidadeDe("Pública | Privada").admiteParticulares).toBe("desconhecido");
+    expect(elegibilidadeDe("Pública | Privada").admiteParticulares).toBe(
+      "desconhecido",
+    );
     expect(elegibilidadeDe("").admiteParticulares).toBe("desconhecido");
   });
 
   it("nunca devolve sim", () => {
-    for (const t of ["Pública", "Privada", "Pública | Privada", "qualquer coisa", ""]) {
+    for (const t of [
+      "Pública",
+      "Privada",
+      "Pública | Privada",
+      "qualquer coisa",
+      "",
+    ]) {
       expect(elegibilidadeDe(t).admiteParticulares).not.toBe("sim");
     }
   });
@@ -69,7 +77,9 @@ describe("lerPlanoAnual — folha real", () => {
 
   it("lê todos os avisos previstos", () => {
     expect(avisos).toHaveLength(211);
-    expect(avisos.every((a) => a.titulo.length > 0 && a.id.length > 0)).toBe(true);
+    expect(avisos.every((a) => a.titulo.length > 0 && a.id.length > 0)).toBe(
+      true,
+    );
   });
 
   it("NENHUM aviso previsto admite particulares", () => {
@@ -78,7 +88,9 @@ describe("lerPlanoAnual — folha real", () => {
     // housing, which are municipal social housing. Correctly gated, this source can
     // populate the catalogue and can never produce a homeowner alert. If this ever
     // fails, the plan has genuinely changed and the product gained a real feature.
-    expect(avisos.filter((a) => a.admiteParticulares === "sim")).toHaveLength(0);
+    expect(avisos.filter((a) => a.admiteParticulares === "sim")).toHaveLength(
+      0,
+    );
   });
 
   it("traz datas de abertura com a precisão colada", () => {
@@ -101,7 +113,9 @@ describe("lerPlanoAnual — folha real", () => {
   it("separa as regiões NUTS II", () => {
     const multiRegiao = avisos.filter((a) => a.regioes.length > 1);
     expect(multiRegiao.length).toBeGreaterThan(0);
-    expect(avisos.every((a) => a.regioes.every((r) => !r.includes("|")))).toBe(true);
+    expect(avisos.every((a) => a.regioes.every((r) => !r.includes("|")))).toBe(
+      true,
+    );
   });
 
   it("localiza o cabeçalho pelo nome, não pela posição", () => {

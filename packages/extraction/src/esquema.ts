@@ -7,7 +7,7 @@ import {
   TRIESTADOS,
 } from "@apoios/core";
 
-export const VERSAO_ESQUEMA = "2";
+export const VERSAO_ESQUEMA = "3";
 
 /**
  * The trust envelope.
@@ -33,12 +33,6 @@ function comProva<T extends z.ZodType>(valor: T) {
         "Citação LITERAL e contígua do documento que suporta o valor. " +
           'Se não existir suporte textual, devolve "" e confianca "baixa". NUNCA parafraseies.',
       ),
-    // 0 quando não se aplica. Era `nullable`, e cada `comProva` no esquema
-    // multiplicava essa união — ver o cabeçalho deste ficheiro.
-    pagina: z
-      .number()
-      .int()
-      .describe("Página do PDF onde a citação aparece; 0 se não se aplicar."),
   });
 }
 
@@ -74,6 +68,13 @@ const dataDeclarada = z.object({
  *   que é exactamente o erro que este projecto evita em todo o lado.
  *
  * Restam cinco uniões, todas numéricas ou booleanas, bem abaixo do limite.
+ *
+ * Há um **segundo** limite, que a execução #21 encontrou assim que o primeiro
+ * ficou resolvido: *"The compiled grammar is too large"*. A gramática compila-se
+ * da estrutura — os `enum`, `maxItems` e `maxLength` são movidos para as
+ * descrições pelo SDK e não contam para ela. Foi por isso que o `pagina` saiu do
+ * `comProva`: nada no repositório o lia, e como o `comProva` é usado oito vezes,
+ * um campo morto custava oito objectos mais largos do que precisavam de ser.
  */
 export const EsquemaExtraccao = z.object({
   schema_version: z.literal(VERSAO_ESQUEMA),

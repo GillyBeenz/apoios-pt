@@ -60,7 +60,9 @@ export class BuscadorReplay implements Buscador {
   async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
     const manifesto = await this.#carregarManifesto();
     const alvo = canonicalizarUrl(pedido.url);
-    const entrada = manifesto.entradas.find((e) => canonicalizarUrl(e.url) === alvo);
+    const entrada = manifesto.entradas.find(
+      (e) => canonicalizarUrl(e.url) === alvo,
+    );
 
     if (!entrada) throw new ErroFixtureEmFalta(pedido.url, this.#dir);
 
@@ -83,8 +85,12 @@ export class BuscadorReplay implements Buscador {
       };
     }
 
-    const bytes = new Uint8Array(await readFile(join(this.#dir, entrada.ficheiro)));
-    const ehPdf = /pdf/i.test(entrada.contentType ?? "") || entrada.ficheiro.endsWith(".pdf");
+    const bytes = new Uint8Array(
+      await readFile(join(this.#dir, entrada.ficheiro)),
+    );
+    const ehPdf =
+      /pdf/i.test(entrada.contentType ?? "") ||
+      entrada.ficheiro.endsWith(".pdf");
 
     return {
       url: entrada.url,

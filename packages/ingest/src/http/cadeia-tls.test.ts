@@ -34,7 +34,9 @@ describe("urlsDoEmissor", () => {
   });
 
   it("ignora esquemas que não são http", () => {
-    expect(urlsDoEmissor("CA Issuers - URI:ldap://directory.example.pt/cn=CA")).toEqual([]);
+    expect(
+      urlsDoEmissor("CA Issuers - URI:ldap://directory.example.pt/cn=CA"),
+    ).toEqual([]);
   });
 });
 
@@ -45,7 +47,9 @@ describe("ehCadeiaIncompleta", () => {
     });
 
   it("reconhece a cadeia incompleta, mesmo aninhada", () => {
-    expect(ehCadeiaIncompleta(comCodigo("UNABLE_TO_VERIFY_LEAF_SIGNATURE"))).toBe(true);
+    expect(
+      ehCadeiaIncompleta(comCodigo("UNABLE_TO_VERIFY_LEAF_SIGNATURE")),
+    ).toBe(true);
   });
 
   it("não trata outros problemas de TLS como reparáveis", () => {
@@ -76,7 +80,9 @@ describe("normalizarParaPem", () => {
 
   it("deixa PEM em paz", () => {
     const pem = derParaPem(new Uint8Array(32).fill(7));
-    expect(normalizarParaPem(new Uint8Array(Buffer.from(pem, "latin1")))).toBe(pem);
+    expect(normalizarParaPem(new Uint8Array(Buffer.from(pem, "latin1")))).toBe(
+      pem,
+    );
   });
 });
 
@@ -86,7 +92,8 @@ describe("combinarComRaizes", () => {
     // recovered intermediate silently removes every public root, and the chain then
     // fails one link higher with a message that reads like the server's fault.
     const { rootCertificates } = await import("node:tls");
-    const extra = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
+    const extra =
+      "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
     const combinado = await combinarComRaizes([extra]);
 
     expect(rootCertificates.length).toBeGreaterThan(50);

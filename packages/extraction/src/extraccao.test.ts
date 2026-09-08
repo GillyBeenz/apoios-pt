@@ -24,7 +24,14 @@ describe("esquema", () => {
       ...invalida,
       medidas: {
         ...invalida.medidas,
-        valor: [{ medida: "piscina_aquecida", percentagem_apoio: null, valor_max_eur: null, unidade: null }],
+        valor: [
+          {
+            medida: "piscina_aquecida",
+            percentagem_apoio: null,
+            valor_max_eur: null,
+            unidade: null,
+          },
+        ],
       },
     };
     expect(() => EsquemaExtraccao.parse(comLixo)).toThrow();
@@ -33,7 +40,8 @@ describe("esquema", () => {
   it("usa exactamente a taxonomia partilhada", () => {
     // If the extraction enum and the subscription list ever drift apart, matching
     // silently fails for the drifted measure — a user simply never hears about it.
-    const doEsquema = EsquemaExtraccao.shape.medidas.shape.valor.element.shape.medida.options;
+    const doEsquema =
+      EsquemaExtraccao.shape.medidas.shape.valor.element.shape.medida.options;
     expect([...doEsquema].sort()).toEqual([...TAXONOMIA_MEDIDAS].sort());
   });
 });
@@ -117,7 +125,11 @@ describe("decidir", () => {
   it("publica e permite alertas para uma extração sólida", () => {
     const e = extraccaoSolar();
     const d = decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn");
-    expect(d).toMatchObject({ publicado: true, alertavel: true, needsReview: false });
+    expect(d).toMatchObject({
+      publicado: true,
+      alertavel: true,
+      needsReview: false,
+    });
     expect(d.confiancaGlobal).toBe("alta");
   });
 
@@ -125,9 +137,16 @@ describe("decidir", () => {
     const e = extraccaoSolar();
     const adulterada = {
       ...e,
-      estado: { ...e.estado, evidencia: "as candidaturas estão encerradas desde janeiro" },
+      estado: {
+        ...e.estado,
+        evidencia: "as candidaturas estão encerradas desde janeiro",
+      },
     };
-    const d = decidir(adulterada, verificarProvas(adulterada, TEXTO_AVISO_SOLAR), "end_turn");
+    const d = decidir(
+      adulterada,
+      verificarProvas(adulterada, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
     expect(d.alertavel).toBe(false);
     expect(d.motivoRevisao.join(" ")).toContain("prova_falhou");
   });
@@ -143,11 +162,14 @@ describe("decidir", () => {
           valor: "desconhecido" as const,
           confianca: "alta" as const,
           evidencia: "Beneficiários: pessoas singulares proprietárias",
-          pagina: 1,
         },
       },
     };
-    const d = decidir(incerta, verificarProvas(incerta, TEXTO_AVISO_SOLAR), "end_turn");
+    const d = decidir(
+      incerta,
+      verificarProvas(incerta, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
     expect(d.alertavel).toBe(false);
     // Still worth showing, badged, with a link to the official notice.
     expect(d.publicado).toBe(true);
@@ -163,7 +185,11 @@ describe("decidir", () => {
 
   it("rejeita um documento que não é um aviso de apoio", () => {
     const e = extraccaoSolar({
-      auto_avaliacao: { documento_e_aviso_de_apoio: false, qualidade_ocr: "boa", notas: "" },
+      auto_avaliacao: {
+        documento_e_aviso_de_apoio: false,
+        qualidade_ocr: "boa",
+        notas: "",
+      },
     });
     const d = decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn");
     expect(d.publicado).toBe(false);
@@ -174,7 +200,11 @@ describe("decidir", () => {
 describe("extraccaoParaApoio", () => {
   it("normaliza datas com o nosso parser, não com a leitura do modelo", () => {
     const e = extraccaoSolar();
-    const apoio = extraccaoParaApoio(e, decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"), CTX);
+    const apoio = extraccaoParaApoio(
+      e,
+      decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"),
+      CTX,
+    );
 
     // 18:00 Lisbon on 30 September 2026 is 17:00 UTC (WEST). The model only said
     // "2026-09-30"; the precise instant comes from parsing the source expression.
@@ -184,7 +214,11 @@ describe("extraccaoParaApoio", () => {
 
   it("canonicaliza a referência legal", () => {
     const e = extraccaoSolar();
-    const apoio = extraccaoParaApoio(e, decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"), CTX);
+    const apoio = extraccaoParaApoio(
+      e,
+      decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"),
+      CTX,
+    );
     expect(apoio.referenciaLegal).toBe("AVISO 02/2026");
   });
 
@@ -195,12 +229,30 @@ describe("extraccaoParaApoio", () => {
       medidas: {
         ...e.medidas,
         valor: [
-          { medida: "solar_fotovoltaico" as const, percentagem_apoio: 85, valor_max_eur: 15000, unidade: "por fracção" },
-          { medida: "solar_fotovoltaico" as const, percentagem_apoio: 70, valor_max_eur: 9000, unidade: "por kWp" },
+          {
+            medida: "solar_fotovoltaico" as const,
+            percentagem_apoio: 85,
+            valor_max_eur: 15000,
+            unidade: "por fracção",
+          },
+          {
+            medida: "solar_fotovoltaico" as const,
+            percentagem_apoio: 70,
+            valor_max_eur: 9000,
+            unidade: "por kWp",
+          },
         ],
       },
     };
-    const apoio = extraccaoParaApoio(repetida, decidir(repetida, verificarProvas(repetida, TEXTO_AVISO_SOLAR), "end_turn"), CTX);
+    const apoio = extraccaoParaApoio(
+      repetida,
+      decidir(
+        repetida,
+        verificarProvas(repetida, TEXTO_AVISO_SOLAR),
+        "end_turn",
+      ),
+      CTX,
+    );
     expect(apoio.medidas).toEqual(["solar_fotovoltaico"]);
     // The per-typology detail is kept even though the measure list is deduped.
     expect(apoio.detalheApoios).toHaveLength(2);
@@ -212,13 +264,25 @@ describe("extraccaoParaApoio", () => {
       ...e,
       dotacao: { ...e.dotacao, apoio_max_por_beneficiario_eur: null },
     };
-    const apoio = extraccaoParaApoio(semGlobal, decidir(semGlobal, verificarProvas(semGlobal, TEXTO_AVISO_SOLAR), "end_turn"), CTX);
+    const apoio = extraccaoParaApoio(
+      semGlobal,
+      decidir(
+        semGlobal,
+        verificarProvas(semGlobal, TEXTO_AVISO_SOLAR),
+        "end_turn",
+      ),
+      CTX,
+    );
     expect(apoio.apoioMaxEur).toBe(15_000);
   });
 
   it("preserva sempre o URL oficial", () => {
     const e = extraccaoSolar();
-    const apoio = extraccaoParaApoio(e, decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"), CTX);
+    const apoio = extraccaoParaApoio(
+      e,
+      decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn"),
+      CTX,
+    );
     expect(apoio.urlOficial).toBe(CTX.urlOficial);
   });
 });
@@ -227,7 +291,10 @@ describe("Extractor em modo replay", () => {
   it("falha alto quando falta a cassete, em vez de ir à rede", () => {
     // A silent fallthrough to the network would make the suite non-deterministic,
     // spend real money, and hang in the egress-blocked sandbox.
-    const extractor = new Extractor({ modo: "replay", dirCassetes: "/tmp/cassetes-inexistentes" });
+    const extractor = new Extractor({
+      modo: "replay",
+      dirCassetes: "/tmp/cassetes-inexistentes",
+    });
     return expect(
       extractor.extrair({
         urlFonte: "https://exemplo.pt/a",
@@ -247,6 +314,8 @@ describe("Extractor em modo replay", () => {
     };
     const chave = chaveCassete(doc);
     expect(chave).toHaveLength(32);
-    expect(chaveCassete({ ...doc, texto: `${TEXTO_AVISO_SOLAR} extra` })).not.toBe(chave);
+    expect(
+      chaveCassete({ ...doc, texto: `${TEXTO_AVISO_SOLAR} extra` }),
+    ).not.toBe(chave);
   });
 });

@@ -10,15 +10,25 @@ export interface CampoComProva {
 /** Pull every evidence-bearing field out of an extraction, with its dotted path. */
 export function camposComProva(e: Extraccao): CampoComProva[] {
   return [
-    { caminho: "identificacao.referencia_legal", ...e.identificacao.referencia_legal },
+    {
+      caminho: "identificacao.referencia_legal",
+      ...e.identificacao.referencia_legal,
+    },
     { caminho: "estado", ...e.estado },
     { caminho: "dotacao_esgotada", ...e.dotacao_esgotada },
     { caminho: "prazos.abertura", ...e.prazos.abertura },
     { caminho: "prazos.encerramento", ...e.prazos.encerramento },
     { caminho: "beneficiarios.tipos", ...e.beneficiarios.tipos },
-    { caminho: "beneficiarios.admite_particulares", ...e.beneficiarios.admite_particulares },
+    {
+      caminho: "beneficiarios.admite_particulares",
+      ...e.beneficiarios.admite_particulares,
+    },
     { caminho: "medidas", ...e.medidas },
-  ].map(({ caminho, confianca, evidencia }) => ({ caminho, confianca, evidencia }));
+  ].map(({ caminho, confianca, evidencia }) => ({
+    caminho,
+    confianca,
+    evidencia,
+  }));
 }
 
 export interface ResultadoVerificacao {
@@ -43,7 +53,10 @@ export interface ResultadoVerificacao {
  * the model to return an empty quote when the document is silent, and punishing
  * that would push it toward inventing quotes instead.
  */
-export function verificarProvas(e: Extraccao, textoFonte: string): ResultadoVerificacao {
+export function verificarProvas(
+  e: Extraccao,
+  textoFonte: string,
+): ResultadoVerificacao {
   const fonte = formaComparavel(textoFonte);
   const provaFalhou: string[] = [];
   const semProva: string[] = [];

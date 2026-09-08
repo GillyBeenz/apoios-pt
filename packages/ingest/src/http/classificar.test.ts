@@ -25,10 +25,14 @@ describe("classificar", () => {
 
   it("mantém a extensão que o servidor serviu", () => {
     expect(classificar("https://x.pt/a/plano.ods", null).extensao).toBe(".ods");
-    expect(classificar("https://x.pt/a/plano.xlsx", null).extensao).toBe(".xlsx");
+    expect(classificar("https://x.pt/a/plano.xlsx", null).extensao).toBe(
+      ".xlsx",
+    );
     expect(
-      classificar("https://recuperarportugal.gov.pt/wp-content/uploads/ap/plano-de-avisos.pdf", null)
-        .extensao,
+      classificar(
+        "https://recuperarportugal.gov.pt/wp-content/uploads/ap/plano-de-avisos.pdf",
+        null,
+      ).extensao,
     ).toBe(".pdf");
   });
 
@@ -55,12 +59,18 @@ describe("classificar", () => {
   });
 
   it("trata HTML como texto normalizável", () => {
-    const r = classificar("https://www.fundoambiental.pt/apoios-2026.aspx", "text/html; charset=utf-8");
+    const r = classificar(
+      "https://www.fundoambiental.pt/apoios-2026.aspx",
+      "text/html; charset=utf-8",
+    );
     expect(r).toEqual({ binario: false, extensao: ".html", normalizar: true });
   });
 
   it("assume HTML quando o servidor não diz nada útil", () => {
     // The ASP.NET sources routinely omit a usable content-type on .aspx.
-    expect(classificar("https://www.fundoambiental.pt/apoios-prr.aspx", null).binario).toBe(false);
+    expect(
+      classificar("https://www.fundoambiental.pt/apoios-prr.aspx", null)
+        .binario,
+    ).toBe(false);
   });
 });
