@@ -5,6 +5,24 @@ import type {
   EventoApoio,
 } from "@apoios/core";
 
+/** One model call, as recorded for later inspection. */
+export interface ExtraccaoRegistada {
+  readonly fundId: string | null;
+  readonly modelo: string;
+  readonly versaoPrompt: string;
+  readonly versaoEsquema: string;
+  /** The extraction exactly as the model returned it, before any normalisation. */
+  readonly bruto: unknown;
+  /** Effective confidence per field path, after verification downgrades. */
+  readonly confiancaCampos: Readonly<Record<string, string>>;
+  /** Field paths whose quote was not found verbatim in the source document. */
+  readonly evidenciaFalhou: readonly string[];
+  readonly tokensEntrada: number;
+  readonly tokensSaida: number;
+  readonly tokensCacheLidos: number;
+  readonly stopReason: string | null;
+}
+
 export interface EstadoSnapshot {
   readonly hashConteudo: string;
   readonly etag: string | null;
@@ -54,6 +72,17 @@ export interface Armazem {
 
   /** Must be idempotent on `impressao` — this is what suppresses duplicate alerts. */
   registarEventos(eventos: readonly EventoApoio[]): Promise<number>;
+
+  /**
+   * The audit trail for one model call.
+   *
+   * `fund_extractions` has existed since the first migration and nothing ever
+   * wrote to it, which is why the first run that produced real funds could not be
+   * debugged: every evidence quote was rejected and there was no way to read what
+   * the model had actually quoted. Stored whether or not a fund came out of it —
+   * a rejected extraction is the one you most want to read afterwards.
+   */
+  guardarExtraccao(e: ExtraccaoRegistada): Promise<void>;
 }
 
 /** In-memory store. Used by the pipeline tests and by `ingerir --dry-run`. */
@@ -143,6 +172,12 @@ export class ArmazemMemoria implements Armazem {
     };
     this.apoios.set(fundId, apoio);
     return apoio;
+  }
+
+  readonly extraccoes: ExtraccaoRegistada[] = [];
+
+  async guardarExtraccao(e: ExtraccaoRegistada): Promise<void> {
+    this.extraccoes.push(e);
   }
 
   async registarEventos(eventos: readonly EventoApoio[]): Promise<number> {
