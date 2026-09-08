@@ -156,9 +156,15 @@ async function main(): Promise<number> {
       const m = r.metricas;
       console.log(
         `candidatos=${m.candidatos} (com data: ${m.candidatosComData})  ` +
-          `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao}  ` +
+          `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao} ` +
+          `falhadas=${m.extraccoesFalhadas}  ` +
           `chamadas-modelo=${m.chamadasModelo}  cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
       );
+
+      // Printed even when the failure rate sits below the alarm threshold: one
+      // call failing for a reason nobody reads is how thirty end up failing.
+      for (const e of m.errosExtraccao)
+        console.log(`  falha de extracção: ${e}`);
 
       if (r.saltouPorNaoModificado)
         console.log("listagem inalterada desde a última execução");

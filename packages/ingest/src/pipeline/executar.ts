@@ -13,7 +13,11 @@ import {
   type ExtractorLike,
 } from "@apoios/extraction";
 import type { Buscador } from "../http/tipos.ts";
-import { hashBytes, hashConteudo, normalizarConteudo } from "../http/normalizar.ts";
+import {
+  hashBytes,
+  hashConteudo,
+  normalizarConteudo,
+} from "../http/normalizar.ts";
 import type { Fonte } from "../sources/tipos.ts";
 import type { Armazem } from "./armazem.ts";
 import type { MetricasFonte } from "./saude.ts";
@@ -59,7 +63,9 @@ function textoVisivel(html: string): string {
  * a listing page changes whenever any *one* of its forty entries does. Together
  * they are the difference between roughly $30 a month and roughly $600.
  */
-export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecucao> {
+export async function executarFonte(
+  op: OpcoesExecucao,
+): Promise<ResultadoExecucao> {
   const inicio = Date.now();
   const { fonte, buscador, armazem, extractor, agora } = op;
 
@@ -104,7 +110,8 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
     const hash = corpo === null ? null : hashConteudo(corpo);
     const mudou = corpo !== null && anterior?.hashConteudo !== hash;
 
-    if (corpo !== null) bytesTotais += resposta.bytes?.byteLength ?? corpo.length;
+    if (corpo !== null)
+      bytesTotais += resposta.bytes?.byteLength ?? corpo.length;
 
     if (mudou) {
       listagemInalterada = false;
@@ -130,10 +137,13 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
     let html = corpo;
     if (html === null) {
       const guardado = await armazem.conteudoSnapshot(url);
-      html = guardado === null ? null : new TextDecoder("utf-8").decode(guardado);
+      html =
+        guardado === null ? null : new TextDecoder("utf-8").decode(guardado);
     }
     if (html !== null) {
-      candidatos.push(...fonte.extrair(html, { urlBase: fonte.urlBase, agora }));
+      candidatos.push(
+        ...fonte.extrair(html, { urlBase: fonte.urlBase, agora }),
+      );
     }
   }
 
@@ -146,6 +156,8 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
   const conflitos: string[] = [];
   let extraccoesOk = 0;
   let extraccoesRevisao = 0;
+  let extraccoesFalhadas = 0;
+  const errosExtraccao = new Set<string>();
   let provasFalhadas = 0;
   let tokensCacheLidos = 0;
   let chamadasModelo = 0;
@@ -212,7 +224,12 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
     tokensCacheLidos += resultado.tokensCacheLidos;
 
     if (resultado.extraccao === null) {
-      extraccoesRevisao++;
+      // Not a review: the call produced nothing. `cliente.ts` already knows why —
+      // a refusal, a response without structured output, or a thrown request
+      // error — and dropping that here left the run with no way to say what went
+      // wrong. Deduplicated because thirty identical messages are one fact.
+      extraccoesFalhadas++;
+      errosExtraccao.add(resultado.erro ?? "sem erro reportado");
       continue;
     }
 
@@ -220,7 +237,11 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
     const verificacao = verificarProvas(resultado.extraccao, texto);
     if (verificacao.provaFalhou.length > 0) provasFalhadas++;
 
-    const decisao = decidir(resultado.extraccao, verificacao, resultado.stopReason);
+    const decisao = decidir(
+      resultado.extraccao,
+      verificacao,
+      resultado.stopReason,
+    );
     if (decisao.needsReview) extraccoesRevisao++;
     else extraccoesOk++;
 
@@ -236,10 +257,14 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
       referenciaLegal: novo.referenciaLegal ?? candidato.referenciaLegalBruta,
       url: candidato.urlDetalhe,
       titulo: novo.titulo,
-      anoAbertura: novo.abreEm.iso ? new Date(novo.abreEm.iso).getUTCFullYear() : null,
+      anoAbertura: novo.abreEm.iso
+        ? new Date(novo.abreEm.iso).getUTCFullYear()
+        : null,
     });
 
-    const existentes = await armazem.procurarIdentidades(chaves.map((c) => c.valor));
+    const existentes = await armazem.procurarIdentidades(
+      chaves.map((c) => c.valor),
+    );
     const resolucao = resolverIdentidade(chaves, existentes);
 
     // --- 10. Diff into events ------------------------------------------------
@@ -262,15 +287,22 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
         alertavel: false,
         motivoRevisao: [...novo.motivoRevisao, "conflito_identidade"],
       };
-      apoiosActualizados.push(await armazem.actualizarApoio(resolucao.fundId, bloqueado));
+      apoiosActualizados.push(
+        await armazem.actualizarApoio(resolucao.fundId, bloqueado),
+      );
       continue;
     }
 
     const anteriorApoio = await armazem.obterApoio(resolucao.fundId);
-    await armazem.registarIdentidades(resolucao.fundId, resolucao.chavesEmFalta);
+    await armazem.registarIdentidades(
+      resolucao.fundId,
+      resolucao.chavesEmFalta,
+    );
     const actualizado = await armazem.actualizarApoio(resolucao.fundId, novo);
     apoiosActualizados.push(actualizado);
-    eventos.push(...diferenciar(anteriorApoio, actualizado, agora.toISOString()));
+    eventos.push(
+      ...diferenciar(anteriorApoio, actualizado, agora.toISOString()),
+    );
   }
 
   // --- 11. Idempotent event insert -------------------------------------------
@@ -288,6 +320,8 @@ export async function executarFonte(op: OpcoesExecucao): Promise<ResultadoExecuc
       candidatosComData: candidatos.filter((c) => c.dataBruta !== null).length,
       extraccoesOk,
       extraccoesRevisao,
+      extraccoesFalhadas,
+      errosExtraccao: [...errosExtraccao],
       provasFalhadas,
       tokensCacheLidos,
       chamadasModelo,
