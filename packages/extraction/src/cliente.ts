@@ -3,7 +3,11 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { EsquemaExtraccao, VERSAO_ESQUEMA, type Extraccao } from "./esquema.ts";
-import { CONTRATO_JSON, extrairJson } from "./contrato.ts";
+import {
+  CONTRATO_JSON,
+  apararDemasiadoLongos,
+  extrairJson,
+} from "./contrato.ts";
 import {
   PROMPT_SISTEMA,
   VERSAO_PROMPT,
@@ -243,7 +247,19 @@ export class Extractor {
         };
       }
 
-      const validado = EsquemaExtraccao.safeParse(json);
+      let validado = EsquemaExtraccao.safeParse(json);
+
+      if (!validado.success) {
+        // One retry, in memory, for length alone. See `apararDemasiadoLongos`:
+        // a 620-character summary is not a reason to throw away an otherwise
+        // sound extraction of a document we have already paid to read.
+        const { json: aparado, aparados } = apararDemasiadoLongos(
+          json,
+          validado.error.issues,
+        );
+        if (aparados.length > 0) validado = EsquemaExtraccao.safeParse(aparado);
+      }
+
       if (!validado.success) {
         // The message names the offending paths, so a prompt or schema drift
         // shows up as "beneficiarios.tipos: invalid enum" instead of silence.
