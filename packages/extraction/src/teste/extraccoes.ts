@@ -25,7 +25,7 @@ por fracção.
 /** A well-formed, fully-supported extraction of the notice above. */
 export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
   const base: Extraccao = {
-    schema_version: "1",
+    schema_version: "2",
     identificacao: {
       titulo: "Aviso de Abertura de Concurso n.º 02/2026 — Solar fotovoltaico",
       referencia_legal: {
@@ -44,7 +44,7 @@ export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
       evidencia: "As candidaturas decorrem entre 1 de março de 2026",
       pagina: 1,
     },
-    dotacao_esgotada: { valor: false, confianca: "alta", evidencia: "", pagina: null },
+    dotacao_esgotada: { valor: false, confianca: "alta", evidencia: "", pagina: 0 },
     prazos: {
       abertura: {
         valor: { texto_fonte: "1 de março de 2026", data_iso: "2026-03-01", precisao: "dia" },
@@ -78,7 +78,7 @@ export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
       },
       restricoes_texto: "Habitação própria e permanente.",
     },
-    ambito: { nivel: "nacional", municipios: [], observacoes: null },
+    ambito: { nivel: "nacional", municipios: [], observacoes: "" },
     medidas: {
       valor: [
         {
@@ -98,13 +98,13 @@ export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
       total_eur: 15_000_000,
       apoio_max_por_beneficiario_eur: 15_000,
     },
-    candidatura: { url: null, plataforma: null },
+    candidatura: { url: "", plataforma: "" },
     documentos: [],
     avisos_importantes: [],
     auto_avaliacao: {
       documento_e_aviso_de_apoio: true,
       qualidade_ocr: "boa",
-      notas: null,
+      notas: "",
     },
   };
   return { ...base, ...sobrepor };

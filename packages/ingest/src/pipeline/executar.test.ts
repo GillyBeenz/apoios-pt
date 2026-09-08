@@ -247,7 +247,7 @@ describe("executarFonte", () => {
           evidencia: "Beneficiários: pessoas singulares proprietárias",
           pagina: 1,
         },
-        restricoes_texto: null,
+        restricoes_texto: "",
       },
     });
 

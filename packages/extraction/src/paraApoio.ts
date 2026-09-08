@@ -12,9 +12,24 @@ import type { Extraccao } from "./esquema.ts";
 import type { Decisao } from "./portao.ts";
 
 interface DataDeclarada {
-  readonly texto_fonte: string | null;
-  readonly data_iso: string | null;
+  readonly texto_fonte: string;
+  readonly data_iso: string;
   readonly precisao: PrecisaoData;
+}
+
+/**
+ * `""` back to `null`, at the boundary.
+ *
+ * The schema represents absent *text* as an empty string, because every
+ * `.nullable()` costs one of the API's sixteen permitted union-typed parameters
+ * and the schema ran out (see `esquema.ts`). Nothing downstream should inherit
+ * that workaround: the database column is nullable, the UI checks for null, and
+ * an empty string would render as a present-but-blank field. So the conversion
+ * happens here, once, rather than being remembered at thirty call sites.
+ */
+function semVazio(s: string): string | null {
+  const t = s.trim();
+  return t.length === 0 ? null : t;
 }
 
 /**
@@ -34,7 +49,10 @@ function resolverData(
   papel: "abertura" | "encerramento",
   anoPredefinido: number | null,
 ): DataComPrecisao {
-  const nosso = analisarDataPt(d.texto_fonte, { papel, anoPredefinido });
+  const nosso = analisarDataPt(semVazio(d.texto_fonte), {
+    papel,
+    anoPredefinido,
+  });
   if (nosso.iso !== null) return nosso;
 
   if (d.data_iso) {
@@ -43,13 +61,18 @@ function resolverData(
       return {
         ...doModelo,
         // Never report better precision than the model claimed for it.
-        precisao: d.precisao === "desconhecida" ? doModelo.precisao : d.precisao,
-        textoFonte: d.texto_fonte ?? d.data_iso,
+        precisao:
+          d.precisao === "desconhecida" ? doModelo.precisao : d.precisao,
+        textoFonte: semVazio(d.texto_fonte) ?? semVazio(d.data_iso),
       };
     }
   }
 
-  return { iso: null, precisao: "desconhecida", textoFonte: d.texto_fonte };
+  return {
+    iso: null,
+    precisao: "desconhecida",
+    textoFonte: semVazio(d.texto_fonte),
+  };
 }
 
 export interface ContextoNormalizacao {
@@ -70,28 +93,41 @@ export function extraccaoParaApoio(
   decisao: Decisao,
   ctx: ContextoNormalizacao,
 ): ApoioNovo {
-  const abreEm = resolverData(e.prazos.abertura.valor, "abertura", ctx.anoPredefinido ?? null);
-  const anoAbertura = abreEm.iso ? new Date(abreEm.iso).getUTCFullYear() : ctx.anoPredefinido ?? null;
-  const fechaEm = resolverData(e.prazos.encerramento.valor, "encerramento", anoAbertura);
+  const abreEm = resolverData(
+    e.prazos.abertura.valor,
+    "abertura",
+    ctx.anoPredefinido ?? null,
+  );
+  const anoAbertura = abreEm.iso
+    ? new Date(abreEm.iso).getUTCFullYear()
+    : (ctx.anoPredefinido ?? null);
+  const fechaEm = resolverData(
+    e.prazos.encerramento.valor,
+    "encerramento",
+    anoAbertura,
+  );
 
   const detalheApoios: DetalheApoio[] = e.medidas.valor.map((m) => ({
     medida: m.medida,
     percentagemApoio: m.percentagem_apoio,
     valorMaxEur: m.valor_max_eur,
-    unidade: m.unidade,
+    unidade: semVazio(m.unidade),
   }));
 
   // De-duplicate: a notice often lists the same measure under several typologies.
   const medidas = [...new Set(detalheApoios.map((d) => d.medida))];
 
   const dotacaoTotalEur =
-    e.dotacao.total_eur ?? analisarMontanteEur(e.dotacao.total_texto);
+    e.dotacao.total_eur ?? analisarMontanteEur(semVazio(e.dotacao.total_texto));
 
   const apoioMaxEur =
     e.dotacao.apoio_max_por_beneficiario_eur ??
     // Fall back to the largest per-measure cap the notice states.
     detalheApoios.reduce<number | null>(
-      (max, d) => (d.valorMaxEur !== null && (max === null || d.valorMaxEur > max) ? d.valorMaxEur : max),
+      (max, d) =>
+        d.valorMaxEur !== null && (max === null || d.valorMaxEur > max)
+          ? d.valorMaxEur
+          : max,
       null,
     );
 
@@ -101,9 +137,11 @@ export function extraccaoParaApoio(
     sourceId: ctx.sourceId,
     titulo: e.identificacao.titulo,
     resumo: e.identificacao.resumo_pt,
-    programaPai: e.identificacao.programa_pai,
-    entidadeGestora: e.identificacao.entidade_gestora,
-    referenciaLegal: canonicalizarReferenciaLegal(e.identificacao.referencia_legal.valor),
+    programaPai: semVazio(e.identificacao.programa_pai),
+    entidadeGestora: semVazio(e.identificacao.entidade_gestora),
+    referenciaLegal: canonicalizarReferenciaLegal(
+      semVazio(e.identificacao.referencia_legal.valor),
+    ),
 
     estado,
     dotacaoEsgotada: e.dotacao_esgotada.valor === true,
@@ -113,7 +151,7 @@ export function extraccaoParaApoio(
 
     beneficiarios: e.beneficiarios.tipos.valor,
     admiteParticulares: e.beneficiarios.admite_particulares.valor,
-    restricoesBeneficiario: e.beneficiarios.restricoes_texto,
+    restricoesBeneficiario: semVazio(e.beneficiarios.restricoes_texto),
 
     ambito: e.ambito.nivel,
     municipios: e.ambito.municipios,
@@ -126,7 +164,7 @@ export function extraccaoParaApoio(
     apoioMaxEur,
 
     urlOficial: ctx.urlOficial,
-    urlCandidatura: e.candidatura.url,
+    urlCandidatura: semVazio(e.candidatura.url),
     documentos: e.documentos,
 
     needsReview: decisao.needsReview,
