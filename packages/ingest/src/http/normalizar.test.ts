@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { hashConteudo, normalizarConteudo } from "./normalizar.ts";
 
 /** A page whose only difference between fetches is the ASP.NET viewstate. */
-function paginaComViewstate(viewstate: string, conteudo = "Aviso n.º 02/2026"): string {
+function paginaComViewstate(
+  viewstate: string,
+  conteudo = "Aviso n.º 02/2026",
+): string {
   return `<!DOCTYPE html><html><body>
     <form method="post">
       <input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="${viewstate}" />
@@ -22,18 +25,28 @@ describe("normalizarConteudo", () => {
    */
   it("dá o mesmo hash quando só o __VIEWSTATE roda", () => {
     const a = paginaComViewstate("dDwtMTUyNDU0MTkwMTs7Pg==AAAA".repeat(200));
-    const b = paginaComViewstate("ZZZZbXl0aGVyc3RhdGV2YWx1ZQ==BBBB".repeat(200));
+    const b = paginaComViewstate(
+      "ZZZZbXl0aGVyc3RhdGV2YWx1ZQ==BBBB".repeat(200),
+    );
     expect(hashConteudo(a)).toBe(hashConteudo(b));
   });
 
   it("continua a detetar uma mudança real de conteúdo", () => {
-    const a = paginaComViewstate("XXXX", "Aviso n.º 02/2026 — candidaturas até 30/09/2026");
-    const b = paginaComViewstate("XXXX", "Aviso n.º 02/2026 — candidaturas até 31/10/2026");
+    const a = paginaComViewstate(
+      "XXXX",
+      "Aviso n.º 02/2026 — candidaturas até 30/09/2026",
+    );
+    const b = paginaComViewstate(
+      "XXXX",
+      "Aviso n.º 02/2026 — candidaturas até 31/10/2026",
+    );
     expect(hashConteudo(a)).not.toBe(hashConteudo(b));
   });
 
   it("ignora diferenças só de espaçamento", () => {
-    expect(hashConteudo("<div>  a\n\n  b </div>")).toBe(hashConteudo("<div> a b </div>"));
+    expect(hashConteudo("<div>  a\n\n  b </div>")).toBe(
+      hashConteudo("<div> a b </div>"),
+    );
   });
 
   it("ignora tokens anti-CSRF e sessões", () => {

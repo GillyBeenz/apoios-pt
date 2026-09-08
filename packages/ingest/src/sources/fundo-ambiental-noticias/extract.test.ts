@@ -25,8 +25,12 @@ describe("extrair — notícias, markup real", () => {
 
   it("encontra as notícias de avisos reais", () => {
     expect(candidatos).toHaveLength(4);
-    expect(caminhos.join("\n")).toContain("aviso-de-abertura-de-concurso-n-032026");
-    expect(caminhos.join("\n")).toContain("fundo-azul-aviso-convite-n-01faz2026");
+    expect(caminhos.join("\n")).toContain(
+      "aviso-de-abertura-de-concurso-n-032026",
+    );
+    expect(caminhos.join("\n")).toContain(
+      "fundo-azul-aviso-convite-n-01faz2026",
+    );
     expect(caminhos.join("\n")).toContain("aviso-convite-n-09c08-i01012026");
   });
 
@@ -43,7 +47,9 @@ describe("extrair — notícias, markup real", () => {
   });
 
   it("lê a referência legal do título quando existe", () => {
-    const comReferencia = candidatos.filter((c) => c.referenciaLegalBruta !== null);
+    const comReferencia = candidatos.filter(
+      (c) => c.referenciaLegalBruta !== null,
+    );
     expect(comReferencia.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -53,7 +59,8 @@ describe("extrair — notícias, markup real", () => {
   });
 
   it("devolve zero na página de erro servida com HTTP 200", () => {
-    const erro = "<html><head><title>Ocorreu um erro</title></head><body></body></html>";
+    const erro =
+      "<html><head><title>Ocorreu um erro</title></head><body></body></html>";
     expect(extrair(erro, CTX)).toEqual([]);
   });
 });

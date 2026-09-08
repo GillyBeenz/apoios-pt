@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
-import { ETIQUETAS_BENEFICIARIO, ETIQUETAS_MEDIDAS, TAXONOMIA_MEDIDAS } from "@apoios/core";
+import {
+  ETIQUETAS_BENEFICIARIO,
+  ETIQUETAS_MEDIDAS,
+  TAXONOMIA_MEDIDAS,
+} from "@apoios/core";
 
 export const VERSAO_PROMPT = "v1";
 
-const listaMedidas = TAXONOMIA_MEDIDAS.map((m) => `- ${m}: ${ETIQUETAS_MEDIDAS[m]}`).join("\n");
+const listaMedidas = TAXONOMIA_MEDIDAS.map(
+  (m) => `- ${m}: ${ETIQUETAS_MEDIDAS[m]}`,
+).join("\n");
 
 const listaBeneficiarios = Object.entries(ETIQUETAS_BENEFICIARIO)
   .map(([k, v]) => `- ${k}: ${v}`)
@@ -105,7 +111,10 @@ restantes campos com confianca "baixa". Não tentes extrair algo que não está 
 
 /** Stable identifier of the prompt text, used to key extraction cassettes. */
 export function hashPrompt(): string {
-  return createHash("sha256").update(PROMPT_SISTEMA, "utf8").digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(PROMPT_SISTEMA, "utf8")
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**

@@ -76,7 +76,8 @@ const CODIGOS_REPARAVEIS = new Set([
 export function ehCadeiaIncompleta(erro: unknown): boolean {
   for (let e: unknown = erro, i = 0; e != null && i < 5; i += 1) {
     const codigo = (e as { code?: unknown }).code;
-    if (typeof codigo === "string" && CODIGOS_REPARAVEIS.has(codigo)) return true;
+    if (typeof codigo === "string" && CODIGOS_REPARAVEIS.has(codigo))
+      return true;
     e = (e as { cause?: unknown }).cause;
   }
   return false;
@@ -86,7 +87,10 @@ export function ehCadeiaIncompleta(erro: unknown): boolean {
  * A root certificate signs itself, and is where the walk up the chain stops. Going
  * past it would just fetch the same certificate over and over.
  */
-export function ehAutoAssinado(cert: { subject: string; issuer: string }): boolean {
+export function ehAutoAssinado(cert: {
+  subject: string;
+  issuer: string;
+}): boolean {
   return cert.subject === cert.issuer;
 }
 
@@ -132,7 +136,9 @@ export async function certificadoApresentado(
  * That cost four rounds of misdiagnosis on recuperarportugal.gov.pt, whose chain turns
  * out to be ordinary Sectigo: the roots were trusted all along.
  */
-export async function combinarComRaizes(pems: readonly string[]): Promise<string[]> {
+export async function combinarComRaizes(
+  pems: readonly string[],
+): Promise<string[]> {
   const { rootCertificates } = await import("node:tls");
   return [...rootCertificates, ...pems];
 }

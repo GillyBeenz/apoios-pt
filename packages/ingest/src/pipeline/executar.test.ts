@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { DocumentoEntrada, ExtractorLike, ResultadoExtraccao } from "@apoios/extraction";
+import type {
+  DocumentoEntrada,
+  ExtractorLike,
+  ResultadoExtraccao,
+} from "@apoios/extraction";
 import { extraccaoSolar } from "@apoios/extraction/teste";
 import { executarFonte } from "./executar.ts";
 import { ArmazemMemoria } from "./armazem.ts";
@@ -48,7 +52,9 @@ function detalhe(prazo = "até às 18:00 do dia 30 de setembro de 2026"): string
 }
 
 /** Stub extractor: deterministic, offline, free. */
-function extractorFixo(sobrepor: Parameters<typeof extraccaoSolar>[0] = {}): ExtractorLike {
+function extractorFixo(
+  sobrepor: Parameters<typeof extraccaoSolar>[0] = {},
+): ExtractorLike {
   return {
     async extrair(_doc: DocumentoEntrada): Promise<ResultadoExtraccao> {
       return {
@@ -66,7 +72,11 @@ function extractorFixo(sobrepor: Parameters<typeof extraccaoSolar>[0] = {}): Ext
   };
 }
 
-function contexto(buscador: BuscadorMemoria, armazem: ArmazemMemoria, extractor = extractorFixo()) {
+function contexto(
+  buscador: BuscadorMemoria,
+  armazem: ArmazemMemoria,
+  extractor = extractorFixo(),
+) {
   return { fonte, buscador, armazem, extractor, agora: AGORA };
 }
 
@@ -157,7 +167,10 @@ describe("executarFonte", () => {
 
     // Same notice, same legal reference, republished at a new address.
     const urlNovo = `${BASE}/apoios-2026/transicao-energetica1/022026-solar-republicado.aspx`;
-    const listagemNova = listagem().replace("/apoios-2026/transicao-energetica1/022026-solar.aspx", urlNovo);
+    const listagemNova = listagem().replace(
+      "/apoios-2026/transicao-energetica1/022026-solar.aspx",
+      urlNovo,
+    );
     const dia2 = new BuscadorMemoria()
       .definir(URL_LISTAGEM, { corpo: listagemNova })
       .definir(urlNovo, { corpo: detalhe() });
@@ -182,16 +195,22 @@ describe("executarFonte", () => {
     const extractorProlongado = extractorFixo({
       prazos: {
         abertura: {
-          valor: { texto_fonte: "1 de março de 2026", data_iso: "2026-03-01", precisao: "dia" },
+          valor: {
+            texto_fonte: "1 de março de 2026",
+            data_iso: "2026-03-01",
+            precisao: "dia",
+          },
           confianca: "alta",
           evidencia: "As candidaturas decorrem entre 1 de março de 2026",
-          pagina: 1,
         },
         encerramento: {
-          valor: { texto_fonte: prazoNovo, data_iso: "2026-10-31", precisao: "minuto" },
+          valor: {
+            texto_fonte: prazoNovo,
+            data_iso: "2026-10-31",
+            precisao: "minuto",
+          },
           confianca: "alta",
           evidencia: prazoNovo,
-          pagina: 1,
         },
       },
     });
@@ -220,7 +239,10 @@ describe("executarFonte", () => {
     const dia2 = new BuscadorMemoria()
       .definir(URL_LISTAGEM, { corpo: listagem() })
       .definir(URL_DETALHE, {
-        corpo: detalhe().replace("</main>", "<p>Contacto: 210 000 000.</p></main>"),
+        corpo: detalhe().replace(
+          "</main>",
+          "<p>Contacto: 210 000 000.</p></main>",
+        ),
       });
 
     const r = await executarFonte(contexto(dia2, armazem));
@@ -239,13 +261,11 @@ describe("executarFonte", () => {
           valor: ["municipio", "ipss"],
           confianca: "alta",
           evidencia: "Beneficiários: pessoas singulares proprietárias",
-          pagina: 1,
         },
         admite_particulares: {
           valor: "desconhecido",
           confianca: "alta",
           evidencia: "Beneficiários: pessoas singulares proprietárias",
-          pagina: 1,
         },
         restricoes_texto: "",
       },
@@ -273,7 +293,10 @@ describe("executarFonte", () => {
       },
     };
 
-    const r = await executarFonte({ ...contexto(buscador, armazem, extractor), simulacao: true });
+    const r = await executarFonte({
+      ...contexto(buscador, armazem, extractor),
+      simulacao: true,
+    });
 
     expect(chamadas).toBe(0);
     expect(armazem.apoios.size).toBe(0);

@@ -25,32 +25,38 @@ por fracção.
 /** A well-formed, fully-supported extraction of the notice above. */
 export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
   const base: Extraccao = {
-    schema_version: "2",
+    schema_version: "3",
     identificacao: {
       titulo: "Aviso de Abertura de Concurso n.º 02/2026 — Solar fotovoltaico",
       referencia_legal: {
         valor: "Aviso n.º 02/2026",
         confianca: "alta",
         evidencia: "Aviso de Abertura de Concurso n.º 02/2026",
-        pagina: 1,
       },
       programa_pai: "Fundo Ambiental",
       entidade_gestora: "Fundo Ambiental",
-      resumo_pt: "Apoio à instalação de painéis solares em habitação própria e permanente.",
+      resumo_pt:
+        "Apoio à instalação de painéis solares em habitação própria e permanente.",
     },
     estado: {
       valor: "aberto",
       confianca: "alta",
       evidencia: "As candidaturas decorrem entre 1 de março de 2026",
-      pagina: 1,
     },
-    dotacao_esgotada: { valor: false, confianca: "alta", evidencia: "", pagina: 0 },
+    dotacao_esgotada: {
+      valor: false,
+      confianca: "alta",
+      evidencia: "",
+    },
     prazos: {
       abertura: {
-        valor: { texto_fonte: "1 de março de 2026", data_iso: "2026-03-01", precisao: "dia" },
+        valor: {
+          texto_fonte: "1 de março de 2026",
+          data_iso: "2026-03-01",
+          precisao: "dia",
+        },
         confianca: "alta",
         evidencia: "As candidaturas decorrem entre 1 de março de 2026",
-        pagina: 1,
       },
       encerramento: {
         valor: {
@@ -60,21 +66,19 @@ export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
         },
         confianca: "alta",
         evidencia: "até às 18:00 do dia 30 de\nsetembro de 2026",
-        pagina: 1,
       },
     },
     beneficiarios: {
       tipos: {
         valor: ["particular", "condominio"],
         confianca: "alta",
-        evidencia: "pessoas singulares proprietárias de habitação própria e permanente",
-        pagina: 1,
+        evidencia:
+          "pessoas singulares proprietárias de habitação própria e permanente",
       },
       admite_particulares: {
         valor: "sim",
         confianca: "alta",
         evidencia: "Beneficiários: pessoas singulares proprietárias",
-        pagina: 1,
       },
       restricoes_texto: "Habitação própria e permanente.",
     },
@@ -90,7 +94,6 @@ export function extraccaoSolar(sobrepor: Partial<Extraccao> = {}): Extraccao {
       ],
       confianca: "alta",
       evidencia: "sistemas solares fotovoltaicos para autoconsumo",
-      pagina: 1,
     },
     medidas_nao_classificadas: [],
     dotacao: {

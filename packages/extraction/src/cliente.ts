@@ -4,7 +4,12 @@ import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { EsquemaExtraccao, VERSAO_ESQUEMA, type Extraccao } from "./esquema.ts";
-import { PROMPT_SISTEMA, VERSAO_PROMPT, hashPrompt, instrucaoVolatil } from "./prompt.ts";
+import {
+  PROMPT_SISTEMA,
+  VERSAO_PROMPT,
+  hashPrompt,
+  instrucaoVolatil,
+} from "./prompt.ts";
 
 export const MODELO = "claude-opus-5";
 
@@ -45,7 +50,10 @@ export function chaveCassete(doc: DocumentoEntrada): string {
     VERSAO_ESQUEMA,
     createHash("sha256").update(doc.texto, "utf8").digest("hex"),
   ].join("|");
-  return createHash("sha256").update(material, "utf8").digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(material, "utf8")
+    .digest("hex")
+    .slice(0, 32);
 }
 
 /**
@@ -90,7 +98,8 @@ export class Extractor {
   constructor(opcoes: OpcoesExtractor = {}) {
     this.#modo = opcoes.modo ?? modoPorDefeito();
     this.#dirCassetes =
-      opcoes.dirCassetes ?? join(process.cwd(), "packages/extraction/fixtures/cassetes");
+      opcoes.dirCassetes ??
+      join(process.cwd(), "packages/extraction/fixtures/cassetes");
     this.#cliente = opcoes.cliente;
   }
 
@@ -202,7 +211,12 @@ export class Extractor {
       // usable output, and throwing here would take down the whole run for one
       // awkward document.
       if (resposta.stop_reason === "refusal") {
-        return { ...base, extraccao: null, stopReason: "refusal", erro: "modelo recusou" };
+        return {
+          ...base,
+          extraccao: null,
+          stopReason: "refusal",
+          erro: "modelo recusou",
+        };
       }
 
       return {

@@ -42,7 +42,10 @@ export function normalizarConteudo(html: string): string {
     /(<input[^>]*\bname\s*=\s*["']?(?:__RequestVerificationToken|csrf[-_]?token|authenticity_token)["']?[^>]*\bvalue\s*=\s*["'])[^"']*(["'])/gi,
     "$1[removido]$2",
   );
-  t = t.replace(/\b(jsessionid|phpsessid|aspsessionid[a-z]*)=[^&"';\s]+/gi, "$1=[removido]");
+  t = t.replace(
+    /\b(jsessionid|phpsessid|aspsessionid[a-z]*)=[^&"';\s]+/gi,
+    "$1=[removido]",
+  );
 
   // Cache-busting query strings on assets: ?v=1724... changes on every deploy.
   t = t.replace(/([?&](?:v|ver|version|_|cb|t)=)\d{6,}/gi, "$1[removido]");
@@ -62,7 +65,9 @@ export function normalizarConteudo(html: string): string {
 
 /** Content hash used by the change gate. Always over the normalised form. */
 export function hashConteudo(html: string): string {
-  return createHash("sha256").update(normalizarConteudo(html), "utf8").digest("hex");
+  return createHash("sha256")
+    .update(normalizarConteudo(html), "utf8")
+    .digest("hex");
 }
 
 /** Hash raw bytes (PDFs), where there is nothing volatile to strip. */

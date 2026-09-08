@@ -27,22 +27,31 @@ describe("registo de fontes", () => {
     // extractor, and would sail through that weaker check.
     for (const f of FONTES_ACTIVAS) {
       const dir = join(RAIZ_FONTES, f.id, "fixtures");
-      expect(existsSync(dir), `${f.id} está activa sem fixtures capturadas`).toBe(true);
+      expect(
+        existsSync(dir),
+        `${f.id} está activa sem fixtures capturadas`,
+      ).toBe(true);
 
-      const manifesto = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
-      const entradas: { url: string; ficheiro: string }[] = manifesto.entradas ?? [];
+      const manifesto = JSON.parse(
+        readFileSync(join(dir, "manifest.json"), "utf8"),
+      );
+      const entradas: { url: string; ficheiro: string }[] =
+        manifesto.entradas ?? [];
 
       let melhor = 0;
       for (const url of f.urlsEntrada) {
         const entrada = entradas.find((e) => e.url === url);
-        if (entrada === undefined || !/\.html$/i.test(entrada.ficheiro)) continue;
+        if (entrada === undefined || !/\.html$/i.test(entrada.ficheiro))
+          continue;
         const html = readFileSync(join(dir, entrada.ficheiro), "utf8");
         const n = f.extrair(html, { urlBase: url, agora: AGORA }).length;
         melhor = Math.max(melhor, n);
       }
 
-      expect(melhor, `${f.id}: o extractor devolve ${melhor} da sua própria captura`)
-        .toBeGreaterThanOrEqual(f.candidatosMin);
+      expect(
+        melhor,
+        `${f.id}: o extractor devolve ${melhor} da sua própria captura`,
+      ).toBeGreaterThanOrEqual(f.candidatosMin);
     }
   });
 
@@ -53,7 +62,9 @@ describe("registo de fontes", () => {
         // forty entries to one would pass — so it has to be higher. A dataset source
         // is different in kind: it expects a single file, and 1 genuinely means "the
         // download link is still there".
-        expect(f.candidatosMin, f.id).toBeGreaterThan(f.tipo === "dataset" ? 0 : 1);
+        expect(f.candidatosMin, f.id).toBeGreaterThan(
+          f.tipo === "dataset" ? 0 : 1,
+        );
       } else {
         // Any other number would be invented rather than measured.
         expect(f.candidatosMin, f.id).toBe(0);
@@ -74,7 +85,9 @@ describe("registo de fontes", () => {
   });
 
   it("resolve fontes por id", () => {
-    expect(obterFonte("fundo-ambiental-aac")?.nome).toContain("Fundo Ambiental");
+    expect(obterFonte("fundo-ambiental-aac")?.nome).toContain(
+      "Fundo Ambiental",
+    );
     expect(obterFonte("nao-existe")).toBeUndefined();
   });
 

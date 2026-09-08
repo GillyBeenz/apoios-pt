@@ -37,7 +37,8 @@ const RE_CAMINHO_AVISO = /^apoios-(?:\d{4}|prr)\/[^/]+\/[^/]+\.aspx$/i;
  * Sections that sit at the notice path depth but are documentation, not notices.
  * Kept deliberately short: the path rule already does the heavy lifting.
  */
-const SECCOES_IGNORADAS = /^(documentos|documentacao|formularios|faq|legislacao)/i;
+const SECCOES_IGNORADAS =
+  /^(documentos|documentacao|formularios|faq|legislacao)/i;
 
 export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
   // A dead entry URL must yield nothing rather than a plausible-looking zero, so the

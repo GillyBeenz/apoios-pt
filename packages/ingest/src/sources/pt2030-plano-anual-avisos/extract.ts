@@ -1,5 +1,9 @@
 import { parse } from "node-html-parser";
-import { canonicalizarUrl, normalizarEspacos, type Candidato } from "@apoios/core";
+import {
+  canonicalizarUrl,
+  normalizarEspacos,
+  type Candidato,
+} from "@apoios/core";
 import type { ContextoExtraccao } from "../tipos.ts";
 
 /**
@@ -53,7 +57,9 @@ export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
     // The link text is often just "Descarregar", so fall back to the filename —
     // which on this site carries the version, e.g. "PAA_2026_v3.xlsx".
     const rotulo = normalizarEspacos(ancora.text ?? "");
-    const ficheiro = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
+    const ficheiro = decodeURIComponent(
+      new URL(url).pathname.split("/").pop() ?? "",
+    );
     const rotuloUtil = rotulo.length >= 4 && !RE_ROTULO_GENERICO.test(rotulo);
     const titulo = rotuloUtil ? rotulo : ficheiro;
 

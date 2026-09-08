@@ -75,7 +75,9 @@ export function extrair(html: string, ctx: ContextoExtraccao): Candidato[] {
     const caminho = caminhoRelativo(href, ctx.urlBase);
     if (caminho === null || !RE_CAMINHO_NOTICIA.test(caminho)) continue;
 
-    const slug = caminho.slice("listagem-noticias/".length).replace(/\.aspx$/i, "");
+    const slug = caminho
+      .slice("listagem-noticias/".length)
+      .replace(/\.aspx$/i, "");
     if (RE_SLUG_PAGINACAO.test(slug)) continue;
 
     const url = new URL(href, ctx.urlBase).toString();

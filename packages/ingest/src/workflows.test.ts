@@ -28,10 +28,15 @@ describe("workflows", () => {
       for (const [i, linha] of linhas.entries()) {
         if (!linha.includes("pnpm/action-setup")) continue;
         // Look at the step's `with:` block — anything up to the next step.
-        const resto = linhas.slice(i + 1, i + 8).join("\n").split(/\n\s*- /)[0] ?? "";
-        expect(resto, `${f}:${i + 1} passa version: ao pnpm/action-setup`).not.toMatch(
-          /^\s*version:/m,
-        );
+        const resto =
+          linhas
+            .slice(i + 1, i + 8)
+            .join("\n")
+            .split(/\n\s*- /)[0] ?? "";
+        expect(
+          resto,
+          `${f}:${i + 1} passa version: ao pnpm/action-setup`,
+        ).not.toMatch(/^\s*version:/m);
       }
     }
   });

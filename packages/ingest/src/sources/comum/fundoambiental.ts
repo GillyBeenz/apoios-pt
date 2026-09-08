@@ -43,7 +43,10 @@ export function textoLimpo(el: HTMLElement): string {
 export function caminhoRelativo(href: string, urlBase: string): string | null {
   try {
     const u = new URL(href, urlBase);
-    if (u.hostname.replace(/^www\./, "") !== new URL(urlBase).hostname.replace(/^www\./, "")) {
+    if (
+      u.hostname.replace(/^www\./, "") !==
+      new URL(urlBase).hostname.replace(/^www\./, "")
+    ) {
       return null;
     }
     return u.pathname.replace(/^\//, "");
@@ -54,5 +57,7 @@ export function caminhoRelativo(href: string, urlBase: string): string | null {
 
 /** Anchors that can never be a document link. */
 export function hrefInutil(href: string | undefined): href is undefined {
-  return !href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href);
+  return (
+    !href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href)
+  );
 }

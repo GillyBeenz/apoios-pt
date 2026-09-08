@@ -31,12 +31,18 @@ describe("extrair — Plano Anual de Avisos", () => {
 
   it("recorre ao nome do ficheiro quando o texto da ligação não diz nada", () => {
     // "Descarregar" identifies nothing; the filename carries the version.
-    const c = extrair(`<a href="/uploads/PAA_2026_v3.xlsx">Descarregar</a>`, CTX);
+    const c = extrair(
+      `<a href="/uploads/PAA_2026_v3.xlsx">Descarregar</a>`,
+      CTX,
+    );
     expect(c[0]?.titulo).toBe("PAA_2026_v3.xlsx");
   });
 
   it("prefere o texto da ligação quando este é descritivo", () => {
-    const c = extrair(`<a href="/uploads/PAA_2026_v3.xlsx">Plano Anual de Avisos 2026</a>`, CTX);
+    const c = extrair(
+      `<a href="/uploads/PAA_2026_v3.xlsx">Plano Anual de Avisos 2026</a>`,
+      CTX,
+    );
     expect(c[0]?.titulo).toBe("Plano Anual de Avisos 2026");
   });
 

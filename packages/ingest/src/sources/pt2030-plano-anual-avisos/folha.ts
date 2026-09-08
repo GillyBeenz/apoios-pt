@@ -64,7 +64,9 @@ export function dataDeSerieExcel(serie: number): string {
  * would put a notice two months early — the kind of quiet arithmetic error that turns
  * into a user planning around a window that has not opened.
  */
-export function mesesDoQuadrimestre(q: string): { primeiro: number; ultimo: number } | null {
+export function mesesDoQuadrimestre(
+  q: string,
+): { primeiro: number; ultimo: number } | null {
   const n = Number(q.trim().replace(/^q/i, ""));
   if (!Number.isInteger(n) || n < 1 || n > 3) return null;
   return { primeiro: (n - 1) * 4 + 1, ultimo: n * 4 };
@@ -93,21 +95,35 @@ export function elegibilidadeDe(tipoEnt: string): {
 
   return {
     beneficiarios,
-    admiteParticulares: privada ? "desconhecido" : publica ? "nao" : "desconhecido",
+    admiteParticulares: privada
+      ? "desconhecido"
+      : publica
+        ? "nao"
+        : "desconhecido",
   };
 }
 
-function celulas(sheetXml: string, partilhadas: string[]): Map<string, string>[] {
+function celulas(
+  sheetXml: string,
+  partilhadas: string[],
+): Map<string, string>[] {
   const linhas: Map<string, string>[] = [];
   for (const linha of sheetXml.matchAll(/<row[^>]*>(.*?)<\/row>/gs)) {
     const corpo = linha[1] ?? "";
     const m = new Map<string, string>();
-    for (const encontrado of corpo.matchAll(/<c r="([A-Z]+)\d+"([^>]*)>(.*?)<\/c>/gs)) {
+    for (const encontrado of corpo.matchAll(
+      /<c r="([A-Z]+)\d+"([^>]*)>(.*?)<\/c>/gs,
+    )) {
       const ref = encontrado[1];
       const atributos = encontrado[2] ?? "";
       const valor = /<v>(.*?)<\/v>/s.exec(encontrado[3] ?? "")?.[1];
       if (ref === undefined || valor === undefined) continue;
-      m.set(ref, atributos.includes('t="s"') ? (partilhadas[Number(valor)] ?? "") : valor);
+      m.set(
+        ref,
+        atributos.includes('t="s"')
+          ? (partilhadas[Number(valor)] ?? "")
+          : valor,
+      );
     }
     if (m.size > 0) linhas.push(m);
   }
@@ -126,15 +142,22 @@ function desescapar(s: string): string {
 export function lerPlanoAnual(bytes: Uint8Array): AvisoPrevisto[] {
   const zip = unzipSync(bytes);
   const sheet = zip["xl/worksheets/sheet1.xml"];
-  if (sheet === undefined) throw new Error("A folha não tem xl/worksheets/sheet1.xml");
+  if (sheet === undefined)
+    throw new Error("A folha não tem xl/worksheets/sheet1.xml");
 
   const partilhadas: string[] = [];
   const sstBruto = zip["xl/sharedStrings.xml"];
   if (sstBruto !== undefined) {
-    for (const encontrado of strFromU8(sstBruto).matchAll(/<si>(.*?)<\/si>/gs)) {
+    for (const encontrado of strFromU8(sstBruto).matchAll(
+      /<si>(.*?)<\/si>/gs,
+    )) {
       const si = encontrado[1] ?? "";
       partilhadas.push(
-        desescapar([...si.matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((m) => m[1] ?? "").join("")),
+        desescapar(
+          [...si.matchAll(/<t[^>]*>(.*?)<\/t>/gs)]
+            .map((m) => m[1] ?? "")
+            .join(""),
+        ),
       );
     }
   }
@@ -196,12 +219,16 @@ export function lerPlanoAnual(bytes: Uint8Array): AvisoPrevisto[] {
       objetivoEspecifico: em(l, "Objetivo Especifico") || null,
       fundo: em(l, "Fundo") || null,
       natureza: em(l, "Natureza Aviso") || null,
-      dotacaoEur: Number.isFinite(dotacao) && dotacao > 0 ? Math.round(dotacao) : null,
+      dotacaoEur:
+        Number.isFinite(dotacao) && dotacao > 0 ? Math.round(dotacao) : null,
       abreEm,
       abreEmPrecisao,
       fechaEm:
-        fim !== "" && Number.isFinite(Number(fim)) ? dataDeSerieExcel(Number(fim)) : null,
-      fechaEmPrecisao: fim !== "" && Number.isFinite(Number(fim)) ? "dia" : "desconhecida",
+        fim !== "" && Number.isFinite(Number(fim))
+          ? dataDeSerieExcel(Number(fim))
+          : null,
+      fechaEmPrecisao:
+        fim !== "" && Number.isFinite(Number(fim)) ? "dia" : "desconhecida",
       regioes: em(l, "NUTS II")
         .split("|")
         .map((r) => r.trim())
