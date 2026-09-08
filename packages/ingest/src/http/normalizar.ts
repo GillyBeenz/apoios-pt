@@ -59,6 +59,25 @@ export function normalizarConteudo(html: string): string {
   // Nonces and inline script integrity attributes.
   t = t.replace(/\bnonce\s*=\s*["'][^"']*["']/gi, 'nonce="[removido]"');
 
+  // Script and style bodies, wholesale.
+  //
+  // The list above was a list of *known* volatile fields, and it was beaten by an
+  // unknown one: fundoambiental.pt emits `var mlkSessMLKID = 'dqfcufoq…'` — a
+  // 24-character per-request session id — inside an inline script. Fixed length,
+  // new value on every fetch, so the page hashed differently every run while being
+  // otherwise byte-identical. Seven captures of each notice on 2026-09-08, seven
+  // distinct hashes, seven times the extraction bill. Exactly the failure the
+  // comment on CAMPOS_VOLATEIS says must not happen, arriving through a door that
+  // list does not cover.
+  //
+  // Naming this one token would leave the door open for the next one. Dropping the
+  // bodies entirely closes the class, and costs nothing that matters: `textoVisivel`
+  // already strips script and style before the model sees the page, so a change
+  // confined to one cannot change an extraction. Markup, attributes and links stay
+  // in the hash — a moved link on a listing page is still a change.
+  t = t.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "<script>[removido]</script>");
+  t = t.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "<style>[removido]</style>");
+
   // Whitespace-only differences must not register as change.
   return t.replace(/\s+/g, " ").trim();
 }

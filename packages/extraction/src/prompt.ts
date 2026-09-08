@@ -5,7 +5,11 @@ import {
   TAXONOMIA_MEDIDAS,
 } from "@apoios/core";
 
-export const VERSAO_PROMPT = "v1";
+// v2: o envelope deixou de ter `pagina` (saiu do esquema na #29 e o prompt ficou a
+// anunciá-lo), e a instrução de citação passa a dizer contra que texto a citação é
+// conferida. Gravado em `fund_extractions.versao_prompt`, para que uma prova
+// falhada se possa atribuir a um prompt em concreto em vez de a "o prompt".
+export const VERSAO_PROMPT = "v2";
 
 const listaMedidas = TAXONOMIA_MEDIDAS.map(
   (m) => `- ${m}: ${ETIQUETAS_MEDIDAS[m]}`,
@@ -37,10 +41,18 @@ Nunca infiras o que o documento não diz. Este sistema envia alertas a pessoas q
 tomam decisões financeiras reais com base neles. Uma afirmação plausível mas sem
 suporte no texto é pior do que admitir desconhecimento.
 
-Para cada campo com o envelope {valor, confianca, evidencia, pagina}:
+Para cada campo com o envelope {valor, confianca, evidencia}:
 - "evidencia" tem de ser uma citação LITERAL e contígua do documento. Copia os
   caracteres exactos. Não parafraseies, não corrijas, não traduzas, não juntes
   partes separadas do texto.
+- O texto que recebes de uma página HTML já vem sem marcação e com todos os
+  espaços, tabulações e mudanças de linha reduzidos a um único espaço. Cita a
+  partir do texto que estás a ver, e não de como a página apareceria formatada:
+  não reponhas quebras de linha, não acrescentes travessões, não arranjes a
+  pontuação, não completes uma abreviatura. A citação é conferida por comparação exacta
+  contra este mesmo texto, e uma que tenha sido arrumada não é encontrada.
+- Uma citação curta e exacta vale mais do que uma longa e arrumada. Escolhe o
+  fragmento contíguo mais pequeno que sustente o valor.
 - Se não encontrares suporte textual directo, devolve evidencia "" e confianca
   "baixa". Isto é uma resposta correcta e esperada.
 - "confianca":

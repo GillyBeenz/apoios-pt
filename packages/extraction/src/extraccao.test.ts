@@ -58,7 +58,7 @@ describe("prompt", () => {
    * the hash below, and re-record with ANTHROPIC_MODE=record.
    */
   it("mantém o hash fixado", () => {
-    expect(hashPrompt()).toBe("f8d27ee7c13508b4");
+    expect(hashPrompt()).toBe("7dc318ee938f4c70");
   });
 
   it("não interpola nada volátil no prefixo em cache", () => {

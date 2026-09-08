@@ -71,6 +71,37 @@ describe("normalizarConteudo", () => {
     expect(hashConteudo(a)).toBe(hashConteudo(b));
   });
 
+  it("ignora um id de sessão por pedido dentro de um script", () => {
+    // Os valores são reais, lidos de duas capturas da mesma página do Fundo
+    // Ambiental no mesmo dia. Foram estes 24 caracteres que fizeram a página
+    // hashar diferente sete vezes seguidas, e re-extrair sete vezes.
+    const pagina = (id: string) =>
+      `<h1>Aviso 03/2026</h1><script type="text/javascript">
+       <!--
+         var mlkSessMLKID = '${id}';
+       //-->
+       </script><p>Candidaturas até 30/09/2026</p>`;
+    expect(hashConteudo(pagina("dqfcufoqklstxa150ocgalxg"))).toBe(
+      hashConteudo(pagina("vlkosb1trlyoxuvjayngkdeh")),
+    );
+  });
+
+  it("ignora um estilo em linha que muda", () => {
+    const a = "<style>.a{color:#111}</style><p>Aviso</p>";
+    const b = "<style>.a{color:#222}</style><p>Aviso</p>";
+    expect(hashConteudo(a)).toBe(hashConteudo(b));
+  });
+
+  it("continua a detetar uma ligação alterada, que não vive num script", () => {
+    // O corte é aos corpos de script e style, não à marcação: uma listagem que
+    // passa a apontar para outro aviso tem de continuar a contar como mudança.
+    const a =
+      '<script>var x=1;</script><a href="/avisos/03-2026.aspx">Aviso</a>';
+    const b =
+      '<script>var x=1;</script><a href="/avisos/04-2026.aspx">Aviso</a>';
+    expect(hashConteudo(a)).not.toBe(hashConteudo(b));
+  });
+
   it("encolhe drasticamente o tamanho, que é o que torna as fixtures commitáveis", () => {
     const grande = paginaComViewstate("A".repeat(120_000));
     expect(normalizarConteudo(grande).length).toBeLessThan(grande.length / 10);
