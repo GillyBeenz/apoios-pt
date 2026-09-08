@@ -12,7 +12,12 @@ import {
   type EventoApoio,
 } from "@apoios/core";
 
-import { gerarSlug, type Armazem, type EstadoSnapshot } from "./armazem.ts";
+import {
+  gerarSlug,
+  type Armazem,
+  type EstadoSnapshot,
+  type ExtraccaoRegistada,
+} from "./armazem.ts";
 
 /**
  * Supabase's root certificate, committed rather than fetched.
@@ -290,6 +295,33 @@ export class ArmazemPostgres implements Armazem {
     if (l === undefined)
       throw new Error(`actualizarApoio(${fundId}): apoio desconhecido`);
     return paraApoio(normalizar(l));
+  }
+
+  async guardarExtraccao(e: ExtraccaoRegistada): Promise<void> {
+    // Deliberately not idempotent and never deduplicated: every call is a distinct
+    // event, and two extractions of the same document on different days are the
+    // record of what changed between them.
+    await this.#consulta(
+      `insert into fund_extractions
+         (fund_id, modelo, prompt_version, schema_version, bruto,
+          confianca_campos, evidencia_falhou, tokens_entrada, tokens_saida,
+          tokens_cache_lidos, stop_reason)
+       values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::text[], $8, $9, $10, $11)`,
+      [
+        e.fundId,
+        e.modelo,
+        e.versaoPrompt,
+        e.versaoEsquema,
+        JSON.stringify(e.bruto),
+        JSON.stringify(e.confiancaCampos),
+        [...e.evidenciaFalhou],
+        e.tokensEntrada,
+        e.tokensSaida,
+        e.tokensCacheLidos,
+        e.stopReason,
+      ],
+      "guardarExtraccao",
+    );
   }
 
   async registarEventos(eventos: readonly EventoApoio[]): Promise<number> {

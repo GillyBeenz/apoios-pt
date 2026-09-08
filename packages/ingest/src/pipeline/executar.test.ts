@@ -306,3 +306,65 @@ describe("executarFonte", () => {
     expect(r.metricas.candidatos).toBe(1);
   });
 });
+
+/**
+ * The gap that made execução #23 undebuggable.
+ *
+ * That run produced three real funds and `verificarProvas` rejected the evidence
+ * for every field of all three. There was no way to see what the model had
+ * actually quoted: `fund_extractions` has existed since the first migration and
+ * nothing ever wrote to it. A hallucination gate you cannot audit is a gate you
+ * cannot trust in either direction — you cannot tell a caught invention from a
+ * rejected honest quote.
+ */
+describe("o rasto de auditoria das extracções", () => {
+  const mundo = () =>
+    new BuscadorMemoria()
+      .definir(URL_LISTAGEM, { corpo: listagem() })
+      .definir(URL_DETALHE, { corpo: detalhe() });
+
+  it("guarda a extracção, com o bruto do modelo", async () => {
+    const armazem = new ArmazemMemoria();
+    const r = await executarFonte(contexto(mundo(), armazem));
+
+    expect(r.apoiosNovos).toHaveLength(1);
+    expect(armazem.extraccoes).toHaveLength(1);
+
+    const reg = armazem.extraccoes[0]!;
+    // The raw extraction, not the normalised Apoio — the point is to see exactly
+    // what the model said, including the quotes that were rejected.
+    expect(reg.bruto).not.toBeNull();
+    expect(reg.fundId).toBe(r.apoiosNovos[0]!.id);
+    expect(reg.modelo).toBe("claude-opus-5");
+    expect(reg.tokensEntrada).toBe(20_000);
+  });
+
+  it("regista as provas que falharam e a confiança efectiva", async () => {
+    const armazem = new ArmazemMemoria();
+    // An invented quote: nothing in `detalhe()` contains this sentence.
+    await executarFonte(
+      contexto(
+        mundo(),
+        armazem,
+        extractorFixo({
+          estado: {
+            valor: "aberto",
+            confianca: "alta",
+            evidencia: "uma frase que o documento nunca contém",
+          },
+        }),
+      ),
+    );
+
+    const reg = armazem.extraccoes[0]!;
+    expect(reg.evidenciaFalhou).toContain("estado");
+    // Verification downgrades a failed quote to `baixa`, and the record keeps it.
+    expect(reg.confiancaCampos["estado"]).toBe("baixa");
+  });
+
+  it("não escreve nada em simulação", async () => {
+    const armazem = new ArmazemMemoria();
+    await executarFonte({ ...contexto(mundo(), armazem), simulacao: true });
+    expect(armazem.extraccoes).toHaveLength(0);
+  });
+});

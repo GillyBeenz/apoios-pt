@@ -14,6 +14,7 @@ import {
 } from "@apoios/extraction";
 import type { Buscador } from "../http/tipos.ts";
 import {
+  decodificarEntidades,
   hashBytes,
   hashConteudo,
   normalizarConteudo,
@@ -44,14 +45,18 @@ export interface ResultadoExecucao {
 }
 
 function textoVisivel(html: string): string {
-  return normalizarConteudo(html)
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    decodificarEntidades(
+      normalizarConteudo(html)
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " "),
+    )
+      // Entities are decoded before the whitespace collapse, so a `&#160;` that
+      // became a space is folded like any other.
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -267,9 +272,30 @@ export async function executarFonte(
     );
     const resolucao = resolverIdentidade(chaves, existentes);
 
+    // The audit trail, written for every extraction that produced a value —
+    // including the ones whose evidence failed. Those are precisely the ones worth
+    // reading later: without them, "every quote was rejected" is a dead end.
+    const registar = async (fundId: string | null): Promise<void> => {
+      if (op.simulacao) return;
+      await armazem.guardarExtraccao({
+        fundId,
+        modelo: resultado.modelo,
+        versaoPrompt: resultado.versaoPrompt,
+        versaoEsquema: resultado.versaoEsquema,
+        bruto: resultado.extraccao,
+        confiancaCampos: Object.fromEntries(verificacao.confiancaEfectiva),
+        evidenciaFalhou: verificacao.provaFalhou,
+        tokensEntrada: resultado.tokensEntrada,
+        tokensSaida: resultado.tokensSaida,
+        tokensCacheLidos: resultado.tokensCacheLidos,
+        stopReason: resultado.stopReason,
+      });
+    };
+
     // --- 10. Diff into events ------------------------------------------------
     if (resolucao.tipo === "novo") {
       const apoio = await armazem.criarApoio(novo, chaves);
+      await registar(apoio.id);
       apoiosNovos.push(apoio);
       eventos.push(...diferenciar(null, apoio, agora.toISOString()));
       continue;
@@ -299,6 +325,7 @@ export async function executarFonte(
       resolucao.chavesEmFalta,
     );
     const actualizado = await armazem.actualizarApoio(resolucao.fundId, novo);
+    await registar(actualizado.id);
     apoiosActualizados.push(actualizado);
     eventos.push(
       ...diferenciar(anteriorApoio, actualizado, agora.toISOString()),

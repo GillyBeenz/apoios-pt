@@ -74,3 +74,80 @@ export function hashConteudo(html: string): string {
 export function hashBytes(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
+
+/**
+ * Named entities worth decoding, beyond the numeric ones.
+ *
+ * Deliberately short: these ASP.NET pages encode almost everything numerically
+ * (`&#231;` for ç), and a long table would imply a completeness this does not
+ * have. `&amp;` is last in application order for the usual reason — decoding it
+ * first would turn `&amp;#231;` into `ç` instead of the literal `&#231;`.
+ */
+const ENTIDADES_NOMEADAS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/&nbsp;/gi, " "],
+  [/&ordm;/gi, "º"],
+  [/&ordf;/gi, "ª"],
+  [/&aacute;/gi, "á"],
+  [/&agrave;/gi, "à"],
+  [/&atilde;/gi, "ã"],
+  [/&acirc;/gi, "â"],
+  [/&eacute;/gi, "é"],
+  [/&ecirc;/gi, "ê"],
+  [/&iacute;/gi, "í"],
+  [/&oacute;/gi, "ó"],
+  [/&otilde;/gi, "õ"],
+  [/&ocirc;/gi, "ô"],
+  [/&uacute;/gi, "ú"],
+  [/&ccedil;/gi, "ç"],
+  [/&euro;/gi, "€"],
+  [/&hellip;/gi, "…"],
+  [/&ndash;/gi, "–"],
+  [/&mdash;/gi, "—"],
+  [/&laquo;/gi, "«"],
+  [/&raquo;/gi, "»"],
+  [/&quot;/gi, '"'],
+  [/&#39;|&apos;/gi, "'"],
+  [/&lt;/gi, "<"],
+  [/&gt;/gi, ">"],
+  [/&amp;/gi, "&"],
+];
+
+/**
+ * Decode HTML entities so the text we verify against is the text the model reads.
+ *
+ * This is why every evidence quote failed verification on the first successful
+ * run. One Fundo Ambiental page carries **2746** numeric entities against six
+ * `&nbsp;` — the whole Portuguese text is entity-encoded — and the old
+ * `textoVisivel` decoded only `&nbsp;` and `&amp;`. So the model was handed
+ * `Refor&#231;o da resili&#234;ncia`, read it, silently rendered it, and quoted
+ * `Reforço da resiliência`. A literal substring check could never match, and
+ * `verificarProvas` correctly reported that it could not find the quote.
+ *
+ * The model was right and our comparison text was wrong, which is the worst shape
+ * for a hallucination gate to fail in: it discredits honest extractions and would
+ * have kept every fund in the review queue permanently.
+ */
+export function decodificarEntidades(texto: string): string {
+  const comNumericas = texto
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      codigoParaTexto(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, dec: string) =>
+      codigoParaTexto(Number.parseInt(dec, 10)),
+    );
+
+  return ENTIDADES_NOMEADAS.reduce(
+    (s, [padrao, valor]) => s.replace(padrao, valor),
+    comNumericas,
+  );
+}
+
+/** Out-of-range code points are left as-is rather than throwing mid-page. */
+function codigoParaTexto(codigo: number): string {
+  if (!Number.isFinite(codigo) || codigo < 0 || codigo > 0x10ffff) return "";
+  try {
+    return String.fromCodePoint(codigo);
+  } catch {
+    return "";
+  }
+}
