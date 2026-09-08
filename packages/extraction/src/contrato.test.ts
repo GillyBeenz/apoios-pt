@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { CONTRATO_JSON, extrairJson } from "./contrato.ts";
+import {
+  CONTRATO_JSON,
+  apararDemasiadoLongos,
+  extrairJson,
+} from "./contrato.ts";
 import { EsquemaExtraccao } from "./esquema.ts";
 import { extraccaoSolar } from "./teste/extraccoes.ts";
 
@@ -79,5 +83,69 @@ describe("a validação continua a ser o esquema", () => {
     const bruto = JSON.parse(JSON.stringify(extraccaoSolar()));
     bruto.identificacao.programa_pai = null;
     expect(EsquemaExtraccao.safeParse(bruto).success).toBe(false);
+  });
+});
+
+describe("apararDemasiadoLongos", () => {
+  // Os caminhos e limites são os que a execução #24 reportou, tal e qual.
+  const problemaResumo = {
+    code: "too_big",
+    origin: "string",
+    maximum: 600,
+    path: ["identificacao", "resumo_pt"],
+  };
+
+  it("apara um resumo comprido em vez de deitar fora a extracção", () => {
+    const json = { identificacao: { resumo_pt: "a".repeat(620) } };
+    const { json: saida, aparados } = apararDemasiadoLongos(json, [
+      problemaResumo,
+    ]);
+    expect(aparados).toEqual(["identificacao.resumo_pt"]);
+    expect(
+      (saida as { identificacao: { resumo_pt: string } }).identificacao
+        .resumo_pt,
+    ).toHaveLength(600);
+  });
+
+  it("apara uma citação, e o que sobra continua a ser um prefixo do que o modelo escreveu", () => {
+    const citacao = `${"O documento afirma que ".repeat(20)}FIM`;
+    const json = { beneficiarios: { tipos: { evidencia: citacao } } };
+    const { json: saida } = apararDemasiadoLongos(json, [
+      {
+        code: "too_big",
+        origin: "string",
+        maximum: 400,
+        path: ["beneficiarios", "tipos", "evidencia"],
+      },
+    ]);
+    const aparada = (
+      saida as { beneficiarios: { tipos: { evidencia: string } } }
+    ).beneficiarios.tipos.evidencia;
+    expect(aparada).toHaveLength(400);
+    // É o que mantém o portão de alucinação com a mesma força: uma citação
+    // honesta aparada continua literal, e uma paráfrase aparada continua paráfrase.
+    expect(citacao.startsWith(aparada)).toBe(true);
+  });
+
+  it("não toca em nada que não seja um comprimento", () => {
+    const json = { estado: { valor: "inventado" } };
+    const { json: saida, aparados } = apararDemasiadoLongos(json, [
+      {
+        code: "invalid_value",
+        origin: "string",
+        path: ["estado", "valor"],
+      },
+    ]);
+    expect(aparados).toEqual([]);
+    expect(saida).toEqual({ estado: { valor: "inventado" } });
+  });
+
+  it("não inventa estrutura quando o caminho não existe no que o modelo enviou", () => {
+    const json = { identificacao: {} };
+    const { json: saida, aparados } = apararDemasiadoLongos(json, [
+      { code: "too_big", origin: "string", maximum: 10, path: ["a", "b", "c"] },
+    ]);
+    expect(aparados).toEqual([]);
+    expect(saida).toEqual({ identificacao: {} });
   });
 });

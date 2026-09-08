@@ -65,3 +65,55 @@ export function extrairJson(texto: string): unknown {
     return null;
   }
 }
+
+/**
+ * Trim strings that came back too long, and only those.
+ *
+ * Execução #24 threw away 21 of its 34 model calls. Nearly all of them for this:
+ *
+ *     identificacao.resumo_pt: Too big: expected string to have <=600 characters
+ *     beneficiarios.tipos.evidencia: Too big: expected string to have <=400 characters
+ *
+ * A complete, well-formed, correctly-typed extraction discarded because a summary
+ * ran to 620 characters. Those limits exist so a card fits on a screen and a quote
+ * stays a quote; neither is a claim about the world, and neither is worth the whole
+ * document. While `output_config.format` constrained the decoding the model could
+ * not overshoot them, so nothing had to decide what to do when it did. Since #30
+ * validates on arrival, something does.
+ *
+ * The leniency is narrow on purpose. It is driven by the issues Zod actually
+ * reported, and it acts on exactly one of them — `too_big` on a string. A wrong
+ * enum, a missing field, a number where text belongs: all still reject, loudly, as
+ * they should. And the gate does not weaken: a truncated quote is a prefix of what
+ * the model wrote, so an honest quote stays verbatim and a paraphrase stays a
+ * paraphrase.
+ */
+export function apararDemasiadoLongos(
+  json: unknown,
+  problemas: readonly { code: string; origin?: unknown; maximum?: unknown; path: readonly PropertyKey[] }[],
+): { json: unknown; aparados: string[] } {
+  const aparados: string[] = [];
+
+  for (const p of problemas) {
+    if (p.code !== "too_big" || p.origin !== "string") continue;
+    if (typeof p.maximum !== "number" || p.path.length === 0) continue;
+
+    // Walk to the parent of the offending string; bail on anything unexpected
+    // rather than creating structure the model did not send.
+    let no: unknown = json;
+    for (const passo of p.path.slice(0, -1)) {
+      if (no === null || typeof no !== "object") { no = undefined; break; }
+      no = (no as Record<PropertyKey, unknown>)[passo];
+    }
+    if (no === null || typeof no !== "object") continue;
+
+    const chave = p.path[p.path.length - 1] as PropertyKey;
+    const valor = (no as Record<PropertyKey, unknown>)[chave];
+    if (typeof valor !== "string" || valor.length <= p.maximum) continue;
+
+    (no as Record<PropertyKey, unknown>)[chave] = valor.slice(0, p.maximum);
+    aparados.push(p.path.join("."));
+  }
+
+  return { json, aparados };
+}
