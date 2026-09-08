@@ -163,7 +163,7 @@ describe("decidir", () => {
 
   it("rejeita um documento que não é um aviso de apoio", () => {
     const e = extraccaoSolar({
-      auto_avaliacao: { documento_e_aviso_de_apoio: false, qualidade_ocr: "boa", notas: null },
+      auto_avaliacao: { documento_e_aviso_de_apoio: false, qualidade_ocr: "boa", notas: "" },
     });
     const d = decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn");
     expect(d.publicado).toBe(false);

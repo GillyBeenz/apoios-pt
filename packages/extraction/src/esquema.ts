@@ -7,7 +7,7 @@ import {
   TRIESTADOS,
 } from "@apoios/core";
 
-export const VERSAO_ESQUEMA = "1";
+export const VERSAO_ESQUEMA = "2";
 
 /**
  * The trust envelope.
@@ -33,33 +33,69 @@ function comProva<T extends z.ZodType>(valor: T) {
         "Citação LITERAL e contígua do documento que suporta o valor. " +
           'Se não existir suporte textual, devolve "" e confianca "baixa". NUNCA parafraseies.',
       ),
-    pagina: z.number().int().nullable(),
+    // 0 quando não se aplica. Era `nullable`, e cada `comProva` no esquema
+    // multiplicava essa união — ver o cabeçalho deste ficheiro.
+    pagina: z
+      .number()
+      .int()
+      .describe("Página do PDF onde a citação aparece; 0 se não se aplicar."),
   });
 }
 
 const dataDeclarada = z.object({
   texto_fonte: z
     .string()
-    .nullable()
-    .describe('A expressão exacta usada no documento, ex.: "até às 18:00 do dia 30 de setembro de 2026".'),
-  data_iso: z.string().nullable().describe("A tua leitura da data, em AAAA-MM-DD."),
+    .describe(
+      'A expressão exacta usada no documento, ex.: "até às 18:00 do dia 30 de setembro de 2026". "" se não houver.',
+    ),
+  data_iso: z
+    .string()
+    .describe('A tua leitura da data, em AAAA-MM-DD. "" se não houver data.'),
   precisao: z.enum(PRECISOES_DATA),
 });
 
+/**
+ * O esquema de saída estruturada.
+ *
+ * Uma restrição da API molda-o e não é óbvia ao lê-lo: **um esquema não pode ter
+ * mais de 16 parâmetros com tipos-união**. Cada `.nullable()` é uma união
+ * (`anyOf: [T, null]`), e a execução #20 bateu no limite com 17 —
+ * `invalid_request_error`, todas as chamadas recusadas antes de gerarem um único
+ * token.
+ *
+ * Por isso a ausência é representada de duas maneiras diferentes, deliberadamente:
+ *
+ * - **Texto ausente é `""`** — a convenção que a `evidencia` já usava. Uma string
+ *   vazia não se confunde com nenhum valor real, e o `paraApoio.ts` converte-a de
+ *   volta a `null` antes de gravar.
+ * - **Números e booleanos ausentes continuam `null`** — e isso não é negociável.
+ *   `0 €` não é "não sabemos quanto"; `false` não é "não sabemos se esgotou". Trocar
+ *   estes por sentinelas transformaria uma incerteza honesta numa afirmação falsa,
+ *   que é exactamente o erro que este projecto evita em todo o lado.
+ *
+ * Restam cinco uniões, todas numéricas ou booleanas, bem abaixo do limite.
+ */
 export const EsquemaExtraccao = z.object({
   schema_version: z.literal(VERSAO_ESQUEMA),
 
   identificacao: z.object({
     titulo: z.string(),
-    referencia_legal: comProva(z.string().nullable()).describe(
-      'Ex.: "Aviso n.º 03/C13-i01/2024". null se o documento não tiver referência.',
+    referencia_legal: comProva(z.string()).describe(
+      'Ex.: "Aviso n.º 03/C13-i01/2024". "" se o documento não tiver referência.',
     ),
-    programa_pai: z.string().nullable(),
-    entidade_gestora: z.string().nullable(),
-    resumo_pt: z.string().max(600).describe("Resumo em português claro, para um proprietário."),
+    programa_pai: z.string().describe('"" se não houver programa acima deste.'),
+    entidade_gestora: z
+      .string()
+      .describe('"" se o documento não a identificar.'),
+    resumo_pt: z
+      .string()
+      .max(600)
+      .describe("Resumo em português claro, para um proprietário."),
   }),
 
-  estado: comProva(z.enum(["previsto", "aberto", "encerrado", "suspenso", "desconhecido"])),
+  estado: comProva(
+    z.enum(["previsto", "aberto", "encerrado", "suspenso", "desconhecido"]),
+  ),
   dotacao_esgotada: comProva(z.boolean().nullable()),
 
   prazos: z.object({
@@ -79,7 +115,9 @@ export const EsquemaExtraccao = z.object({
         'Se listar apenas entidades colectivas (municípios, IPSS, associações), é "nao". ' +
         'Na dúvida, "desconhecido" — NUNCA "sim" por omissão.',
     ),
-    restricoes_texto: z.string().nullable(),
+    restricoes_texto: z
+      .string()
+      .describe('"" se não houver restrições declaradas.'),
   }),
 
   ambito: z.object({
@@ -93,7 +131,7 @@ export const EsquemaExtraccao = z.object({
       "desconhecido",
     ]),
     municipios: z.array(z.string()).max(308),
-    observacoes: z.string().nullable(),
+    observacoes: z.string().describe('"" se não houver observações.'),
   }),
 
   medidas: comProva(
@@ -103,7 +141,9 @@ export const EsquemaExtraccao = z.object({
           medida: z.enum(TAXONOMIA_MEDIDAS),
           percentagem_apoio: z.number().nullable(),
           valor_max_eur: z.number().nullable(),
-          unidade: z.string().nullable().describe('Ex.: "por fracção", "por kWp".'),
+          unidade: z
+            .string()
+            .describe('Ex.: "por fracção", "por kWp". "" se não indicada.'),
         }),
       )
       .max(40),
@@ -111,17 +151,23 @@ export const EsquemaExtraccao = z.object({
   medidas_nao_classificadas: z
     .array(z.string())
     .max(20)
-    .describe("Medidas do documento que não encaixam na taxonomia — para a melhorarmos."),
+    .describe(
+      "Medidas do documento que não encaixam na taxonomia — para a melhorarmos.",
+    ),
 
   dotacao: z.object({
-    total_texto: z.string().nullable(),
+    total_texto: z
+      .string()
+      .describe('A dotação como o documento a escreve. "" se não indicada.'),
     total_eur: z.number().nullable(),
     apoio_max_por_beneficiario_eur: z.number().nullable(),
   }),
 
   candidatura: z.object({
-    url: z.string().nullable(),
-    plataforma: z.string().nullable(),
+    url: z
+      .string()
+      .describe('"" se o documento não indicar URL de candidatura.'),
+    plataforma: z.string().describe('"" se não indicada.'),
   }),
 
   documentos: z
@@ -129,7 +175,14 @@ export const EsquemaExtraccao = z.object({
       z.object({
         titulo: z.string(),
         url: z.string(),
-        tipo: z.enum(["aviso", "formulario", "faq", "legislacao", "anexo", "outro"]),
+        tipo: z.enum([
+          "aviso",
+          "formulario",
+          "faq",
+          "legislacao",
+          "anexo",
+          "outro",
+        ]),
       }),
     )
     .max(30),
@@ -140,7 +193,7 @@ export const EsquemaExtraccao = z.object({
   auto_avaliacao: z.object({
     documento_e_aviso_de_apoio: z.boolean(),
     qualidade_ocr: z.enum(["boa", "media", "ma", "nao_aplicavel"]),
-    notas: z.string().nullable(),
+    notas: z.string().describe('"" se não houver nada a assinalar.'),
   }),
 });
 
