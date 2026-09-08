@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { EsquemaExtraccao, VERSAO_ESQUEMA, type Extraccao } from "./esquema.ts";
+import { CONTRATO_JSON, extrairJson } from "./contrato.ts";
 import {
   PROMPT_SISTEMA,
   VERSAO_PROMPT,
@@ -175,20 +175,21 @@ export class Extractor {
     });
 
     try {
-      const resposta = await cliente.beta.messages.parse({
+      const resposta = await cliente.beta.messages.create({
         model: MODELO,
         max_tokens: 16000,
         thinking: { type: "adaptive" },
-        output_config: {
-          effort: "high",
-          format: betaZodOutputFormat(EsquemaExtraccao),
-        },
+        // `format` is deliberately absent — see `contrato.ts`. `effort` stays:
+        // it governs how hard the model thinks, not how the output is decoded.
+        output_config: { effort: "high" },
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: [
           {
             type: "text",
-            text: PROMPT_SISTEMA,
+            // The contract goes inside the cached block: it is the same bytes on
+            // every call, so it is read from cache at ~0.1x rather than re-sent.
+            text: `${PROMPT_SISTEMA}\n\n${CONTRATO_JSON}`,
             // The whole taxonomy and rubric sit before this breakpoint, so every
             // document after the first reads them from cache at ~0.1x.
             cache_control: { type: "ephemeral", ttl: "1h" },
@@ -219,11 +220,50 @@ export class Extractor {
         };
       }
 
+      // Validation moved from the decoder to here, and the schema doing it is the
+      // same one that used to constrain it — so a response that would have been
+      // rejected mid-decode is now rejected on arrival, by `EsquemaExtraccao`
+      // itself. What is lost is the guarantee that the model *cannot* produce
+      // something invalid; what is gained is a schema that the API will accept.
+      const texto = resposta.content
+        .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      const json = extrairJson(texto);
+      if (json === null) {
+        return {
+          ...base,
+          extraccao: null,
+          stopReason: resposta.stop_reason ?? null,
+          erro:
+            resposta.stop_reason === "max_tokens"
+              ? "resposta truncada em max_tokens antes de fechar o JSON"
+              : "resposta sem JSON reconhecível",
+        };
+      }
+
+      const validado = EsquemaExtraccao.safeParse(json);
+      if (!validado.success) {
+        // The message names the offending paths, so a prompt or schema drift
+        // shows up as "beneficiarios.tipos: invalid enum" instead of silence.
+        const problemas = validado.error.issues
+          .slice(0, 5)
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; ");
+        return {
+          ...base,
+          extraccao: null,
+          stopReason: resposta.stop_reason ?? null,
+          erro: `JSON não valida contra o esquema — ${problemas}`,
+        };
+      }
+
       return {
         ...base,
-        extraccao: resposta.parsed_output ?? null,
+        extraccao: validado.data,
         stopReason: resposta.stop_reason ?? null,
-        erro: resposta.parsed_output ? null : "resposta sem output estruturado",
+        erro: null,
       };
     } catch (erro) {
       return {
