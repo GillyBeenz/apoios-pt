@@ -143,6 +143,58 @@ describe("executarFonte", () => {
     expect(chamadas).toBe(1);
   });
 
+  /**
+   * The bug that made a failed extraction permanent.
+   *
+   * The snapshot is written before the model call, so a call that produced
+   * nothing still left a row at the current hash. While the change gate was
+   * broken every page hashed differently on every run and everything got retried
+   * by accident; fixing the gate turned that accident into a permanent skip, and
+   * execução #24 lost 21 of 34 documents to it.
+   */
+  it("volta a tentar um documento cuja extracção falhou", async () => {
+    const armazem = new ArmazemMemoria();
+    let chamadas = 0;
+
+    const extractorQueFalha: ExtractorLike = {
+      async extrair(): Promise<ResultadoExtraccao> {
+        chamadas++;
+        return {
+          extraccao: null,
+          stopReason: null,
+          modelo: "claude-opus-5",
+          versaoPrompt: "v2",
+          versaoEsquema: "3",
+          tokensEntrada: 20_000,
+          tokensSaida: 0,
+          tokensCacheLidos: 5_000,
+          erro: "JSON não valida contra o esquema",
+        };
+      },
+    };
+
+    const mundo = () =>
+      new BuscadorMemoria()
+        .definir(URL_LISTAGEM, { corpo: listagem() })
+        .definir(URL_DETALHE, { corpo: detalhe() });
+
+    const r1 = await executarFonte({
+      ...contexto(mundo(), armazem, extractorQueFalha),
+    });
+    expect(r1.metricas.extraccoesFalhadas).toBe(1);
+    expect(chamadas).toBe(1);
+
+    // Same page, same bytes. The document was never extracted, so the gate must
+    // not treat it as done.
+    await executarFonte({ ...contexto(mundo(), armazem, extractorQueFalha) });
+    expect(chamadas).toBe(2);
+
+    // And once it succeeds, it stops being retried.
+    await executarFonte({ ...contexto(mundo(), armazem, extractorFixo()) });
+    await executarFonte({ ...contexto(mundo(), armazem, extractorFixo()) });
+    expect(chamadas).toBe(2);
+  });
+
   it("para cedo quando o servidor responde 304", async () => {
     const armazem = new ArmazemMemoria();
     const buscador = new BuscadorMemoria().definir(URL_LISTAGEM, {

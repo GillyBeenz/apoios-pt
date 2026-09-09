@@ -127,9 +127,13 @@ export class ArmazemPostgres implements Armazem {
       last_modified: string | null;
       capturado_em: Date;
     }>(
+      // `processado` is the point of this filter. The snapshot is written before
+      // the model call, so without it a failed extraction reads as a finished one
+      // and the document is never tried again. Served by the partial index
+      // `snapshots_url_processado`.
       `select hash_conteudo, etag, last_modified, capturado_em
          from snapshots
-        where url = $1
+        where url = $1 and processado
         order by capturado_em desc
         limit 1`,
       [url],
@@ -175,6 +179,19 @@ export class ArmazemPostgres implements Armazem {
         Buffer.from(conteudo),
       ],
       `guardarSnapshot(${url})`,
+    );
+  }
+
+  async marcarProcessado(url: string, hashConteudo: string): Promise<void> {
+    // Keyed on the hash, not on 'the latest row': marking by recency would set the
+    // flag on whatever happens to be newest, which on a page that changed mid-run
+    // is not the content that was actually extracted.
+    await this.#consulta(
+      `update snapshots
+          set processado = true
+        where url = $1 and hash_conteudo = $2`,
+      [url, hashConteudo],
+      `marcarProcessado(${url})`,
     );
   }
 

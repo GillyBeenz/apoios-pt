@@ -131,6 +131,10 @@ export async function executarFonte(
           },
           new TextEncoder().encode(normalizarConteudo(corpo)),
         );
+        // A listing is finished the moment it is stored: parsing it is local,
+        // free, and happens unconditionally a few lines below. Nothing
+        // downstream can fail in a way that should make us read it again.
+        await armazem.marcarProcessado(url, hash);
       }
     }
 
@@ -237,6 +241,13 @@ export async function executarFonte(
       errosExtraccao.add(resultado.erro ?? "sem erro reportado");
       continue;
     }
+
+    // The document has now been extracted, so its snapshot stops being a retry
+    // candidate. Deliberately before verification and not after: failing the
+    // evidence gate is a fact about the document, not a transient error, and
+    // re-running the same text through the same prompt would only buy the same
+    // answer at the same price. Only a call that produced *nothing* is retried.
+    await armazem.marcarProcessado(candidato.urlDetalhe, hash);
 
     // --- 8. Verification, gating, normalisation ------------------------------
     const verificacao = verificarProvas(resultado.extraccao, texto);
