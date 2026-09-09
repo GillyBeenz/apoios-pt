@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { RegistarServiceWorker } from "@/components/RegistarServiceWorker.tsx";
+import { urlDoSitio } from "@/lib/sitio.ts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://apoios.pt"),
+  // Resolved rather than hard-coded: no custom domain is registered yet, so a
+  // literal here would emit canonical URLs and Open Graph tags pointing at a host
+  // that does not serve the site. `urlDoSitio` falls back to the Vercel domain.
+  metadataBase: new URL(urlDoSitio()),
   title: {
     default: "Apoios — financiamento ambiental para a sua casa",
     template: "%s · Apoios",
@@ -46,6 +50,7 @@ const LIGACOES = [
   { href: "/apoios", texto: "Apoios" },
   { href: "/conta/preferencias", texto: "Preferências" },
   { href: "/sobre", texto: "Sobre" },
+  { href: "/entrar", texto: "Entrar" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

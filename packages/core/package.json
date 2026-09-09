@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./taxonomia": "./src/taxonomia.ts",
     "./teste": "./src/teste/construtores.ts"
   },
   "scripts": {
