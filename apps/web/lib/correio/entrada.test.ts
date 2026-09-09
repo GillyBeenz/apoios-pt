@@ -7,6 +7,7 @@ import {
   destinatarioConhecido,
   escaparHtml,
   TOLERANCIA_SEGUNDOS,
+  variaveisEmFalta,
 } from "./entrada.ts";
 
 const SEGREDO = `whsec_${Buffer.from("segredo-de-teste-com-tamanho").toString("base64")}`;
@@ -151,5 +152,46 @@ describe("escaparHtml", () => {
 
   it("escapa o & primeiro, para não desfazer o próprio escape", () => {
     expect(escaparHtml("<&>")).toBe("&lt;&amp;&gt;");
+  });
+});
+
+describe("variaveisEmFalta", () => {
+  const completo = {
+    RESEND_INBOUND_WEBHOOK_SECRET: "whsec_abc",
+    RESEND_API_KEY: "re_envio",
+    RESEND_RECEIVING_API_KEY: "re_recepcao",
+    CORREIO_OPERADOR: "alguem@exemplo.pt",
+  };
+
+  it("não devolve nada quando está tudo lá", () => {
+    expect(variaveisEmFalta(completo)).toEqual([]);
+  });
+
+  it("nomeia a que falta, e só essa", () => {
+    // O ponto todo desta função. A primeira versão registava os quatro nomes
+    // sempre que faltava um, que é precisamente nenhuma ajuda no momento em que
+    // se está a ler o log para descobrir qual se esqueceu.
+    const { RESEND_RECEIVING_API_KEY: _, ...semRecepcao } = completo;
+    expect(variaveisEmFalta(semRecepcao)).toEqual(["RESEND_RECEIVING_API_KEY"]);
+  });
+
+  it("nomeia várias, pela ordem declarada", () => {
+    expect(variaveisEmFalta({ RESEND_API_KEY: "re_envio" })).toEqual([
+      "RESEND_INBOUND_WEBHOOK_SECRET",
+      "RESEND_RECEIVING_API_KEY",
+      "CORREIO_OPERADOR",
+    ]);
+  });
+
+  it("conta como em falta uma variável só com espaços", () => {
+    // Uma variável colada com um \n a mais é indistinguível de uma esquecida no
+    // efeito, e muito mais difícil de ver a olho no painel da Vercel.
+    expect(variaveisEmFalta({ ...completo, CORREIO_OPERADOR: "  \n " })).toEqual([
+      "CORREIO_OPERADOR",
+    ]);
+  });
+
+  it("ignora variáveis alheias", () => {
+    expect(variaveisEmFalta({ ...completo, OUTRA_QUALQUER: "" })).toEqual([]);
   });
 });

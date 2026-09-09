@@ -96,3 +96,35 @@ export function carimboRecente(carimbo: string, agoraMs = Date.now()): boolean {
     Math.abs(agoraMs / 1000 - segundos) <= TOLERANCIA_SEGUNDOS
   );
 }
+
+/** The environment variables the inbound route cannot run without. */
+export const VARIAVEIS_OBRIGATORIAS = [
+  "RESEND_INBOUND_WEBHOOK_SECRET",
+  "RESEND_API_KEY",
+  "RESEND_RECEIVING_API_KEY",
+  "CORREIO_OPERADOR",
+] as const;
+
+/**
+ * Which required variables are absent or blank, by name.
+ *
+ * The first version of this check logged all four names whenever any one was
+ * missing, which is exactly no help at the moment you are reading the log to
+ * find out which one you forgot. Naming them individually turns a five-minute
+ * hunt through the Vercel dashboard into one line.
+ *
+ * A variable set to whitespace counts as missing: an env var pasted with a
+ * stray newline is indistinguishable from a forgotten one in its effect, and
+ * far harder to spot by eye.
+ *
+ * Only ever written to the server log. The HTTP response stays a bare "not
+ * configured" — telling an unauthenticated caller which secrets a deployment
+ * is missing is a map of where to push.
+ */
+export function variaveisEmFalta(
+  ambiente: Readonly<Record<string, string | undefined>>,
+): readonly string[] {
+  return VARIAVEIS_OBRIGATORIAS.filter(
+    (nome) => (ambiente[nome] ?? "").trim() === "",
+  );
+}
