@@ -15,8 +15,8 @@ import type { MetadataRoute } from "next";
 export function GET(): Response {
   const manifest: MetadataRoute.Manifest = {
     id: "/",
-    name: "Apoios — financiamento ambiental para a sua casa",
-    short_name: "Apoios",
+    name: "Appoios — financiamento ambiental para a sua casa",
+    short_name: "Appoios",
     description:
       "Apoios ambientais e energéticos para habitação em Portugal, com alerta " +
       "quando abre financiamento para o que quer melhorar em casa.",

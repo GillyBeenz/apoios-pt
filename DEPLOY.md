@@ -34,11 +34,59 @@ Antes de mostrar isto a alguém que possa agir sobre a informação, é preciso 
 deploy protegido (Vercel → Settings → Deployment Protection), porque a informação
 de financiamento errada é exactamente o dano que este produto existe para evitar.
 
+## Domínio
+
+A app chama-se **Appoios** e vive em **`appoios.guru`**. O **`apoios.guru`** foi
+registado como defensivo e redirige (308) para o canónico.
+
+Ambos na Namecheap.
+
+Nada no código o tem escrito à mão. O `urlDoSitio()` resolve a origem por esta ordem:
+`NEXT_PUBLIC_APP_URL` → domínio de produção da Vercel → localhost. É deliberado: um
+literal no `metadataBase` emitia canónicos e Open Graph a apontar para um host que
+podia nem servir o site, e a ligação mágica de entrada é construída a partir da mesma
+origem — se estiver errada, a ligação que chega ao email não abre.
+
+A única excepção é o `USER_AGENT` do recolector (`packages/ingest/src/http/tipos.ts`),
+que é uma constante: o URL e o endereço que ali estão são a forma de um operador do
+Fundo Ambiental distinguir um leitor bem-comportado de um scraper, e o único canal
+que tem para pedir que abrande. Têm de resolver e de receber correio a sério.
+
+### O que é preciso fazer fora do repositório
+
+| onde | o quê |
+|---|---|
+| Vercel → Domains | adicionar `appoios.guru`, `www.appoios.guru`, `apoios.guru`, `www.apoios.guru`; copiar os registos que a Vercel mostrar |
+| Namecheap → Advanced DNS | criar esses registos (a Vercel dá os valores exactos; não os adivinhe) |
+| Vercel → Environment Variables | `NEXT_PUBLIC_APP_URL=https://appoios.guru` |
+| Supabase → Authentication → URL Configuration | Site URL `https://appoios.guru`; Redirect URLs incluindo `https://appoios.guru/auth/confirmar` |
+| Supabase → Authentication → Email Templates → Magic Link | apontar para `/auth/confirmar` com `{{ .TokenHash }}` — **não** `{{ .ConfirmationURL }}` |
+| Resend → Domains | verificar `appoios.guru`; os registos DKIM/SPF são gerados por domínio |
+
+### O defensivo vale a renovação?
+
+O redireccionamento é contado. A migração `0006` cria `dominio_acessos` — um contador
+por dia e por domínio, sem IP, sem cookie, sem caminho — e o middleware chama-a antes
+de redirigir. Ao fim do ano a pergunta responde-se com uma consulta:
+
+```sql
+select host, sum(contagem) as visitas
+  from dominio_acessos
+ where dia >= current_date - 365
+ group by host order by visitas desc;
+```
+
+Se o `apoios.guru` estiver perto de zero, não se renova.
+
+O template do Magic Link não é um detalhe: o `{{ .ConfirmationURL }}` por omissão
+manda as pessoas pelo `/verify` do Supabase e de volta ao fluxo PKCE, que falha
+sempre em telemóvel — a webview do Gmail tem outro frasco de cookies e o
+`code_verifier` não está lá. Ver o comentário em `app/auth/confirmar/route.ts`.
+
 ## Variáveis de ambiente
 
-Nenhuma é necessária hoje. Quando o Supabase existir:
-
 ```
+NEXT_PUBLIC_APP_URL            https://appoios.guru
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```

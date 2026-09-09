@@ -29,8 +29,17 @@ export interface Buscador {
   buscar(pedido: PedidoCondicional): Promise<RespostaHttp>;
 }
 
+/**
+ * Identifies the crawler to the sites it reads.
+ *
+ * The URL and the address have to be real and have to work: this is the only way an
+ * operator at the Fundo Ambiental can tell a well-behaved reader from a scraper, and
+ * the one channel they have to ask it to stop or slow down. Pointing it at a domain
+ * that does not resolve, or an address that bounces, is worse than sending nothing —
+ * it claims accountability that is not there.
+ */
 export const USER_AGENT =
-  "ApoiosBot/1.0 (+https://apoios.pt/sobre; contacto@apoios.pt)";
+  "AppoiosBot/1.0 (+https://appoios.guru/sobre; contacto@appoios.guru)";
 
 /** Minimum gap between requests to the same host. Government infrastructure. */
 export const ATRASO_ENTRE_PEDIDOS_MS = 2_000;

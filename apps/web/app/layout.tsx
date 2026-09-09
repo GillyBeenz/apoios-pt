@@ -10,17 +10,17 @@ export const metadata: Metadata = {
   // that does not serve the site. `urlDoSitio` falls back to the Vercel domain.
   metadataBase: new URL(urlDoSitio()),
   title: {
-    default: "Apoios — financiamento ambiental para a sua casa",
-    template: "%s · Apoios",
+    default: "Appoios — financiamento ambiental para a sua casa",
+    template: "%s · Appoios",
   },
   description:
     "Alertas de apoios ambientais e energéticos em Portugal, para as melhorias " +
     "que quer fazer em casa e a que se pode mesmo candidatar.",
-  applicationName: "Apoios",
+  applicationName: "Appoios",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Apoios",
+    title: "Appoios",
     // `default` keeps the status bar legible in both colour schemes; `black-translucent`
     // would put iOS's own text over the header.
     statusBarStyle: "default",
@@ -72,13 +72,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               href="/"
               className="flex items-center gap-2 text-lg font-semibold tracking-tight"
             >
-              <span
-                aria-hidden
-                className="grid size-7 place-items-center rounded-lg bg-marca text-sm font-bold text-white"
-              >
-                A
-              </span>
-              Apoios
+              {/* The mark itself, not a letter in a box: the wordmark is beside it,
+                  so a second "A" here would just say the same thing twice. */}
+              <img src="/icone.svg" alt="" aria-hidden width={28} height={28} className="rounded-lg" />
+              Appoios
             </Link>
             <nav aria-label="Principal" className="flex gap-1 text-sm">
               {LIGACOES.map((l) => (
@@ -106,7 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mt-16 border-t border-linha bg-superficie">
           <div className="mx-auto max-w-6xl space-y-4 px-4 py-8 text-sm text-suave">
             <p className="max-w-3xl">
-              O Apoios não está associado ao Fundo Ambiental, ao Portugal 2030, ao PRR
+              O Appoios não está associado ao Fundo Ambiental, ao Portugal 2030, ao PRR
               nem a qualquer entidade pública. A informação é recolhida
               automaticamente e pode estar incompleta ou desatualizada.{" "}
               <strong className="font-medium text-tinta">
