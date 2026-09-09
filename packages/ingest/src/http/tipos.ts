@@ -39,7 +39,7 @@ export interface Buscador {
  * it claims accountability that is not there.
  */
 export const USER_AGENT =
-  "ApoiosBot/1.0 (+https://apoios.guru/sobre; contacto@apoios.guru)";
+  "AppoiosBot/1.0 (+https://appoios.guru/sobre; contacto@appoios.guru)";
 
 /** Minimum gap between requests to the same host. Government infrastructure. */
 export const ATRASO_ENTRE_PEDIDOS_MS = 2_000;

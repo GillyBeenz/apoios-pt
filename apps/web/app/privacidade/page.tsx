@@ -43,7 +43,11 @@ export default function Privacidade() {
       <h2 className="text-lg font-medium pt-2">Cookies</h2>
       <p>
         Usamos apenas o cookie de sessão estritamente necessário ao início de sessão.
-        Não usamos analítica nem cookies de terceiros.
+        Não usamos analítica nem cookies de terceiros. Contamos quantas visitas
+        chegam por cada um dos nossos domínios — só isso, um número por dia e por
+        domínio, sem endereço IP, sem cookie e sem a página visitada. Serve para
+        decidir se vale a pena manter o segundo domínio registado, e não permite
+        identificar ninguém.
       </p>
     </div>
   );

@@ -36,7 +36,10 @@ de financiamento errada é exactamente o dano que este produto existe para evita
 
 ## Domínio
 
-**`apoios.guru`**, registado na Namecheap.
+A app chama-se **Appoios** e vive em **`appoios.guru`**. O **`apoios.guru`** foi
+registado como defensivo e redirige (308) para o canónico.
+
+Ambos na Namecheap.
 
 Nada no código o tem escrito à mão. O `urlDoSitio()` resolve a origem por esta ordem:
 `NEXT_PUBLIC_APP_URL` → domínio de produção da Vercel → localhost. É deliberado: um
@@ -53,12 +56,27 @@ que tem para pedir que abrande. Têm de resolver e de receber correio a sério.
 
 | onde | o quê |
 |---|---|
-| Vercel → Domains | adicionar `apoios.guru` e `www.apoios.guru`; copiar os registos que a Vercel mostrar |
+| Vercel → Domains | adicionar `appoios.guru`, `www.appoios.guru`, `apoios.guru`, `www.apoios.guru`; copiar os registos que a Vercel mostrar |
 | Namecheap → Advanced DNS | criar esses registos (a Vercel dá os valores exactos; não os adivinhe) |
-| Vercel → Environment Variables | `NEXT_PUBLIC_APP_URL=https://apoios.guru` |
-| Supabase → Authentication → URL Configuration | Site URL `https://apoios.guru`; Redirect URLs incluindo `https://apoios.guru/auth/confirmar` |
+| Vercel → Environment Variables | `NEXT_PUBLIC_APP_URL=https://appoios.guru` |
+| Supabase → Authentication → URL Configuration | Site URL `https://appoios.guru`; Redirect URLs incluindo `https://appoios.guru/auth/confirmar` |
 | Supabase → Authentication → Email Templates → Magic Link | apontar para `/auth/confirmar` com `{{ .TokenHash }}` — **não** `{{ .ConfirmationURL }}` |
-| Resend → Domains | verificar `apoios.guru`; os registos DKIM/SPF são gerados por domínio |
+| Resend → Domains | verificar `appoios.guru`; os registos DKIM/SPF são gerados por domínio |
+
+### O defensivo vale a renovação?
+
+O redireccionamento é contado. A migração `0006` cria `dominio_acessos` — um contador
+por dia e por domínio, sem IP, sem cookie, sem caminho — e o middleware chama-a antes
+de redirigir. Ao fim do ano a pergunta responde-se com uma consulta:
+
+```sql
+select host, sum(contagem) as visitas
+  from dominio_acessos
+ where dia >= current_date - 365
+ group by host order by visitas desc;
+```
+
+Se o `apoios.guru` estiver perto de zero, não se renova.
 
 O template do Magic Link não é um detalhe: o `{{ .ConfirmationURL }}` por omissão
 manda as pessoas pelo `/verify` do Supabase e de volta ao fluxo PKCE, que falha
@@ -68,7 +86,7 @@ sempre em telemóvel — a webview do Gmail tem outro frasco de cookies e o
 ## Variáveis de ambiente
 
 ```
-NEXT_PUBLIC_APP_URL            https://apoios.guru
+NEXT_PUBLIC_APP_URL            https://appoios.guru
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
