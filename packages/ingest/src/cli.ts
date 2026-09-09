@@ -45,13 +45,35 @@ interface Armazenamento {
   /** One store per source: `snapshots.source_id` and `funds.source_id` are both
    * `not null`, and the Armazem interface carries no source argument. */
   de(fonteId: string): Armazem;
+  /**
+   * Open the run record, returning its id — or null when nothing is being written.
+   *
+   * `ingest_runs` has existed since the first migration and nothing ever wrote to
+   * it, which quietly disabled the one alarm that matters most. `vigiar_ingestao()`
+   * runs hourly inside Supabase and asks "was there a successful run in the last
+   * 36 hours?"; against an empty table the answer is always no, so it fired once
+   * on 2026-09-06 and — because it will not raise a second alarm while the first
+   * is unresolved — sat there through five successful runs, unable to report a
+   * real outage. A watchdog that cannot go quiet cannot bark.
+   */
+  abrirExecucao(): Promise<string | null>;
+  fecharExecucao(
+    runId: string | null,
+    estado: "ok" | "parcial" | "falhou",
+    resumo: unknown,
+  ): Promise<void>;
   fechar(): Promise<void>;
 }
 
 function escolherArmazem(simulacao: boolean): Armazenamento {
   if (simulacao) {
     const memoria = new ArmazemMemoria();
-    return { de: () => memoria, fechar: async () => {} };
+    return {
+      de: () => memoria,
+      abrirExecucao: async () => null,
+      fecharExecucao: async () => {},
+      fechar: async () => {},
+    };
   }
 
   const url = process.env.DATABASE_URL;
@@ -77,6 +99,12 @@ function escolherArmazem(simulacao: boolean): Armazenamento {
   const pool = ArmazemPostgres.poolDe(url);
   return {
     de: (fonteId) => new ArmazemPostgres(pool, fonteId),
+    abrirExecucao: () =>
+      ArmazemPostgres.abrirExecucao(pool, process.env.GITHUB_SHA ?? null),
+    fecharExecucao: (runId, estado, resumo) =>
+      runId === null
+        ? Promise.resolve()
+        : ArmazemPostgres.fecharExecucao(pool, runId, estado, resumo),
     fechar: () => pool.end(),
   };
 }
@@ -139,6 +167,9 @@ async function main(): Promise<number> {
   const armazenamento = escolherArmazem(simulacao);
 
   let houveCritico = false;
+  let houveErroDeFonte = false;
+  const resumo: Record<string, unknown>[] = [];
+  const runId = await armazenamento.abrirExecucao();
 
   try {
     for (const fonte of fontes) {
@@ -213,7 +244,45 @@ async function main(): Promise<number> {
         );
         if (a.gravidade === "critico") houveCritico = true;
       }
+
+      if (m.erro) houveErroDeFonte = true;
+
+      resumo.push({
+        fonte: fonte.id,
+        candidatos: m.candidatos,
+        extraccoesOk: m.extraccoesOk,
+        extraccoesRevisao: m.extraccoesRevisao,
+        extraccoesFalhadas: m.extraccoesFalhadas,
+        chamadasModelo: m.chamadasModelo,
+        alarmes: alarmes.map((a) => `${a.gravidade}:${a.regra}`),
+        erro: m.erro,
+      });
+
+      if (runId !== null) {
+        await armazenamento.de(fonte.id).guardarSaudeFonte({
+          runId,
+          httpStatus: m.httpStatus ?? null,
+          bytes: m.bytes,
+          duracaoMs: m.duracaoMs,
+          candidatos: m.candidatos,
+          candidatosComData: m.candidatosComData,
+          extraccoesOk: m.extraccoesOk,
+          extraccoesRevisao: m.extraccoesRevisao,
+          provasFalhadas: m.provasFalhadas,
+          tokensCacheLidos: m.tokensCacheLidos,
+          erro: m.erro,
+        });
+      }
     }
+
+    // Written before `finally` closes the pool, and only on the path that got
+    // here: a crash leaves the row as `a_correr`, which says "began and never
+    // finished" rather than "never ran".
+    await armazenamento.fecharExecucao(
+      runId,
+      houveCritico ? "falhou" : houveErroDeFonte ? "parcial" : "ok",
+      { fontes: resumo },
+    );
   } finally {
     await armazenamento.fechar();
   }

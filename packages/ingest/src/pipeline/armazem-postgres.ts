@@ -16,6 +16,7 @@ import {
   gerarSlug,
   type Armazem,
   type EstadoSnapshot,
+  type SaudeFonte,
   type ExtraccaoRegistada,
 } from "./armazem.ts";
 
@@ -192,6 +193,62 @@ export class ArmazemPostgres implements Armazem {
         where url = $1 and hash_conteudo = $2`,
       [url, hashConteudo],
       `marcarProcessado(${url})`,
+    );
+  }
+
+  async guardarSaudeFonte(s: SaudeFonte): Promise<void> {
+    await this.#consulta(
+      `insert into source_health
+         (run_id, source_id, http_status, bytes, duracao_ms, candidatos,
+          candidatos_com_data, extraccoes_ok, extraccoes_revisao,
+          provas_falhadas, tokens_cache_lidos, erro)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        s.runId,
+        this.#fonteId,
+        s.httpStatus,
+        s.bytes,
+        s.duracaoMs,
+        s.candidatos,
+        s.candidatosComData,
+        s.extraccoesOk,
+        s.extraccoesRevisao,
+        s.provasFalhadas,
+        s.tokensCacheLidos,
+        s.erro,
+      ],
+      `guardarSaudeFonte(${this.#fonteId})`,
+    );
+  }
+
+  /**
+   * Open the run record.
+   *
+   * Written at the start, not the end, and left as `a_correr` if the process dies:
+   * a row stuck in that state says "a run began and never finished", which is a
+   * different fact from "no run happened" and the only one that distinguishes a
+   * crash from a scheduler that stopped firing. The watchdog looks for `ok`, so
+   * neither state can be mistaken for success.
+   */
+  static async abrirExecucao(pool: Pool, gitSha: string | null): Promise<string> {
+    const r = await pool.query<{ id: string }>(
+      `insert into ingest_runs (estado, git_sha) values ('a_correr', $1) returning id`,
+      [gitSha],
+    );
+    return r.rows[0]!.id;
+  }
+
+  static async fecharExecucao(
+    pool: Pool,
+    runId: string,
+    estado: "ok" | "parcial" | "falhou",
+    resumo: unknown,
+  ): Promise<void> {
+    await pool.query(
+      `update ingest_runs
+          set estado = $2, terminado_em = now(), resumo = $3::jsonb
+        where id = $1`,
+      [runId, estado, JSON.stringify(resumo)],
     );
   }
 
