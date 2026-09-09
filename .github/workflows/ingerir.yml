@@ -45,6 +45,11 @@ jobs:
       # stray query against a user table fails loudly here instead of quietly
       # printing somebody's email into a public build log.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Passed explicitly although Actions already sets it: the code reads it to
+      # stamp `ingest_runs.git_sha`, and a test asserts that everything the code
+      # reads is declared here. Relying on an implicit default is how an env var
+      # disappears when the job moves somewhere else.
+      GITHUB_SHA: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
