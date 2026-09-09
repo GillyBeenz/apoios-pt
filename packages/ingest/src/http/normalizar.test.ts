@@ -102,6 +102,26 @@ describe("normalizarConteudo", () => {
     expect(hashConteudo(a)).not.toBe(hashConteudo(b));
   });
 
+  it("ignora ids de elementos gerados a cada pedido", () => {
+    // Os valores são reais, de duas capturas da mesma página do portugal2030.pt
+    // com hora e meia de diferença.
+    const pagina = (id: string) =>
+      `<li><input class="sf-input-checkbox" type="checkbox" value="post"
+         name="_sf_post_type[]" id="sf-input-${id}"><label
+         class="sf-label-checkbox" for="sf-input-${id}">Artigos</label></li>`;
+    expect(hashConteudo(pagina("b2873f8a21f440a53b0b612f1b42a0a5"))).toBe(
+      hashConteudo(pagina("7c2cea91106dd7001ec185163858b8fb")),
+    );
+  });
+
+  it("continua a detetar uma mudança de classe, que os adaptadores leem", () => {
+    // Os adaptadores selecionam por classe e por href; nenhum lê `id` ou `for`.
+    // O corte tem de parar exactamente aí.
+    const a = '<article class="entry-title"><a href="/a.aspx">Aviso</a></article>';
+    const b = '<article class="entry-oculta"><a href="/a.aspx">Aviso</a></article>';
+    expect(hashConteudo(a)).not.toBe(hashConteudo(b));
+  });
+
   it("encolhe drasticamente o tamanho, que é o que torna as fixtures commitáveis", () => {
     const grande = paginaComViewstate("A".repeat(120_000));
     expect(normalizarConteudo(grande).length).toBeLessThan(grande.length / 10);
