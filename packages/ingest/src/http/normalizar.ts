@@ -78,6 +78,33 @@ export function normalizarConteudo(html: string): string {
   t = t.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "<script>[removido]</script>");
   t = t.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "<style>[removido]</style>");
 
+  // Generated element ids, and the labels that point at them.
+  //
+  // The second instance of the same class, on a different source. portugal2030.pt
+  // runs a WordPress search-filter widget that mints a fresh 32-hex id for every
+  // checkbox on every request:
+  //
+  //   id="sf-input-b2873f8a21f440a53b0b612f1b42a0a5"   06:45
+  //   id="sf-input-7c2cea91106dd7001ec185163858b8fb"   08:10
+  //
+  // Dozens of them per page, each paired with a `for=` on its label, in a sidebar
+  // that has nothing to do with the notice. Run #26 skipped all 25 Fundo Ambiental
+  // documents and re-extracted all 6 from Portugal 2030 because of it.
+  //
+  // Blanking `id` and `for` outright, rather than matching this vendor's prefix,
+  // because the rule is checkable and general: nothing in this pipeline reads
+  // either one. The adapters select on tags, classes and `href` (see the
+  // `querySelectorAll` calls in `sources/*/extract.ts`), and the model never sees
+  // attributes at all — `textoVisivel` strips every tag before the page reaches it.
+  //
+  // Deliberately not going further and hashing only "visible text plus href plus
+  // class". It would close the class for good, but the failure modes are not
+  // symmetric: a gate that re-reads too much wastes money, while a gate blinded to
+  // a change it should have seen misses an extended deadline, which is the entire
+  // point of the product. A third instance in some other attribute would be the
+  // signal to take that risk; two is not.
+  t = t.replace(/\b(id|for)\s*=\s*["'][^"']*["']/gi, '$1="[removido]"');
+
   // Whitespace-only differences must not register as change.
   return t.replace(/\s+/g, " ").trim();
 }
