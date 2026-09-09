@@ -34,11 +34,41 @@ Antes de mostrar isto a alguém que possa agir sobre a informação, é preciso 
 deploy protegido (Vercel → Settings → Deployment Protection), porque a informação
 de financiamento errada é exactamente o dano que este produto existe para evitar.
 
+## Domínio
+
+**`apoios.guru`**, registado na Namecheap.
+
+Nada no código o tem escrito à mão. O `urlDoSitio()` resolve a origem por esta ordem:
+`NEXT_PUBLIC_APP_URL` → domínio de produção da Vercel → localhost. É deliberado: um
+literal no `metadataBase` emitia canónicos e Open Graph a apontar para um host que
+podia nem servir o site, e a ligação mágica de entrada é construída a partir da mesma
+origem — se estiver errada, a ligação que chega ao email não abre.
+
+A única excepção é o `USER_AGENT` do recolector (`packages/ingest/src/http/tipos.ts`),
+que é uma constante: o URL e o endereço que ali estão são a forma de um operador do
+Fundo Ambiental distinguir um leitor bem-comportado de um scraper, e o único canal
+que tem para pedir que abrande. Têm de resolver e de receber correio a sério.
+
+### O que é preciso fazer fora do repositório
+
+| onde | o quê |
+|---|---|
+| Vercel → Domains | adicionar `apoios.guru` e `www.apoios.guru`; copiar os registos que a Vercel mostrar |
+| Namecheap → Advanced DNS | criar esses registos (a Vercel dá os valores exactos; não os adivinhe) |
+| Vercel → Environment Variables | `NEXT_PUBLIC_APP_URL=https://apoios.guru` |
+| Supabase → Authentication → URL Configuration | Site URL `https://apoios.guru`; Redirect URLs incluindo `https://apoios.guru/auth/confirmar` |
+| Supabase → Authentication → Email Templates → Magic Link | apontar para `/auth/confirmar` com `{{ .TokenHash }}` — **não** `{{ .ConfirmationURL }}` |
+| Resend → Domains | verificar `apoios.guru`; os registos DKIM/SPF são gerados por domínio |
+
+O template do Magic Link não é um detalhe: o `{{ .ConfirmationURL }}` por omissão
+manda as pessoas pelo `/verify` do Supabase e de volta ao fluxo PKCE, que falha
+sempre em telemóvel — a webview do Gmail tem outro frasco de cookies e o
+`code_verifier` não está lá. Ver o comentário em `app/auth/confirmar/route.ts`.
+
 ## Variáveis de ambiente
 
-Nenhuma é necessária hoje. Quando o Supabase existir:
-
 ```
+NEXT_PUBLIC_APP_URL            https://apoios.guru
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
