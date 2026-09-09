@@ -61,7 +61,9 @@ que tem para pedir que abrande. Têm de resolver e de receber correio a sério.
 | Vercel → Environment Variables | `NEXT_PUBLIC_APP_URL=https://appoios.guru` |
 | Supabase → Authentication → URL Configuration | Site URL `https://appoios.guru`; Redirect URLs incluindo `https://appoios.guru/auth/confirmar` |
 | Supabase → Authentication → Email Templates → Magic Link | apontar para `/auth/confirmar` com `{{ .TokenHash }}` — **não** `{{ .ConfirmationURL }}` |
-| Resend → Domains | verificar `appoios.guru`; os registos DKIM/SPF são gerados por domínio |
+| Resend → Domains | verificar `appoios.guru` (região `eu-west-1`, envio **e** recepção) |
+| Namecheap → Advanced DNS → Mail Settings | pôr em **Custom MX** — enquanto estiver em *Email Forwarding* o MX da raiz é ignorado e o correio de entrada nunca chega ao Resend |
+| Resend → Webhooks | subscrever `email.received` para `https://appoios.guru/api/correio-entrada`; guardar o `whsec_…` |
 
 ### O defensivo vale a renovação?
 
@@ -86,14 +88,45 @@ sempre em telemóvel — a webview do Gmail tem outro frasco de cookies e o
 ## Variáveis de ambiente
 
 ```
-NEXT_PUBLIC_APP_URL            https://appoios.guru
+NEXT_PUBLIC_APP_URL              https://appoios.guru
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+RESEND_API_KEY                   sending_access — reencaminha
+RESEND_RECEIVING_API_KEY         full_access    — lê a mensagem recebida
+RESEND_INBOUND_WEBHOOK_SECRET    whsec_… do webhook
+CORREIO_OPERADOR                 caixa real para onde vai o correio reencaminhado
 ```
+
+As duas chaves do Resend são mesmo duas: a de envio responde `401
+restricted_api_key` na API de recepção. A `RESEND_RECEIVING_API_KEY` é `full_access`
+e por isso vive só na Vercel, nunca no repositório nem num log do Actions.
+
+O `CORREIO_OPERADOR` é uma variável e não uma constante porque este repositório é
+**público** — o endereço pessoal do operador em código-fonte fica ao alcance de
+qualquer colector de endereços que passe pelo GitHub.
 
 A `service_role` **nunca** vai para a Vercel — só o pipeline de recolha (GitHub
 Actions, com o papel restrito `apoios_ingest`) e as funções dentro do Supabase
 precisam de escrever.
+
+## Correio de entrada
+
+O MX de recepção está na raiz, portanto o Resend apanha correio para **qualquer**
+endereço em `appoios.guru`, inventado ou não. O `app/api/correio-entrada/route.ts`
+reencaminha só os aliases publicados — `contacto`, `rgpd`, `alertas`, `abuso` — e
+responde 200 a tudo o resto sem reencaminhar. Sem essa lista, um endereço colhido
+por um spammer chegaria a uma caixa real.
+
+O `contacto@` não é decorativo: o `USER_AGENT` em
+`packages/ingest/src/http/tipos.ts` anuncia-o a todos os sites do Estado que o
+recolector lê. Um `contacto@` que devolve bounce transforma essa identificação numa
+mentira, e há um teste em `lib/correio/entrada.test.ts` a prender o alias ao
+User-Agent para que ninguém o tire por distração.
+
+O `From:` do reencaminhamento fica no domínio verificado e o remetente original vai
+no `reply_to`. Pôr o remetente no `From:` falharia SPF e DKIM, e o reencaminhamento
+acabaria no spam.
 
 ## Ligar ao Supabase
 
