@@ -5,6 +5,7 @@ import {
   destinatarioConhecido,
   escaparHtml,
   MAX_CORPO_BYTES,
+  variaveisEmFalta,
 } from "@/lib/correio/entrada.ts";
 
 /**
@@ -44,11 +45,16 @@ export async function POST(request: NextRequest) {
     const chaveRecepcao = process.env.RESEND_RECEIVING_API_KEY;
     const paraOnde = caixaDoOperador();
 
+    const emFalta = variaveisEmFalta(process.env);
+    if (emFalta.length > 0) {
+      // Named individually, and only in the log. The response stays a bare
+      // "not configured": telling an unauthenticated caller which secrets a
+      // deployment lacks is a map of where to push.
+      console.error(`[correio] Variáveis em falta: ${emFalta.join(", ")}`);
+      return NextResponse.json({ erro: "Não configurado" }, { status: 500 });
+    }
     if (!segredoWebhook || !chaveEnvio || !chaveRecepcao || !paraOnde) {
-      console.error(
-        "[correio] Falta RESEND_INBOUND_WEBHOOK_SECRET, RESEND_API_KEY, " +
-          "RESEND_RECEIVING_API_KEY ou CORREIO_OPERADOR",
-      );
+      // Unreachable given the check above; narrows the types for TypeScript.
       return NextResponse.json({ erro: "Não configurado" }, { status: 500 });
     }
 
