@@ -7,9 +7,10 @@ export default function Privacidade() {
       <h1 className="text-2xl font-semibold tracking-tight">Política de privacidade</h1>
 
       <div className="rounded-lg border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Documento por completar. Antes de qualquer lançamento público é necessário
-        identificar o responsável pelo tratamento com nome e contacto reais — sem
-        isso esta política não cumpre o RGPD.
+        Documento por completar. O contacto já é real (ver abaixo), mas falta
+        identificar o responsável pelo tratamento pelo nome. Antes de qualquer
+        lançamento público isso tem de constar aqui — sem o nome do responsável esta
+        política não cumpre o RGPD.
       </div>
 
       <h2 className="text-lg font-medium pt-2">Que dados tratamos</h2>
@@ -48,6 +49,16 @@ export default function Privacidade() {
         domínio, sem endereço IP, sem cookie e sem a página visitada. Serve para
         decidir se vale a pena manter o segundo domínio registado, e não permite
         identificar ninguém.
+      </p>
+
+      <h2 className="text-lg font-medium pt-2">Como nos contactar</h2>
+      <p>
+        Para exercer qualquer um destes direitos, escreva para{" "}
+        <a className="underline" href="mailto:rgpd@appoios.guru">
+          rgpd@appoios.guru
+        </a>
+        . É uma caixa monitorizada por uma pessoa, não um formulário automático.
+        Respondemos dentro do prazo de um mês previsto no art. 12.º, n.º 3 do RGPD.
       </p>
     </div>
   );

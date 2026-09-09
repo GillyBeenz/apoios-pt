@@ -26,7 +26,12 @@ export default function Sobre() {
         ao aviso oficial, que prevalece sempre sobre o que consta aqui.
       </p>
       <p className="text-sm text-suave pt-2">
-        Contacto: <em>a definir antes do lançamento público</em>.
+        Contacto:{" "}
+        <a className="underline" href="mailto:contacto@appoios.guru">
+          contacto@appoios.guru
+        </a>
+        . É o mesmo endereço que o nosso recolector anuncia aos sites que lê, para
+        que qualquer entidade nos possa dizer que pare.
       </p>
     </div>
   );
