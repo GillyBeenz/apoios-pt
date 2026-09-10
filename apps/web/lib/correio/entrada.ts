@@ -128,3 +128,27 @@ export function variaveisEmFalta(
     (nome) => (ambiente[nome] ?? "").trim() === "",
   );
 }
+
+/**
+ * A failed API response, reduced to one log line.
+ *
+ * The first version logged only the status code, which is the half that does
+ * not say what went wrong. A `401` from Resend's receiving API could be a typo
+ * in the key, a truncated paste, or the sending key in the receiving key's
+ * slot — and the body says which: `restricted_api_key`, `invalid_api_key`,
+ * `not_found`. Throwing it away meant reading a 502 in the webhook log and
+ * guessing between three causes.
+ *
+ * Truncated because a proxy error page can be megabytes of HTML, and a log
+ * line nobody can scroll past is its own kind of useless.
+ */
+export function resumoDeErro(
+  estado: number,
+  corpo: string,
+  limite = 500,
+): string {
+  const limpo = corpo.replace(/\s+/g, " ").trim();
+  const texto =
+    limpo.length > limite ? `${limpo.slice(0, limite)}… (truncado)` : limpo;
+  return texto.length > 0 ? `${estado} ${texto}` : `${estado} (sem corpo)`;
+}

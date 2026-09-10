@@ -5,6 +5,7 @@ import {
   destinatarioConhecido,
   escaparHtml,
   MAX_CORPO_BYTES,
+  resumoDeErro,
   variaveisEmFalta,
 } from "@/lib/correio/entrada.ts";
 
@@ -111,8 +112,13 @@ export async function POST(request: NextRequest) {
       { headers: { Authorization: `Bearer ${chaveRecepcao}` } },
     );
     if (!resposta.ok) {
+      // The body, not just the status: Resend answers a sending-tier key with
+      // `restricted_api_key` and a mistyped one with `invalid_api_key`, and
+      // those are different fixes. Safe to log — it describes our own
+      // credential's problem, never the credential.
       console.error(
-        `[correio] Não consegui ler a mensagem recebida: ${resposta.status}`,
+        "[correio] Não consegui ler a mensagem recebida: " +
+          resumoDeErro(resposta.status, await resposta.text()),
       );
       return NextResponse.json({ erro: "Falha a ler" }, { status: 502 });
     }
@@ -154,7 +160,10 @@ export async function POST(request: NextRequest) {
       }),
     });
     if (!envio.ok) {
-      console.error(`[correio] Não consegui reencaminhar: ${envio.status}`);
+      console.error(
+        "[correio] Não consegui reencaminhar: " +
+          resumoDeErro(envio.status, await envio.text()),
+      );
       return NextResponse.json({ erro: "Falha a reencaminhar" }, { status: 502 });
     }
 
