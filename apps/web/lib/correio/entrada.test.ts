@@ -6,6 +6,7 @@ import {
   carimboRecente,
   destinatarioConhecido,
   escaparHtml,
+  resumoDeErro,
   TOLERANCIA_SEGUNDOS,
   variaveisEmFalta,
 } from "./entrada.ts";
@@ -193,5 +194,44 @@ describe("variaveisEmFalta", () => {
 
   it("ignora variáveis alheias", () => {
     expect(variaveisEmFalta({ ...completo, OUTRA_QUALQUER: "" })).toEqual([]);
+  });
+});
+
+describe("resumoDeErro", () => {
+  it("junta estado e corpo, que é a metade que diz o que correu mal", () => {
+    expect(
+      resumoDeErro(401, '{"name":"restricted_api_key","message":"This API key is restricted"}'),
+    ).toBe('401 {"name":"restricted_api_key","message":"This API key is restricted"}');
+  });
+
+  it("distingue as causas que dão o mesmo código", () => {
+    // 401 com `restricted_api_key` é a chave de envio no lugar da de recepção;
+    // 401 com `invalid_api_key` é um valor mal colado. Correções diferentes.
+    const restrita = resumoDeErro(401, '{"name":"restricted_api_key"}');
+    const invalida = resumoDeErro(401, '{"name":"invalid_api_key"}');
+    expect(restrita).not.toBe(invalida);
+  });
+
+  it("colapsa espaços para caber numa linha de log", () => {
+    expect(resumoDeErro(500, "erro\n  grande\n\tdemais")).toBe(
+      "500 erro grande demais",
+    );
+  });
+
+  it("trunca uma página de erro enorme", () => {
+    // Uma página de erro de um proxy pode ter megabytes de HTML, e uma linha de
+    // log que ninguém consegue passar à frente é inútil à sua maneira.
+    const resumo = resumoDeErro(502, "x".repeat(5000));
+    expect(resumo.length).toBeLessThan(600);
+    expect(resumo).toMatch(/… \(truncado\)$/);
+  });
+
+  it("não trunca o que cabe", () => {
+    expect(resumoDeErro(404, "not found")).toBe("404 not found");
+  });
+
+  it("diz que não havia corpo, em vez de deixar o estado sozinho e ambíguo", () => {
+    expect(resumoDeErro(502, "")).toBe("502 (sem corpo)");
+    expect(resumoDeErro(502, "   \n  ")).toBe("502 (sem corpo)");
   });
 });
