@@ -65,6 +65,26 @@ que tem para pedir que abrande. Têm de resolver e de receber correio a sério.
 | Namecheap → Advanced DNS → Mail Settings | pôr em **Custom MX** — enquanto estiver em *Email Forwarding* o MX da raiz é ignorado e o correio de entrada nunca chega ao Resend |
 | Resend → Webhooks | subscrever `email.received` para `https://appoios.guru/api/correio-entrada`; guardar o `whsec_…` |
 
+### Que host é o verdadeiro
+
+`appoios.guru`, sem `www`. Está em `lib/dominios.ts` como `CANONICO`, e os outros
+três — `apoios.guru`, `www.apoios.guru`, `www.appoios.guru` — levam 308 para lá.
+
+O `www.appoios.guru` está lá por razão diferente dos outros dois. Aqueles são o
+registo defensivo. O `www` é o mesmo domínio de chapéu: a Vercel serve-o porque
+está listado no projecto, e deixado em paz responde no seu próprio hostname —
+conteúdo duplicado para um motor de busca e, pior, um cookie de sessão posto num
+dos hosts é invisível ao outro. Entrar no `www` e voltar mais tarde ao canónico
+parece ficar sem sessão sem razão nenhuma.
+
+**Se algum dia se configurar a Vercel para redirigir o ápex *para* o www**, o
+`www.appoios.guru` tem de sair do `NAO_CANONICOS` na mesma alteração. O
+redireccionamento da Vercel corre na berma, antes do middleware, e as duas regras
+a apontar uma para a outra é um ciclo infinito.
+
+Por isso o Site URL do Supabase, o `NEXT_PUBLIC_APP_URL` e tudo o que peça um URL
+canónico levam `https://appoios.guru`.
+
 ### O defensivo vale a renovação?
 
 O redireccionamento é contado. A migração `0006` cria `dominio_acessos` — um contador

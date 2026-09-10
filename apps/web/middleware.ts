@@ -1,18 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-/** Where the app actually lives. */
-const CANONICO = "appoios.guru";
-
-/** The defensive registration. Redirected, and counted before it is. */
-const DEFENSIVOS = new Set(["apoios.guru", "www.apoios.guru"]);
-
-const CONTADOS = new Set([
-  "appoios.guru",
-  "www.appoios.guru",
-  "apoios.guru",
-  "www.apoios.guru",
-]);
+import { destinoCanonico, ehContado, normalizarHost } from "@/lib/dominios.ts";
 
 /**
  * Count one visit against a domain.
@@ -29,7 +17,7 @@ const CONTADOS = new Set([
 function contar(host: string): void {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const chave = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !chave || !CONTADOS.has(host)) return;
+  if (!url || !chave || !ehContado(host)) return;
 
   void fetch(`${url}/rest/v1/rpc/registar_acesso_dominio`, {
     method: "POST",
@@ -53,13 +41,16 @@ function contar(host: string): void {
  * change them should not be asked to sign in again.
  */
 export async function middleware(request: NextRequest) {
-  const host = (request.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
+  // Normalised once: `contar` sends this straight to a function whose allowlist
+  // is exact (migration 0006), so a stray port or capital would silently miss.
+  const host = normalizarHost(request.headers.get("host") ?? "");
 
   contar(host);
 
-  if (DEFENSIVOS.has(host)) {
+  const canonico = destinoCanonico(host);
+  if (canonico !== null) {
     const destino = new URL(request.nextUrl);
-    destino.host = CANONICO;
+    destino.host = canonico;
     destino.port = "";
     destino.protocol = "https:";
     // 308 rather than 302: permanent, and it preserves the method, so a form post
