@@ -265,6 +265,7 @@ async function main(): Promise<number> {
           bytes: m.bytes,
           duracaoMs: m.duracaoMs,
           candidatos: m.candidatos,
+          candidatosIgnorados: m.candidatosIgnorados,
           candidatosComData: m.candidatosComData,
           extraccoesOk: m.extraccoesOk,
           extraccoesRevisao: m.extraccoesRevisao,
