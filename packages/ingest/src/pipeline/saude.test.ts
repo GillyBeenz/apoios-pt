@@ -15,6 +15,7 @@ function metricas(parcial: Partial<MetricasFonte> = {}): MetricasFonte {
     bytes: 1000,
     duracaoMs: 100,
     candidatos: 10,
+    candidatosIgnorados: 0,
     candidatosComData: 10,
     extraccoesOk: 0,
     extraccoesRevisao: 0,

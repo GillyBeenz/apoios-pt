@@ -4,6 +4,15 @@ export interface MetricasFonte {
   readonly bytes: number;
   readonly duracaoMs: number;
   readonly candidatos: number;
+  /**
+   * Candidates the per-run cap refused to look at.
+   *
+   * Always zero in a healthy run. Anything else means the listing outgrew
+   * `maxDetalhes` and documents were dropped without being fetched — which is
+   * indistinguishable, downstream, from a document that was checked and found
+   * unchanged. That ambiguity is what hid the loss of every household scheme.
+   */
+  readonly candidatosIgnorados: number;
   readonly candidatosComData: number;
   readonly extraccoesOk: number;
   readonly extraccoesRevisao: number;

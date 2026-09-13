@@ -420,3 +420,97 @@ describe("o rasto de auditoria das extracções", () => {
     expect(armazem.extraccoes).toHaveLength(0);
   });
 });
+
+/**
+ * The bug that cost the product its subject.
+ *
+ * The Fundo Ambiental listing yields 47 candidates and the cap was 25, applied as
+ * `candidatos.slice(0, 25)` in document order. Everything below the cut was never
+ * fetched — and what sat below the cut was the whole `c13 — eficiência energética
+ * em edifícios` section: PAE+S, Vale Eficiência, E-Lar, Condomínios Residenciais,
+ * Bairros Mais Sustentáveis. Every household scheme this app exists to alert on.
+ *
+ * Confirmed against the live database before fixing: 220 PRR detail pages fetched,
+ * covering c8, c9, c10 and c12, and not one from c13.
+ *
+ * What made it survive so long is that a dropped candidate is indistinguishable
+ * downstream from one that was fetched and found unchanged. Both simply produce
+ * nothing. So the run reported success, the health rules saw a healthy candidate
+ * count, and the catalogue was quietly missing its entire reason to exist.
+ */
+describe("limite de detalhes por execução", () => {
+  const N = 40;
+
+  function listagemGrande(): string {
+    const linhas = Array.from({ length: N }, (_, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      return `<article><h3><a href="/apoios-2026/seccao-${n}/${n}2026-aviso-numero-${n}.aspx">Aviso de Abertura de Concurso n.º ${n}/2026 — Medida ${n}</a></h3><span>Candidaturas até 30/09/2026</span></article>`;
+    }).join("");
+    return `<html><body>${linhas}</body></html>`;
+  }
+
+  function buscadorGrande(): BuscadorMemoria {
+    const b = new BuscadorMemoria().definir(URL_LISTAGEM, {
+      corpo: listagemGrande(),
+    });
+    for (let i = 1; i <= N; i++) {
+      const n = String(i).padStart(2, "0");
+      b.definir(`${BASE}/apoios-2026/seccao-${n}/${n}2026-aviso-numero-${n}.aspx`, {
+        corpo: detalhe(),
+      });
+    }
+    return b;
+  }
+
+  it("não deixa cair candidatos com o limite por omissão", async () => {
+    // Este teste falhava antes da correcção: com o limite a 25, os 15 últimos
+    // avisos — a secção que interessa ao produto — nunca eram sequer buscados.
+    const armazem = new ArmazemMemoria();
+    const r = await executarFonte(contexto(buscadorGrande(), armazem));
+
+    expect(r.metricas.candidatos).toBe(N);
+    expect(r.metricas.candidatosIgnorados).toBe(0);
+    // `chamadasModelo` e não `apoiosNovos`: o extractor de teste devolve a mesma
+    // extracção para todos os documentos, por isso a identidade dobra os 40 num
+    // único apoio — e bem. O que este teste mede é se cada candidato chegou a ser
+    // buscado e processado, não quantos apoios distintos daí saíram.
+    expect(r.metricas.chamadasModelo).toBe(N);
+  });
+
+  it("processa o fim da listagem, não só o princípio", async () => {
+    // O corte era em ordem de documento, por isso a prova que interessa é sobre o
+    // último candidato e não sobre a contagem.
+    const armazem = new ArmazemMemoria();
+    await executarFonte(contexto(buscadorGrande(), armazem));
+
+    const ultimo = `${BASE}/apoios-2026/seccao-${N}/${N}2026-aviso-numero-${N}.aspx`;
+    expect(await armazem.snapshotAnterior(ultimo)).not.toBeNull();
+  });
+
+  it("conta e não esconde os que o limite recusa", async () => {
+    // Um limite ultrapassado deixa de ser silencioso. Um candidato deixado cair é
+    // indistinguível, a jusante, de um candidato buscado e sem alterações — foi
+    // essa ambiguidade que escondeu a perda durante toda a vida do projecto.
+    const armazem = new ArmazemMemoria();
+    const r = await executarFonte({
+      ...contexto(buscadorGrande(), armazem),
+      maxDetalhes: 10,
+    });
+
+    expect(r.metricas.candidatos).toBe(N);
+    expect(r.metricas.candidatosIgnorados).toBe(N - 10);
+    expect(r.metricas.chamadasModelo).toBe(10);
+  });
+
+  it("continua a proteger contra uma listagem em fuga", async () => {
+    // O limite continua a existir: é uma protecção, não um orçamento.
+    const armazem = new ArmazemMemoria();
+    const r = await executarFonte({
+      ...contexto(buscadorGrande(), armazem),
+      maxDetalhes: 1,
+    });
+
+    expect(r.metricas.chamadasModelo).toBe(1);
+    expect(r.metricas.candidatosIgnorados).toBe(N - 1);
+  });
+});

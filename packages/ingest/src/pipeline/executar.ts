@@ -29,7 +29,24 @@ export interface OpcoesExecucao {
   readonly armazem: Armazem;
   readonly extractor: ExtractorLike;
   readonly agora: Date;
-  /** Cap on detail documents extracted per run; protects against a runaway listing. */
+  /**
+   * Safety rail against a runaway listing. NOT a budget.
+   *
+   * It was 25, and that quietly cost the product its whole subject. The Fundo
+   * Ambiental listing yields 47 candidates and this took the first 25 in document
+   * order, so the `c13 — eficiência energética em edifícios` section never got
+   * fetched: PAE+S, Vale Eficiência, E-Lar, Condomínios Residenciais, Bairros Mais
+   * Sustentáveis. Every household scheme the app exists to alert on, one link from
+   * a page already in the pipeline, dropped by an off-by-a-round-number.
+   *
+   * The number was low because it was read as a cost control, and it is not one.
+   * The costly step is the model call, and that is gated separately and much more
+   * tightly: a candidate is fetched conditionally (etag/last-modified), hashed, and
+   * only reaches the extractor when the content genuinely changed. Fetching 47
+   * unchanged pages costs 47 conditional GETs and nothing else. This rail exists
+   * only so a source that starts emitting thousands of links cannot run away with
+   * a night, which is a different problem with a different right answer.
+   */
   readonly maxDetalhes?: number;
   /** When true, nothing is written and no model call is made. */
   readonly simulacao?: boolean;
@@ -171,7 +188,18 @@ export async function executarFonte(
   let tokensCacheLidos = 0;
   let chamadasModelo = 0;
 
-  const limite = op.maxDetalhes ?? 25;
+  const limite = op.maxDetalhes ?? 250;
+  const ignorados = Math.max(0, candidatos.length - limite);
+  if (ignorados > 0) {
+    // Loud, because the previous truncation was silent for the entire life of the
+    // project and nothing in the run summary, the health rules or the database
+    // gave any sign that a document had been skipped rather than found unchanged.
+    console.warn(
+      `[${fonte.id}] ${candidatos.length} candidatos, limite ${limite}: ` +
+        `${ignorados} ignorados. Uma listagem maior que o limite é sinal de que ` +
+        `o limite está errado, não de que a listagem está.`,
+    );
+  }
 
   for (const candidato of candidatos.slice(0, limite)) {
     const anterior = await armazem.snapshotAnterior(candidato.urlDetalhe);
@@ -355,6 +383,7 @@ export async function executarFonte(
       bytes: bytesTotais,
       duracaoMs: Date.now() - inicio,
       candidatos: candidatos.length,
+      candidatosIgnorados: ignorados,
       candidatosComData: candidatos.filter((c) => c.dataBruta !== null).length,
       extraccoesOk,
       extraccoesRevisao,
