@@ -1,0 +1,63 @@
+name: Redecidir publicação
+
+# Volta a aplicar o portão de publicação às extracções que já estão na base de
+# dados, sem chamar o modelo.
+#
+# `publicado`, `alertavel` e `confianca_global` são decididos uma vez, na
+# extracção, e ficam gravados na linha do apoio. O portão da mudança impede depois
+# que o mesmo documento volte a ser olhado enquanto o conteúdo não mudar — o que
+# está certo, e o que faz com que um apoio continue a carregar uma decisão tomada
+# ao abrigo de uma regra que já não existe.
+#
+# Foi o que aconteceu quando o `dotacao_esgotada` saiu da confiança global: 26
+# apoios ficaram invisíveis, travados por um veto que o código já tinha deixado de
+# aplicar. A alternativa era voltar a extrair tudo, ou seja, pagar ao modelo para
+# reler documentos que já leu e chegar à mesma extracção. A extracção não mudou; a
+# nossa leitura dela é que mudou.
+#
+# Repare no que NÃO está aqui: `ANTHROPIC_API_KEY`. Não é um esquecimento. Sem
+# chave não há chamada possível, e isso é uma garantia estrutural em vez de uma
+# promessa no README.
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulacao:
+        description: "Só relatar o que mudaria, sem escrever"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  redecidir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # O mesmo papel restrito da ingestão: sem grants em `profiles`,
+      # `subscriptions`, `alerts_sent`, `alerts_outbox`, `unsubscribe_tokens` nem
+      # em `auth`. Este trabalho só lê `fund_extractions` e só escreve as quatro
+      # colunas de decisão em `funds`.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Redecidir
+        run: |
+          if [ "${{ inputs.simulacao }}" = "true" ]; then
+            pnpm ingerir --redecidir --dry-run
+          else
+            pnpm ingerir --redecidir
+          fi
