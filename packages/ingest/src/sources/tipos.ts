@@ -1,4 +1,4 @@
-import type { Candidato } from "@apoios/core";
+import type { ApoioNovo, Candidato } from "@apoios/core";
 
 export interface ContextoExtraccao {
   /** Base URL for resolving relative links. */
@@ -53,4 +53,25 @@ export interface Fonte {
    * fixture in an environment with no network at all.
    */
   extrair(html: string, ctx: ContextoExtraccao): Candidato[];
+
+  /**
+   * Read a spreadsheet candidate into funds directly, with no model call.
+   *
+   * A `dataset` source publishes a structured file — the annual notice plan is a
+   * table of dates, dotações and programmes. Sending that to the model would be
+   * paying to make a deterministic table less certain, so `executar` routes
+   * `folha` candidates here instead.
+   *
+   * Optional, and its absence is meaningful: a `folha` candidate from a source
+   * without this is dropped, because decoding a .xlsx as if it were text and
+   * sending the mojibake to the model is a paid call whose output could only be
+   * nonsense.
+   */
+  lerDataset?(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[];
+}
+
+export interface ContextoDataset {
+  /** The page the file was linked from — the authoritative source to link back to. */
+  readonly urlOrigem: string;
+  readonly entidade: string;
 }
