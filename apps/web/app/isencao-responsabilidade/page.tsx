@@ -6,7 +6,7 @@ export default function Isencao() {
     <div className="max-w-2xl space-y-4 leading-relaxed">
       <h1 className="text-2xl font-semibold tracking-tight">Isenção de responsabilidade</h1>
       <p>
-        O Apoios é um agregador independente e{" "}
+        O Appoios é um agregador independente e{" "}
         <strong>não está associado ao Fundo Ambiental, ao Portugal 2030, ao PRR, à
         ADENE, à DGEG nem a qualquer outra entidade pública</strong>.
       </p>
@@ -22,7 +22,7 @@ export default function Isencao() {
         oficial presente em cada página.
       </p>
       <p>
-        O Apoios não presta aconselhamento jurídico, financeiro nem técnico, e não se
+        O Appoios não presta aconselhamento jurídico, financeiro nem técnico, e não se
         responsabiliza por decisões tomadas com base na informação aqui apresentada,
         na medida permitida pela lei portuguesa.
       </p>

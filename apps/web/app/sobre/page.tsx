@@ -4,9 +4,9 @@ export const metadata: Metadata = { title: "Sobre" };
 export default function Sobre() {
   return (
     <div className="max-w-2xl space-y-4 leading-relaxed">
-      <h1 className="text-2xl font-semibold tracking-tight">Sobre o Apoios</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Sobre o Appoios</h1>
       <p>
-        O Apoios acompanha automaticamente as fontes públicas portuguesas de
+        O Appoios acompanha automaticamente as fontes públicas portuguesas de
         financiamento ambiental e energético — Fundo Ambiental, Portugal 2030, PRR,
         ADENE e DGEG — e avisa proprietários quando abre financiamento para as
         melhorias que escolheram seguir.
