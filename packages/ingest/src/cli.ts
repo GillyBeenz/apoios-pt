@@ -18,6 +18,9 @@ apoios ingerir — executa o pipeline de recolha
                     onde os domínios do Estado português estão bloqueados)
   --dry-run         Não escreve nada nem chama o modelo
   --list            Lista as fontes conhecidas
+  --redecidir       Volta a aplicar o portão de publicação às extracções já
+                    guardadas. Não chama o modelo nem vai à rede. Use com
+                    --dry-run primeiro.
 
 Fontes activas: ${FONTES_ACTIVAS.map((f) => f.id).join(", ")}
 Em captura (ignoradas sem --source): ${FONTES.filter(
@@ -116,6 +119,7 @@ async function main(): Promise<number> {
       fixtures: { type: "string" },
       "dry-run": { type: "boolean", default: false },
       list: { type: "boolean", default: false },
+      redecidir: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
     allowPositionals: true,
@@ -131,6 +135,38 @@ async function main(): Promise<number> {
       console.log(
         `${f.id}\t${f.estado}\t${f.nome}\t${f.urlsEntrada.length} URL(s)`,
       );
+    }
+    return 0;
+  }
+
+  if (values.redecidir) {
+    const simulacao = values["dry-run"] === true;
+    const url = process.env.DATABASE_URL;
+    if (url === undefined || url.length === 0) {
+      console.error("Falta DATABASE_URL. Ver --help.");
+      return 2;
+    }
+
+    const pool = ArmazemPostgres.poolDe(url);
+    try {
+      const r = await ArmazemPostgres.redecidir(pool, simulacao);
+      console.log(
+        `${simulacao ? "[simulação] " : ""}extracções lidas=${r.lidos}  ` +
+          `alterados=${r.alterados}  a publicar=${r.publicadosAgora}  ` +
+          `a despublicar=${r.despublicadosAgora}`,
+      );
+      for (const i of r.ilegiveis) {
+        // Left exactly as it was, and said out loud. A `bruto` the current schema
+        // cannot read is a row whose decision we have no right to rewrite.
+        console.warn(`[ilegível, decisão anterior mantida] ${i}`);
+      }
+      if (r.despublicadosAgora > 0 && !simulacao) {
+        console.warn(
+          `aviso: ${r.despublicadosAgora} apoio(s) deixaram de estar publicados.`,
+        );
+      }
+    } finally {
+      await pool.end();
     }
     return 0;
   }

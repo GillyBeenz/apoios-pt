@@ -12,6 +12,7 @@ import {
   type EventoApoio,
 } from "@apoios/core";
 
+import { mudou, redecidir } from "./redecidir.ts";
 import {
   gerarSlug,
   type Armazem,
@@ -63,6 +64,16 @@ const CA_SUPABASE = readFileSync(
  * Scoped per source, because `snapshots.source_id` and `funds.source_id` are both
  * `not null` while the `Armazem` interface carries no source argument.
  */
+/** What one re-decision pass did, or would have done. */
+export interface RelatorioRedecisao {
+  readonly lidos: number;
+  alterados: number;
+  publicadosAgora: number;
+  despublicadosAgora: number;
+  readonly ilegiveis: string[];
+  readonly simulacao: boolean;
+}
+
 export class ArmazemPostgres implements Armazem {
   readonly #pool: Pool;
   readonly #fonteId: string;
@@ -251,6 +262,97 @@ export class ArmazemPostgres implements Armazem {
         where id = $1`,
       [runId, estado, JSON.stringify(resumo)],
     );
+  }
+
+  /**
+   * Re-run the publication gate over every fund's most recent extraction.
+   *
+   * Reads only `fund_extractions` and writes only the four decision columns on
+   * `funds`. No model call, no network beyond Postgres — the whole point is that
+   * the model's answer has not changed; our reading of it has.
+   *
+   * `simulacao` reports what would change and writes nothing. A gate change is
+   * exactly the moment to look before writing across the live catalogue.
+   */
+  static async redecidir(
+    pool: Pool,
+    simulacao: boolean,
+  ): Promise<RelatorioRedecisao> {
+    const linhas = await pool.query<{
+      fund_id: string;
+      bruto: unknown;
+      confianca_campos: Record<string, string>;
+      evidencia_falhou: string[] | null;
+      stop_reason: string | null;
+      publicado: boolean;
+      alertavel: boolean;
+    }>(
+      // `distinct on` takes the newest extraction per fund. A fund re-extracted
+      // after a document changed has several, and only the last one describes
+      // what the catalogue currently shows.
+      `select distinct on (fe.fund_id)
+              fe.fund_id, fe.bruto, fe.confianca_campos, fe.evidencia_falhou,
+              fe.stop_reason, f.publicado, f.alertavel
+         from fund_extractions fe
+         join funds f on f.id = fe.fund_id
+        where fe.fund_id is not null
+        order by fe.fund_id, fe.criado_em desc`,
+      [],
+    );
+
+    const relatorio: RelatorioRedecisao = {
+      lidos: linhas.rows.length,
+      alterados: 0,
+      publicadosAgora: 0,
+      despublicadosAgora: 0,
+      ilegiveis: [],
+      simulacao,
+    };
+
+    for (const linha of linhas.rows) {
+      const r = redecidir({
+        fundId: linha.fund_id,
+        bruto: linha.bruto,
+        confiancaCampos: linha.confianca_campos ?? {},
+        evidenciaFalhou: linha.evidencia_falhou ?? [],
+        stopReason: linha.stop_reason,
+      });
+
+      if (r.estado === "ilegivel") {
+        relatorio.ilegiveis.push(`${r.fundId}: ${r.motivo}`);
+        continue;
+      }
+
+      const actual = { publicado: linha.publicado, alertavel: linha.alertavel };
+      if (!mudou(actual, r.decisao)) continue;
+
+      relatorio.alterados++;
+      if (r.decisao.publicado && !actual.publicado) relatorio.publicadosAgora++;
+      // Counted separately and deliberately. A gate change that *hides* funds is
+      // the one worth noticing before it ships, and a single "alterados" total
+      // would let it pass as progress.
+      if (!r.decisao.publicado && actual.publicado) relatorio.despublicadosAgora++;
+
+      if (simulacao) continue;
+
+      await pool.query(
+        `update funds
+            set publicado = $2, alertavel = $3, needs_review = $4,
+                motivo_revisao = $5::text[], confianca_global = $6,
+                actualizado_em = now()
+          where id = $1`,
+        [
+          r.fundId,
+          r.decisao.publicado,
+          r.decisao.alertavel,
+          r.decisao.needsReview,
+          [...r.decisao.motivoRevisao],
+          r.decisao.confiancaGlobal,
+        ],
+      );
+    }
+
+    return relatorio;
   }
 
   async conteudoSnapshot(url: string): Promise<Uint8Array | null> {
