@@ -16,6 +16,9 @@ const PONTO_ESTADO = {
 // what the badge said with nothing to flag it.
 const CAIXA_ELEGIBILIDADE = {
   aberto: "bg-ok-suave text-ok-tinta",
+  // Brand green, not the success green: open *to the condomínio* is a real
+  // route, but it is not the same answer as open to you, today, alone.
+  via_condominio: "bg-marca-suave text-marca-forte",
   fechado: "bg-urgente-suave text-urgente",
   por_confirmar: "bg-aviso-suave text-aviso-tinta",
 } as const satisfies Record<EstadoElegibilidade, string>;

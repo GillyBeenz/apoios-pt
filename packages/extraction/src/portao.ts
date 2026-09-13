@@ -58,8 +58,27 @@ export function decidir(
   // Worth stating separately from the confidence check: even a high-confidence
   // `desconhecido` is not permission to email a homeowner. The matcher enforces
   // this again per-user, but blocking it here keeps it out of every digest at once.
+  //
+  // The exception is a notice that names condomínios explicitly. A homeowner does
+  // roof, façade, lift and collective-solar work *through* their condomínio, never
+  // as a pessoa singular — `BENEFICIARIOS_PROPRIETARIO` in the taxonomy has said
+  // "directly or collectively" since the beginning, and this gate simply never
+  // agreed with it. `Programa de Apoio a Condomínios Residenciais` is a real Fundo
+  // Ambiental programme that this line alone would have kept out of every inbox.
+  //
+  // It is not a loosening. Both sides must be explicit: the notice has to *name*
+  // condomínios as beneficiaries — a positive extraction from the document, not an
+  // inference — and `corresponde()` then still requires the person to have asked
+  // for condomínio alerts. `desconhecido` is admitted by neither branch.
   const admite = e.beneficiarios.admite_particulares.valor;
-  if (admite !== "sim") {
+  // `=== "nao"` and not `!== "sim"`. The door needs a positive determination that
+  // individuals are excluded, alongside a positive naming of condomínios. Written
+  // the loose way first, it let a `desconhecido` notice through whenever it
+  // happened to mention condomínios — fail-open, in the one gate whose entire
+  // purpose is to fail closed. The pre-existing `desconhecido` test caught it.
+  const portaDoCondominio =
+    admite === "nao" && e.beneficiarios.tipos.valor.includes("condominio");
+  if (admite !== "sim" && !portaDoCondominio) {
     motivos.push(`admite_particulares:${admite}`);
   }
 

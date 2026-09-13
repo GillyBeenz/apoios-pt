@@ -5,7 +5,11 @@ import {
   analisarDataPt,
   relogioFixo,
 } from "@apoios/core";
-import { apoioDe, apoioSoParaEntidades } from "@apoios/core/teste";
+import {
+  apoioDe,
+  apoioParaCondominios,
+  apoioSoParaEntidades,
+} from "@apoios/core/teste";
 import {
   FILTROS_PREDEFINIDOS,
   alternar,
@@ -316,5 +320,63 @@ describe("relógio injetado", () => {
     expect(relogioFixo("2026-09-23T09:00:00Z").agora().toISOString()).toBe(
       "2026-09-23T09:00:00.000Z",
     );
+  });
+});
+
+/**
+ * The condomínio route.
+ *
+ * A notice closed to pessoas singulares but open to condomínios is not a dead end
+ * for a homeowner — it is the normal way anything touching the building rather
+ * than the flat gets funded: roof, façade, lifts, collective solar. Calling that
+ * "NÃO aberto a particulares" and colouring it red steers people away from the one
+ * door that is open to them, which is the same harm as a false yes, pointing the
+ * other way.
+ */
+describe("elegibilidade via condomínio", () => {
+  it("não chama fechado a um aviso aberto ao condomínio", () => {
+    const e = elegibilidade(apoioParaCondominios());
+    expect(e.estado).toBe("via_condominio");
+    expect(e.titulo).toBe("Aberto ao seu condomínio");
+  });
+
+  it("diz como se candidata, não só que pode", () => {
+    // Saber que a porta existe não chega: a acção é levá-lo à assembleia.
+    const e = elegibilidade(apoioParaCondominios());
+    expect(e.detalhe).toContain("assembleia de condóminos");
+  });
+
+  it("mantém as restrições declaradas no aviso", () => {
+    expect(elegibilidade(apoioParaCondominios()).detalhe).toContain(
+      "representado pelo administrador",
+    );
+  });
+
+  it("continua a fechar o que não admite nem particulares nem condomínios", () => {
+    // O E-Lar é o caso real do outro lado: municípios, empresas municipais de
+    // habitação, IPSS e associações de moradores. Para um proprietário não há
+    // porta nenhuma, e isso tem de continuar a ler-se a vermelho.
+    const e = elegibilidade(apoioSoParaEntidades());
+    expect(e.estado).toBe("fechado");
+  });
+
+  it("não usa esta porta quando o aviso já admite particulares", () => {
+    // `sim` ganha sempre: dizer "através do condomínio" a quem se pode candidatar
+    // sozinho seria mandá-lo pela via mais lenta sem razão.
+    const e = elegibilidade(
+      apoioParaCondominios({
+        admiteParticulares: "sim",
+        beneficiarios: ["particular", "condominio"],
+      }),
+    );
+    expect(e.estado).toBe("aberto");
+  });
+
+  it("não usa esta porta quando a elegibilidade é desconhecida", () => {
+    // `desconhecido` não é "provavelmente sim" por nenhuma via.
+    const e = elegibilidade(
+      apoioParaCondominios({ admiteParticulares: "desconhecido" }),
+    );
+    expect(e.estado).toBe("por_confirmar");
   });
 });
