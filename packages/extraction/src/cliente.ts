@@ -14,6 +14,7 @@ import {
   hashPrompt,
   instrucaoVolatil,
 } from "./prompt.ts";
+import { custoDaChamada } from "./precos.ts";
 
 export const MODELO = "claude-opus-5";
 
@@ -36,6 +37,16 @@ export interface ResultadoExtraccao {
   readonly tokensEntrada: number;
   readonly tokensSaida: number;
   readonly tokensCacheLidos: number;
+  /**
+   * Tokens written to the cache, billed at 1.25x uncached input.
+   *
+   * Never captured before. Without it the cost of the first call of a run — the
+   * one that pays to build the cached prefix — was invisible, and it is the most
+   * expensive call of the run.
+   */
+  readonly tokensCacheEscritos: number;
+  /** US dollars, or null when this model has no pinned price in `PRECOS`. */
+  readonly custoUsd: number | null;
   readonly erro: string | null;
 }
 
@@ -203,13 +214,21 @@ export class Extractor {
       });
 
       const uso = resposta.usage;
-      const base = {
-        modelo: resposta.model ?? MODELO,
-        versaoPrompt: VERSAO_PROMPT,
-        versaoEsquema: VERSAO_ESQUEMA,
+      const modelo = resposta.model ?? MODELO;
+      const tokens = {
         tokensEntrada: uso?.input_tokens ?? 0,
         tokensSaida: uso?.output_tokens ?? 0,
         tokensCacheLidos: uso?.cache_read_input_tokens ?? 0,
+        tokensCacheEscritos: uso?.cache_creation_input_tokens ?? 0,
+      };
+      const base = {
+        modelo,
+        versaoPrompt: VERSAO_PROMPT,
+        versaoEsquema: VERSAO_ESQUEMA,
+        ...tokens,
+        // Priced against the model the API says served the call, not the one we
+        // asked for. They differ on a fallback, and the bill follows the server.
+        custoUsd: custoDaChamada(modelo, tokens),
       };
 
       // Check the stop reason before touching content: on a refusal there is no
@@ -291,6 +310,11 @@ export class Extractor {
         tokensEntrada: 0,
         tokensSaida: 0,
         tokensCacheLidos: 0,
+        tokensCacheEscritos: 0,
+        // A call that threw before a response was billed nothing, and zero is the
+        // honest figure — unlike an unpriced model, where the cost exists and we
+        // simply cannot name it.
+        custoUsd: 0,
         erro: erro instanceof Error ? erro.message : String(erro),
       };
     }

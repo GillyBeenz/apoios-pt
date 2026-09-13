@@ -327,6 +327,8 @@ export async function executarFonte(
         tokensEntrada: resultado.tokensEntrada,
         tokensSaida: resultado.tokensSaida,
         tokensCacheLidos: resultado.tokensCacheLidos,
+        tokensCacheEscritos: resultado.tokensCacheEscritos,
+        custoUsd: resultado.custoUsd,
         stopReason: resultado.stopReason,
       });
     };

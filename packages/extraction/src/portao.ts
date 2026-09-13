@@ -3,6 +3,17 @@ import type { Extraccao } from "./esquema.ts";
 import { CAMPOS_CRITICOS } from "./esquema.ts";
 import type { ResultadoVerificacao } from "./verificar.ts";
 
+/**
+ * Fields whose confidence does not count towards `confiancaGlobal`.
+ *
+ * Only for fields a notice structurally cannot state. Adding to this set weakens a
+ * fail-closed gate, so each entry needs the reason written down next to it.
+ */
+const CAMPOS_FORA_DA_CONFIANCA_GLOBAL: ReadonlySet<string> = new Set([
+  // Notices announce a dotação; they do not announce that it has run out.
+  "dotacao_esgotada",
+]);
+
 export interface Decisao {
   /** Visible in the public catalogue. */
   readonly publicado: boolean;
@@ -82,7 +93,22 @@ export function decidir(
     motivos.push(`admite_particulares:${admite}`);
   }
 
-  const confiancas = [...v.confiancaEfectiva.values()];
+  // `dotacao_esgotada` está fora da confiança global, de propósito.
+  //
+  // A pergunta é "a dotação já se esgotou?", e um aviso quase nunca o diz — a
+  // resposta honesta é `baixa`, e é a resposta certa. Mas a confiança global é o
+  // mínimo de todos os campos e bloqueia a publicação, por isso um campo que por
+  // natureza não se consegue saber estava a vetar o catálogo inteiro: na execução
+  // #36 saiu `baixa` em 15 de 17 extracções, e 54 dos 56 apoios ficaram por
+  // publicar.
+  //
+  // Não é um afrouxamento do portão da elegibilidade. `CAMPOS_CRITICOS` continua a
+  // exigir `alta` em estado, prazo de encerramento e admite_particulares para
+  // *alertar*, e este campo nunca lá esteve. O que muda é só o direito a aparecer
+  // no catálogo, com a fonte oficial ao lado, que é melhor do que não aparecer.
+  const confiancas = [...v.confiancaEfectiva.entries()]
+    .filter(([campo]) => !CAMPOS_FORA_DA_CONFIANCA_GLOBAL.has(campo))
+    .map(([, confianca]) => confianca);
   const confiancaGlobal: Confianca = confiancas.includes("baixa")
     ? "baixa"
     : confiancas.includes("media")
