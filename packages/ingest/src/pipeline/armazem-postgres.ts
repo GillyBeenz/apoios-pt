@@ -200,9 +200,9 @@ export class ArmazemPostgres implements Armazem {
     await this.#consulta(
       `insert into source_health
          (run_id, source_id, http_status, bytes, duracao_ms, candidatos,
-          candidatos_com_data, extraccoes_ok, extraccoes_revisao,
-          provas_falhadas, tokens_cache_lidos, erro)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          candidatos_ignorados, candidatos_com_data, extraccoes_ok,
+          extraccoes_revisao, provas_falhadas, tokens_cache_lidos, erro)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         s.runId,
         this.#fonteId,
@@ -210,6 +210,7 @@ export class ArmazemPostgres implements Armazem {
         s.bytes,
         s.duracaoMs,
         s.candidatos,
+        s.candidatosIgnorados,
         s.candidatosComData,
         s.extraccoesOk,
         s.extraccoesRevisao,
