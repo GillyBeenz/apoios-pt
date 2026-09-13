@@ -6,12 +6,23 @@ export default function Privacidade() {
     <div className="max-w-2xl space-y-4 leading-relaxed">
       <h1 className="text-2xl font-semibold tracking-tight">Política de privacidade</h1>
 
-      <div className="rounded-lg border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Documento por completar. O contacto já é real (ver abaixo), mas falta
-        identificar o responsável pelo tratamento pelo nome. Antes de qualquer
-        lançamento público isso tem de constar aqui — sem o nome do responsável esta
-        política não cumpre o RGPD.
-      </div>
+      <h2 className="text-lg font-medium pt-2">Quem é o responsável</h2>
+      <p>
+        O responsável pelo tratamento dos seus dados é <strong>Gil Pina Cabral</strong>,
+        pessoa singular, contactável em{" "}
+        <a className="underline" href="mailto:rgpd@appoios.guru">
+          rgpd@appoios.guru
+        </a>
+        .
+      </p>
+      <p className="text-sm text-suave">
+        O Appoios não é uma empresa. É um serviço mantido por uma pessoa, e o art.
+        13.º, n.º 1, al. a) do RGPD exige que essa pessoa se identifique pelo nome —
+        não basta um endereço de contacto. Não há encarregado de proteção de dados
+        porque o art. 37.º não o impõe a um tratamento desta natureza e escala: não
+        somos autoridade pública, não fazemos controlo sistemático em larga escala,
+        e não tratamos categorias especiais de dados.
+      </p>
 
       <h2 className="text-lg font-medium pt-2">Que dados tratamos</h2>
       <p>
