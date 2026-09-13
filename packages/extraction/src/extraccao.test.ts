@@ -58,7 +58,7 @@ describe("prompt", () => {
    * the hash below, and re-record with ANTHROPIC_MODE=record.
    */
   it("mantém o hash fixado", () => {
-    expect(hashPrompt()).toBe("7dc318ee938f4c70");
+    expect(hashPrompt()).toBe("f3d371479cff8200");
   });
 
   it("não interpola nada volátil no prefixo em cache", () => {
@@ -185,7 +185,8 @@ describe("decidir", () => {
   });
 
   it("continua a não alertar quando não admite nem singulares nem condomínios", () => {
-    // O caso E-Lar. Para um proprietário não há porta nenhuma, por via nenhuma.
+    // Nem singulares nem condomínios: para um proprietário não há porta nenhuma,
+    // por via nenhuma.
     const e = extraccaoSolar();
     const soEntidades = {
       ...e,

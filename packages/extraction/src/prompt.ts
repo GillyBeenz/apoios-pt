@@ -5,11 +5,17 @@ import {
   TAXONOMIA_MEDIDAS,
 } from "@apoios/core";
 
+// v3: o prompt afirmava que o E-Lar se destina apenas a entidades colectivas. É
+// falso — o E-Lar admite pessoas singulares — e estava escrito no exacto parágrafo
+// que ensina o modelo a decidir `admite_particulares`. O exemplo saiu; a regra
+// ficou, agora acompanhada da instrução de ler a lista de beneficiários do
+// documento e não do nome do programa.
+//
 // v2: o envelope deixou de ter `pagina` (saiu do esquema na #29 e o prompt ficou a
 // anunciá-lo), e a instrução de citação passa a dizer contra que texto a citação é
 // conferida. Gravado em `fund_extractions.versao_prompt`, para que uma prova
 // falhada se possa atribuir a um prompt em concreto em vez de a "o prompt".
-export const VERSAO_PROMPT = "v2";
+export const VERSAO_PROMPT = "v3";
 
 const listaMedidas = TAXONOMIA_MEDIDAS.map(
   (m) => `- ${m}: ${ETIQUETAS_MEDIDAS[m]}`,
@@ -62,9 +68,10 @@ Para cada campo com o envelope {valor, confianca, evidencia}:
 
 ## Elegibilidade — o campo mais importante
 
-Muitos programas portugueses excluem pessoas singulares. O programa E-Lar, por
-exemplo, destina-se apenas a municípios, empresas municipais de habitação, IPSS e
-associações de moradores.
+Muitos programas portugueses excluem pessoas singulares: há avisos destinados
+apenas a municípios, empresas municipais de habitação, IPSS ou associações de
+moradores. Lê sempre a lista de beneficiários do documento que tens à frente. Não
+decidas a partir do nome do programa nem do que julgues saber sobre ele.
 
 "admite_particulares":
 - "sim" APENAS se o documento admitir explicitamente pessoas singulares,

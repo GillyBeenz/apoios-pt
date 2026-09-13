@@ -55,14 +55,16 @@ export const APOIOS_SEED: readonly Apoio[] = [
     fechaEm: analisarDataPt("31/12/2026", enc),
   }),
 
-  // The E-Lar shape: real, and closed to individuals. Must never read as available.
+  // A forma, não um programa real: fechado a singulares, e nunca deve ler-se como
+  // disponível. Deliberadamente sem nome de aviso verdadeiro — ver construtores.ts.
   apoioSoParaEntidades({
     id: "fund-3",
-    slug: "programa-e-lar-3",
-    titulo: "Programa E-Lar — substituição de equipamentos a gás",
+    slug: "reabilitacao-do-parque-municipal-3",
+    titulo: "Apoio à reabilitação do parque habitacional municipal",
     resumo:
-      "Substituição de equipamentos a gás por soluções elétricas eficientes em " +
-      "agregados em situação de pobreza energética.",
+      "Substituição de equipamentos a gás por soluções elétricas eficientes no " +
+      "parque habitacional municipal. A candidatura é apresentada pela entidade " +
+      "gestora do edificado.",
     referenciaLegal: "AVISO 07/2026",
     dotacaoTotalEur: 30_000_000,
     apoioMaxEur: 3_600,

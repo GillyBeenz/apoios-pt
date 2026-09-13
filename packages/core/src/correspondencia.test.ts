@@ -25,13 +25,13 @@ describe("corresponde", () => {
   });
 
   /**
-   * The rule this whole product turns on. E-Lar is real and excludes individuals;
-   * a homeowner who hears about it wastes an afternoon on a notice they can never
-   * use, and stops trusting the next alert.
+   * The rule this whole product turns on. A homeowner who hears about an
+   * entity-only programme wastes an afternoon on a notice they can never use, and
+   * stops trusting the next alert.
    */
   it("nunca entrega a um particular um aviso destinado só a entidades", () => {
-    const elar = apoioSoParaEntidades();
-    const r = corresponde(eventoAbertura(elar), elar, perfilDe(), VAZIO);
+    const soEntidades = apoioSoParaEntidades();
+    const r = corresponde(eventoAbertura(soEntidades), soEntidades, perfilDe(), VAZIO);
     expect(r.corresponde).toBe(false);
     if (r.corresponde) throw new Error("unreachable");
     expect(r.razao.regra).toBe("beneficiario_incompativel");
