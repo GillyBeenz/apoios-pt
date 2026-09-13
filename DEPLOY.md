@@ -134,7 +134,8 @@ precisam de escrever.
 
 O MX de recepção está na raiz, portanto o Resend apanha correio para **qualquer**
 endereço em `appoios.guru`, inventado ou não. O `app/api/correio-entrada/route.ts`
-reencaminha só os aliases publicados — `contacto`, `rgpd`, `alertas`, `abuso` — e
+reencaminha só os aliases publicados — `contacto`, `rgpd`, `alertas`, `abuso`,
+`entrar` — e
 responde 200 a tudo o resto sem reencaminhar. Sem essa lista, um endereço colhido
 por um spammer chegaria a uma caixa real.
 

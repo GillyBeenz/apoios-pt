@@ -136,6 +136,17 @@ describe("destinatarioConhecido", () => {
     expect(destinatarioConhecido([null, 42, { a: 1 }], dominio)).toBe(null);
   });
 
+  it("reencaminha a resposta a um email de entrada", () => {
+    // O `entrar@` é o remetente do SMTP do Supabase: todos os emails de entrada e
+    // de registo saem de lá. Quem não consegue entrar responde a esse email — é a
+    // coisa mais natural do mundo — e durante algum tempo era o único endereço
+    // cujas respostas deitávamos fora em silêncio. A pessoa com menos meios de nos
+    // chegar pelo site era precisamente aquela cuja mensagem se perdia.
+    expect(destinatarioConhecido(["entrar@appoios.guru"], "appoios.guru")).toBe(
+      "entrar@appoios.guru",
+    );
+  });
+
   it("inclui o contacto que o recolector anuncia", () => {
     // packages/ingest/src/http/tipos.ts promete contacto@appoios.guru no
     // User-Agent a todos os sites do Estado. Tirar este alias da lista torna essa
