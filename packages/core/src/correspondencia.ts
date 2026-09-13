@@ -25,9 +25,9 @@ function intersecta<T>(a: readonly T[], b: readonly T[]): boolean {
  *
  * Every rule is conjunctive and every one fails closed. The eligibility rule in
  * particular is what separates this from spam: several major Portuguese programmes
- * (E-Lar is the canonical case) are open only to municipalities, IPSS and
- * residents' associations, and telling a homeowner about one costs them an
- * afternoon of reading a notice they were never able to use.
+ * are open only to municipalities, IPSS and residents' associations, and telling a
+ * homeowner about one costs them an afternoon of reading a notice they were never
+ * able to use.
  *
  * Returns the failing rule rather than a bare boolean so the admin view can show
  * exactly why a fund reached nobody — silence is otherwise indistinguishable from

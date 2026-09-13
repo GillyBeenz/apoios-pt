@@ -88,8 +88,8 @@ export const ETIQUETAS_MEDIDAS: Record<Medida, string> = {
  *
  * This is the field that decides whether a homeowner ever hears about a fund, so
  * it is modelled explicitly rather than as a free-text tag. Several major
- * Portuguese programmes (E-Lar being the canonical example) are restricted to
- * collective entities and are useless — worse than useless — to an individual.
+ * Portuguese programmes are restricted to collective entities and are useless —
+ * worse than useless — to an individual.
  */
 export const TIPOS_BENEFICIARIO = [
   "particular",

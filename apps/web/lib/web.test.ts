@@ -29,7 +29,7 @@ describe("elegibilidade", () => {
     expect(elegibilidade(apoioDe()).estado).toBe("aberto");
   });
 
-  /** The E-Lar case: real, and closed to individuals. */
+  /** Um apoio fechado a singulares tem de se ler como fechado. */
   it("mostra vermelho e nomeia os beneficiários reais", () => {
     const e = elegibilidade(apoioSoParaEntidades());
     expect(e.estado).toBe("fechado");
@@ -284,12 +284,29 @@ describe("RepositorioSeed", () => {
     expect(apoios.length).toBeGreaterThan(0);
   });
 
-  it("o E-Lar está no catálogo mas fora da vista do proprietário", async () => {
+  it("um apoio só para entidades está no catálogo mas fora da vista do proprietário", async () => {
     const repo = new RepositorioSeed();
-    expect(await repo.obterPorSlug("programa-e-lar-3")).not.toBeNull();
+    const slug = "reabilitacao-do-parque-municipal-3";
+    expect(await repo.obterPorSlug(slug)).not.toBeNull();
 
     const vistaProprietario = await repo.listar(FILTROS_PREDEFINIDOS);
-    expect(vistaProprietario.some((a) => a.slug === "programa-e-lar-3")).toBe(false);
+    expect(vistaProprietario.some((a) => a.slug === slug)).toBe(false);
+  });
+
+  /**
+   * O cartão não se pode contradizer a si próprio.
+   *
+   * O apoio «E-Lar» do seed dizia, no resumo, «agregados em situação de pobreza
+   * energética», e ao mesmo tempo `admiteParticulares: "nao"`. Quem lesse o cartão
+   * via a frase; quem lesse a etiqueta via o contrário. Era das duas uma, e era o
+   * resumo que tinha razão.
+   */
+  it("nenhum apoio fechado a singulares se descreve como sendo para famílias", () => {
+    const palavrasDeParticular = /agregado|família|familiar|proprietári|pessoas singulares/i;
+    for (const a of APOIOS_SEED) {
+      if (a.admiteParticulares !== "nao") continue;
+      expect(palavrasDeParticular.test(a.resumo), `${a.slug}: ${a.resumo}`).toBe(false);
+    }
   });
 
   it("cada apoio do seed liga a uma fonte oficial", () => {

@@ -42,14 +42,20 @@ export function apoioDe(sobrepor: Partial<Apoio> = {}): Apoio {
 }
 
 /**
- * The E-Lar shape: a real Portuguese programme restricted to collective entities.
- * Used to prove that such a fund is published but reaches no homeowner.
+ * A fund open only to collective entities: published, and reaching no homeowner.
+ *
+ * Deliberately **hypothetical**. This fixture used to be called Programa E-Lar and
+ * to assert that E-Lar excludes individuals. That is false — E-Lar is open to
+ * pessoas singulares — and the claim had spread from here into the README, into the
+ * seed catalogue the site serves, and into the prompt the model reads. A test shape
+ * needs the eligibility, not a real programme's name; naming one turns a fixture
+ * into a factual claim that nothing in the test suite can check.
  */
 export function apoioSoParaEntidades(sobrepor: Partial<Apoio> = {}): Apoio {
   return apoioDe({
-    id: "fund-elar",
-    slug: "e-lar",
-    titulo: "Programa E-Lar",
+    id: "fund-so-entidades",
+    slug: "apoio-so-para-entidades",
+    titulo: "Apoio só para entidades",
     beneficiarios: ["municipio", "empresa_municipal_habitacao", "ipss", "associacao_moradores"],
     admiteParticulares: "nao",
     restricoesBeneficiario:

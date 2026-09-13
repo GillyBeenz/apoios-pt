@@ -13,7 +13,7 @@ mesmo candidatar, para as melhorias que escolheu seguir.
 ## Duas decisões que explicam quase tudo o resto
 
 **A elegibilidade falha fechada.** Muitos programas portugueses excluem pessoas
-singulares — o E-Lar destina-se apenas a municípios, IPSS e associações de moradores.
+singulares: há avisos destinados apenas a municípios, IPSS ou associações de moradores.
 Alertar um proprietário para um apoio a que não se pode candidatar custa-lhe uma tarde
 e custa-nos a credibilidade, por isso `admite_particulares` é um triestado e
 `desconhecido` bloqueia o alerta tal como `nao`. O apoio aparece no catálogo com o
