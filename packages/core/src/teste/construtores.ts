@@ -59,6 +59,28 @@ export function apoioSoParaEntidades(sobrepor: Partial<Apoio> = {}): Apoio {
   });
 }
 
+/**
+ * Closed to pessoas singulares, open to condomínios.
+ *
+ * Modelled on `04/C13-i01 — Programa de Apoio a Condomínios Residenciais`, a real
+ * Fundo Ambiental programme. It is the shape that exposed the gap: a homeowner
+ * cannot apply alone, and can apply through the building, and for a long time
+ * every gate in this codebase called that "not open to you".
+ */
+export function apoioParaCondominios(sobrepor: Partial<Apoio> = {}): Apoio {
+  return apoioDe({
+    id: "fund-condominios",
+    slug: "apoio-a-condominios-residenciais",
+    titulo: "Programa de Apoio a Condomínios Residenciais",
+    beneficiarios: ["condominio"],
+    admiteParticulares: "nao",
+    restricoesBeneficiario:
+      "Candidaturas apresentadas pelo condomínio, representado pelo administrador.",
+    medidas: ["bomba_calor", "solar_fotovoltaico"],
+    ...sobrepor,
+  });
+}
+
 export function perfilDe(sobrepor: Partial<PerfilUtilizador> = {}): PerfilUtilizador {
   const base: PerfilUtilizador = {
     userId: "user-1",

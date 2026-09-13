@@ -151,6 +151,90 @@ describe("decidir", () => {
     expect(d.motivoRevisao.join(" ")).toContain("prova_falhou");
   });
 
+  /**
+   * The condomínio door.
+   *
+   * `04/C13-i01 — Programa de Apoio a Condomínios Residenciais` is a real Fundo
+   * Ambiental programme: closed to pessoas singulares, open to the building. This
+   * gate used to call that not-alertable, so it could never reach an inbox — even
+   * the inbox of someone who had explicitly asked for condomínio alerts.
+   *
+   * Both sides stay explicit. The notice must NAME condomínios, and `corresponde()`
+   * still requires the person to have asked. `desconhecido` opens neither door.
+   */
+  it("alerta um aviso fechado a singulares mas aberto a condomínios", () => {
+    const e = extraccaoSolar();
+    const paraCondominios = {
+      ...e,
+      beneficiarios: {
+        ...e.beneficiarios,
+        tipos: { ...e.beneficiarios.tipos, valor: ["condominio" as const] },
+        admite_particulares: {
+          ...e.beneficiarios.admite_particulares,
+          valor: "nao" as const,
+        },
+      },
+    };
+    const d = decidir(
+      paraCondominios,
+      verificarProvas(paraCondominios, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.alertavel).toBe(true);
+    expect(d.motivoRevisao).toEqual([]);
+  });
+
+  it("continua a não alertar quando não admite nem singulares nem condomínios", () => {
+    // O caso E-Lar. Para um proprietário não há porta nenhuma, por via nenhuma.
+    const e = extraccaoSolar();
+    const soEntidades = {
+      ...e,
+      beneficiarios: {
+        ...e.beneficiarios,
+        tipos: {
+          ...e.beneficiarios.tipos,
+          valor: ["municipio" as const, "ipss" as const],
+        },
+        admite_particulares: {
+          ...e.beneficiarios.admite_particulares,
+          valor: "nao" as const,
+        },
+      },
+    };
+    const d = decidir(
+      soEntidades,
+      verificarProvas(soEntidades, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.alertavel).toBe(false);
+    expect(d.motivoRevisao.join(" ")).toContain("admite_particulares:nao");
+  });
+
+  it("não abre a porta do condomínio com elegibilidade desconhecida", () => {
+    // A porta exige uma afirmação positiva nos dois lados. `desconhecido` no
+    // `admite_particulares` com `condominio` nos tipos continua a ser incerteza,
+    // e incerteza nunca é permissão para enviar email.
+    const e = extraccaoSolar();
+    const incerta = {
+      ...e,
+      beneficiarios: {
+        ...e.beneficiarios,
+        tipos: { ...e.beneficiarios.tipos, valor: ["condominio" as const] },
+        admite_particulares: {
+          ...e.beneficiarios.admite_particulares,
+          valor: "desconhecido" as const,
+        },
+      },
+    };
+    const d = decidir(
+      incerta,
+      verificarProvas(incerta, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.alertavel).toBe(false);
+    expect(d.motivoRevisao.join(" ")).toContain("admite_particulares:desconhecido");
+  });
+
   /** Fails closed: "unclear" is not permission to email anyone. */
   it("não alerta quando a elegibilidade de particulares é desconhecida", () => {
     const e = extraccaoSolar();
