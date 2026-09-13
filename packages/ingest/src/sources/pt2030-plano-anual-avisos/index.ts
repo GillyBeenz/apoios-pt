@@ -1,5 +1,8 @@
-import type { Fonte } from "../tipos.ts";
+import type { ApoioNovo } from "@apoios/core";
+import type { ContextoDataset, Fonte } from "../tipos.ts";
 import { extrair } from "./extract.ts";
+import { lerPlanoAnual } from "./folha.ts";
+import { avisoPrevistoParaApoio } from "./paraApoio.ts";
 
 export const pt2030PlanoAnualAvisos: Fonte = {
   id: "pt2030-plano-anual-avisos",
@@ -19,4 +22,20 @@ export const pt2030PlanoAnualAvisos: Fonte = {
   // on a listing where it would hide a collapse from forty entries to one.
   candidatosMin: 1,
   extrair,
+
+  /**
+   * `folha.ts` has read all 211 planned notices out of this file since the source
+   * was added, and until now nothing called it. The pipeline dropped every `folha`
+   * candidate with a comment saying spreadsheets were "handled by their own
+   * deterministic parser" — which was true of the parser and false of the wiring.
+   * This is the wire.
+   */
+  lerDataset(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[] {
+    return lerPlanoAnual(bytes).map((a) =>
+      avisoPrevistoParaApoio(a, {
+        urlPlano: ctx.urlOrigem,
+        entidade: ctx.entidade,
+      }),
+    );
+  },
 };

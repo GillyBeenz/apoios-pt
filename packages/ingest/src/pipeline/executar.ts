@@ -3,6 +3,7 @@ import {
   diferenciar,
   resolverIdentidade,
   type Apoio,
+  type ApoioNovo,
   type Candidato,
   type EventoApoio,
 } from "@apoios/core";
@@ -85,6 +86,72 @@ function textoVisivel(html: string): string {
  * a listing page changes whenever any *one* of its forty entries does. Together
  * they are the difference between roughly $30 a month and roughly $600.
  */
+/**
+ * Resolve identity and write the fund, for a notice from any path.
+ *
+ * Shared by the model path and the dataset path so the two cannot drift. Identity
+ * is the part of this pipeline where a mistake is worst and least visible: a wrong
+ * merge inherits another fund's dedup ledger and silently stops that fund's
+ * subscribers from ever being alerted, and nothing downstream reports it.
+ */
+async function resolverEPersistir(
+  armazem: Armazem,
+  fonte: Fonte,
+  novo: ApoioNovo,
+  entrada: { readonly referenciaLegal: string | null; readonly url: string },
+): Promise<
+  | { readonly tipo: "novo"; readonly apoio: Apoio; readonly anterior: null }
+  | { readonly tipo: "existente"; readonly apoio: Apoio; readonly anterior: Apoio | null }
+  | { readonly tipo: "conflito"; readonly apoio: Apoio; readonly conflito: string }
+> {
+  const chaves = construirChaves({
+    sourceId: fonte.id,
+    referenciaLegal: entrada.referenciaLegal,
+    url: entrada.url,
+    titulo: novo.titulo,
+    anoAbertura: novo.abreEm.iso
+      ? new Date(novo.abreEm.iso).getUTCFullYear()
+      : null,
+  });
+
+  const existentes = await armazem.procurarIdentidades(
+    chaves.map((c) => c.valor),
+  );
+  const resolucao = resolverIdentidade(chaves, existentes);
+
+  if (resolucao.tipo === "novo") {
+    return {
+      tipo: "novo",
+      apoio: await armazem.criarApoio(novo, chaves),
+      anterior: null,
+    };
+  }
+
+  if (resolucao.tipo === "conflito") {
+    // Never merge. A wrong merge inherits the other fund's filled dedup ledger
+    // and silently stops that fund's subscribers from being alerted at all.
+    const bloqueado = {
+      ...novo,
+      needsReview: true,
+      alertavel: false,
+      motivoRevisao: [...novo.motivoRevisao, "conflito_identidade"],
+    };
+    return {
+      tipo: "conflito",
+      apoio: await armazem.actualizarApoio(resolucao.fundId, bloqueado),
+      conflito: `${novo.titulo}: chaves apontam para ${resolucao.fundIdsEmConflito.join(", ")}`,
+    };
+  }
+
+  const anterior = await armazem.obterApoio(resolucao.fundId);
+  await armazem.registarIdentidades(resolucao.fundId, resolucao.chavesEmFalta);
+  return {
+    tipo: "existente",
+    apoio: await armazem.actualizarApoio(resolucao.fundId, novo),
+    anterior,
+  };
+}
+
 export async function executarFonte(
   op: OpcoesExecucao,
 ): Promise<ResultadoExecucao> {
@@ -211,10 +278,68 @@ export async function executarFonte(
 
     if (resposta.erro !== null || resposta.naoModificado) continue;
 
-    // Spreadsheets are handled by their own deterministic parser, never here. Left
-    // to fall through, a .xlsx would be decoded as if it were text and sent to the
-    // model as mojibake — a paid call whose output could only be nonsense.
-    if (candidato.tipoDocumento === "folha") continue;
+    // --- 6b. Spreadsheets: read directly, no model call ----------------------
+    //
+    // Left to fall through, a .xlsx would be decoded as if it were text and sent
+    // to the model as mojibake — a paid call whose output could only be nonsense.
+    // Until now the guard against that was a bare `continue` and a comment saying
+    // spreadsheets were handled by their own parser. The parser existed, was
+    // tested, read all 211 planned notices — and nothing ever called it. The
+    // source has been `activa` and discarding its only candidate on every run
+    // since it was added.
+    if (candidato.tipoDocumento === "folha") {
+      const bytes = resposta.bytes;
+      if (bytes == null || fonte.lerDataset === undefined) continue;
+
+      const hashFolha = hashBytes(bytes);
+      if (anterior?.hashConteudo === hashFolha) continue;
+      if (op.simulacao) continue;
+
+      await armazem.guardarSnapshot(
+        candidato.urlDetalhe,
+        {
+          hashConteudo: hashFolha,
+          etag: resposta.etag,
+          lastModified: resposta.lastModified,
+          capturadoEm: agora.toISOString(),
+        },
+        bytes,
+      );
+
+      for (const novo of fonte.lerDataset(bytes, {
+        // The page the file hangs off, not the file: that is what a reader should
+        // be sent to, and it is what stays valid when the plan is re-published
+        // under a new filename.
+        urlOrigem: fonte.urlsEntrada[0] ?? candidato.urlDetalhe,
+        entidade: fonte.entidade,
+      })) {
+        const r = await resolverEPersistir(armazem, fonte, novo, {
+          referenciaLegal: novo.referenciaLegal,
+          url: novo.urlOficial,
+        });
+
+        if (r.tipo === "novo") {
+          apoiosNovos.push(r.apoio);
+          eventos.push(...diferenciar(null, r.apoio, agora.toISOString()));
+        } else if (r.tipo === "conflito") {
+          conflitos.push(r.conflito);
+          apoiosActualizados.push(r.apoio);
+        } else {
+          apoiosActualizados.push(r.apoio);
+          eventos.push(
+            ...diferenciar(r.anterior, r.apoio, agora.toISOString()),
+          );
+        }
+      }
+
+      // No `fund_extractions` row, deliberately: that table records what a model
+      // was asked and what it answered, and nothing here was asked of a model.
+      // Writing a row with a null model would make the extraction log a place
+      // where some entries mean "the model said so" and others mean "a column
+      // said so" — and the whole point of that table is telling those apart.
+      await armazem.marcarProcessado(candidato.urlDetalhe, hashFolha);
+      continue;
+    }
 
     const ehPdf = candidato.tipoDocumento === "pdf" || resposta.corpo === null;
     const hash = ehPdf
@@ -296,20 +421,10 @@ export async function executarFonte(
     });
 
     // --- 9. Identity resolution ---------------------------------------------
-    const chaves = construirChaves({
-      sourceId: fonte.id,
+    const resolucao = await resolverEPersistir(armazem, fonte, novo, {
       referenciaLegal: novo.referenciaLegal ?? candidato.referenciaLegalBruta,
       url: candidato.urlDetalhe,
-      titulo: novo.titulo,
-      anoAbertura: novo.abreEm.iso
-        ? new Date(novo.abreEm.iso).getUTCFullYear()
-        : null,
     });
-
-    const existentes = await armazem.procurarIdentidades(
-      chaves.map((c) => c.valor),
-    );
-    const resolucao = resolverIdentidade(chaves, existentes);
 
     // The audit trail, written for every extraction that produced a value —
     // including the ones whose evidence failed. Those are precisely the ones worth
@@ -334,42 +449,23 @@ export async function executarFonte(
     };
 
     // --- 10. Diff into events ------------------------------------------------
+    await registar(resolucao.apoio.id);
+
     if (resolucao.tipo === "novo") {
-      const apoio = await armazem.criarApoio(novo, chaves);
-      await registar(apoio.id);
-      apoiosNovos.push(apoio);
-      eventos.push(...diferenciar(null, apoio, agora.toISOString()));
+      apoiosNovos.push(resolucao.apoio);
+      eventos.push(...diferenciar(null, resolucao.apoio, agora.toISOString()));
       continue;
     }
 
     if (resolucao.tipo === "conflito") {
-      // Never merge. A wrong merge inherits the other fund's filled dedup ledger
-      // and silently stops that fund's subscribers from being alerted at all.
-      conflitos.push(
-        `${novo.titulo}: chaves apontam para ${resolucao.fundIdsEmConflito.join(", ")}`,
-      );
-      const bloqueado = {
-        ...novo,
-        needsReview: true,
-        alertavel: false,
-        motivoRevisao: [...novo.motivoRevisao, "conflito_identidade"],
-      };
-      apoiosActualizados.push(
-        await armazem.actualizarApoio(resolucao.fundId, bloqueado),
-      );
+      conflitos.push(resolucao.conflito);
+      apoiosActualizados.push(resolucao.apoio);
       continue;
     }
 
-    const anteriorApoio = await armazem.obterApoio(resolucao.fundId);
-    await armazem.registarIdentidades(
-      resolucao.fundId,
-      resolucao.chavesEmFalta,
-    );
-    const actualizado = await armazem.actualizarApoio(resolucao.fundId, novo);
-    await registar(actualizado.id);
-    apoiosActualizados.push(actualizado);
+    apoiosActualizados.push(resolucao.apoio);
     eventos.push(
-      ...diferenciar(anteriorApoio, actualizado, agora.toISOString()),
+      ...diferenciar(resolucao.anterior, resolucao.apoio, agora.toISOString()),
     );
   }
 
