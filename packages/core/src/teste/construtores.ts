@@ -66,18 +66,27 @@ export function apoioSoParaEntidades(sobrepor: Partial<Apoio> = {}): Apoio {
 }
 
 /**
- * Closed to pessoas singulares, open to condomínios.
+ * Closed to pessoas singulares, open to condomínios: a homeowner who cannot apply
+ * alone, and can apply through the building.
  *
- * Modelled on `04/C13-i01 — Programa de Apoio a Condomínios Residenciais`, a real
- * Fundo Ambiental programme. It is the shape that exposed the gap: a homeowner
- * cannot apply alone, and can apply through the building, and for a long time
- * every gate in this codebase called that "not open to you".
+ * Deliberately **hypothetical**, for the same reason as `apoioSoParaEntidades`.
+ * This fixture used to name `04/C13-i01 — Programa de Apoio a Condomínios
+ * Residenciais` and assert that a homeowner cannot apply to it alone. The real
+ * notice says the opposite in the propriedade-total case: "são elegíveis
+ * Condomínios Residenciais e os proprietários em nome individual no caso de
+ * edifícios em propriedade total". So the programme admits particulares, goes
+ * through the main door, and never exercises this shape at all.
+ *
+ * The shape itself is real — in propriedade horizontal the beneficiary is the
+ * condomínio, represented by the administrador — so the fixture and the gate it
+ * tests both stay. What goes is the claim about a named programme, which nothing
+ * in this test suite could ever have checked.
  */
 export function apoioParaCondominios(sobrepor: Partial<Apoio> = {}): Apoio {
   return apoioDe({
     id: "fund-condominios",
-    slug: "apoio-a-condominios-residenciais",
-    titulo: "Programa de Apoio a Condomínios Residenciais",
+    slug: "apoio-so-atraves-do-condominio",
+    titulo: "Apoio só através do condomínio",
     beneficiarios: ["condominio"],
     admiteParticulares: "nao",
     restricoesBeneficiario:

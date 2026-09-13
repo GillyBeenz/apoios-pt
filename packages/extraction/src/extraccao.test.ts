@@ -133,6 +133,49 @@ describe("decidir", () => {
     expect(d.confiancaGlobal).toBe("alta");
   });
 
+  /**
+   * A execução #36 publicou 2 de 56 apoios. Todos os outros 54 foram travados por
+   * `confianca_global = baixa`, e em 15 das 17 extracções o campo que a puxou para
+   * baixo foi o `dotacao_esgotada` — uma pergunta que os avisos não respondem.
+   */
+  it("publica mesmo sem saber se a dotação se esgotou", () => {
+    const e = extraccaoSolar();
+    const semSaberDaDotacao = {
+      ...e,
+      dotacao_esgotada: { ...e.dotacao_esgotada, confianca: "baixa" as const },
+    };
+    const d = decidir(
+      semSaberDaDotacao,
+      verificarProvas(semSaberDaDotacao, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.confiancaGlobal).toBe("alta");
+    expect(d.publicado).toBe(true);
+  });
+
+  /**
+   * O par do teste acima, e o mais importante dos dois: a excepção é de um campo
+   * só. Se isto passar a verde, a excepção deixou de ser uma excepção e o portão
+   * deixou de falhar fechado.
+   */
+  it("continua a não publicar quando é outro campo que está em baixa", () => {
+    const e = extraccaoSolar();
+    const semSaberDaAbertura = {
+      ...e,
+      prazos: {
+        ...e.prazos,
+        abertura: { ...e.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      semSaberDaAbertura,
+      verificarProvas(semSaberDaAbertura, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.confiancaGlobal).toBe("baixa");
+    expect(d.publicado).toBe(false);
+  });
+
   it("bloqueia alertas quando uma prova falha, mesmo com tudo o resto sólido", () => {
     const e = extraccaoSolar();
     const adulterada = {

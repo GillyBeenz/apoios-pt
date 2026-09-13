@@ -4,6 +4,7 @@ import type {
   ExtractorLike,
   ResultadoExtraccao,
 } from "@apoios/extraction";
+import { custoDaChamada } from "@apoios/extraction";
 import { extraccaoSolar } from "@apoios/extraction/teste";
 import { executarFonte } from "./executar.ts";
 import { ArmazemMemoria } from "./armazem.ts";
@@ -66,6 +67,13 @@ function extractorFixo(
         tokensEntrada: 20_000,
         tokensSaida: 3_000,
         tokensCacheLidos: 5_000,
+        tokensCacheEscritos: 0,
+        custoUsd: custoDaChamada("claude-opus-5", {
+          tokensEntrada: 20_000,
+          tokensSaida: 3_000,
+          tokensCacheLidos: 5_000,
+          tokensCacheEscritos: 0,
+        }),
         erro: null,
       };
     },
@@ -168,6 +176,13 @@ describe("executarFonte", () => {
           tokensEntrada: 20_000,
           tokensSaida: 0,
           tokensCacheLidos: 5_000,
+          tokensCacheEscritos: 0,
+          custoUsd: custoDaChamada("claude-opus-5", {
+            tokensEntrada: 20_000,
+            tokensSaida: 0,
+            tokensCacheLidos: 5_000,
+            tokensCacheEscritos: 0,
+          }),
           erro: "JSON não valida contra o esquema",
         };
       },

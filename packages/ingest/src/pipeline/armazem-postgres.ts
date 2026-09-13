@@ -380,8 +380,9 @@ export class ArmazemPostgres implements Armazem {
       `insert into fund_extractions
          (fund_id, modelo, prompt_version, schema_version, bruto,
           confianca_campos, evidencia_falhou, tokens_entrada, tokens_saida,
-          tokens_cache_lidos, stop_reason)
-       values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::text[], $8, $9, $10, $11)`,
+          tokens_cache_lidos, tokens_cache_escritos, custo_usd, stop_reason)
+       values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::text[], $8, $9, $10, $11,
+               $12, $13)`,
       [
         e.fundId,
         e.modelo,
@@ -393,6 +394,8 @@ export class ArmazemPostgres implements Armazem {
         e.tokensEntrada,
         e.tokensSaida,
         e.tokensCacheLidos,
+        e.tokensCacheEscritos,
+        e.custoUsd,
         e.stopReason,
       ],
       "guardarExtraccao",
