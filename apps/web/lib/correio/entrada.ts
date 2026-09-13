@@ -14,8 +14,20 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * that address has to receive mail for the crawler's self-identification to be
  * honest. `rgpd` is the RGPD contact point on /privacidade — a data subject who
  * writes there and gets a bounce has been denied a right, not inconvenienced.
+ *
+ * `entrar` is the Supabase SMTP sender: every sign-in and signup email leaves from
+ * entrar@appoios.guru. Somebody who cannot get in will reply to that email — it is
+ * the most natural thing to do, and for a while it was the one address whose
+ * replies we silently dropped. The person least able to reach us through the site
+ * was the person whose message we threw away.
  */
-export const ALIASES = ["contacto", "rgpd", "alertas", "abuso"] as const;
+export const ALIASES = [
+  "contacto",
+  "rgpd",
+  "alertas",
+  "abuso",
+  "entrar",
+] as const;
 
 /** Anything larger is not a message we forward; Resend's own cap is well under this. */
 export const MAX_CORPO_BYTES = 256 * 1024;
