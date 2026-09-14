@@ -16,5 +16,10 @@ export const pt2030AvisosListagem: Fonte = {
   // Zero candidatos numa fonte por verificar é o resultado esperado e não quer
   // dizer nada. Pôr aqui um piso agora era inventar um alarme sem saber o normal.
   candidatosMin: 0,
+  // A captura de 14/09/2026 resolveu a dúvida: 2,87 MB em bruto, 33 KB depois de
+  // limpo, 69 ligações — todas navegação — e zero avisos. O texto visível é o
+  // menu e o aviso de cookies. Esta página é montada no browser, tal como a do
+  // PRR, e nenhum extractor que leia o HTML do servidor vai encontrar ali nada.
+  renderizarNoNavegador: true,
   extrair,
 };
