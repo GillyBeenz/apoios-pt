@@ -41,9 +41,15 @@ export function avisoPrevistoParaApoio(
     resumo: resumoDe(a),
     programaPai: a.programa,
     entidadeGestora: opcoes.entidade,
-    // The plan's own notice code. The strongest identity key available here, and
-    // the one that survives the plan being revised and re-published.
-    referenciaLegal: a.id,
+    // Null, not the plan's row id.
+    //
+    // `referenciaLegal` means a legal reference — "AVISO 03/C13-I01/2024" — and
+    // `canonicalizarReferenciaLegal` rejects a bare number outright, so the id
+    // never became an identity key however it was stored. What it did do was put
+    // a value that is not a legal reference into the one column the whole identity
+    // system treats as authoritative. The id is not lost: it is in `urlOficial`,
+    // which is what actually distinguishes these rows.
+    referenciaLegal: null,
 
     // Always `previsto`, even when the planned opening date has passed.
     //

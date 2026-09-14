@@ -118,9 +118,21 @@ export type ResolucaoIdentidade =
  * the other's filled dedup ledger and its users then silently stop receiving
  * alerts — a failure with no visible symptom.
  */
+export interface OpcoesIdentidade {
+  /**
+   * May a `titulo_norm` match alone attach a candidate to an existing fund?
+   *
+   * True for listings, where it is what recognises a republication. False for
+   * datasets, where every row is a separate record and a shared title is a
+   * coincidence rather than a clue.
+   */
+  readonly fundirPorTitulo?: boolean;
+}
+
 export function resolverIdentidade(
   chaves: readonly ChaveIdentidade[],
   existentes: ReadonlyMap<string, string>,
+  opcoes?: OpcoesIdentidade,
 ): ResolucaoIdentidade {
   const encontrados = new Map<string, ChaveIdentidade[]>();
   const emFalta: ChaveIdentidade[] = [];
@@ -139,8 +151,35 @@ export function resolverIdentidade(
   if (encontrados.size === 0) return { tipo: "novo", chaves };
 
   if (encontrados.size === 1) {
-    const [fundId] = [...encontrados.keys()];
-    return { tipo: "existente", fundId: fundId!, chavesEmFalta: emFalta };
+    const [[fundId, correspondidas]] = [...encontrados.entries()] as [
+      [string, ChaveIdentidade[]],
+    ];
+
+    // In a dataset, a shared title is not evidence of a shared identity.
+    //
+    // `titulo_norm` is the weakest key and it earns its place on listings: a notice
+    // republished at a new URL, with no reference on either side, is recognisable
+    // only by its title, and there is a test in this file that says so.
+    //
+    // A dataset is the opposite case. Each row is a distinct record by
+    // construction, and the file itself is the authority on how many there are.
+    // The annual plan lists the same programme once per region — identical title,
+    // different row — and nine of its 211 notices were folded into seven
+    // survivors, each merge overwriting a real planned notice with another one and
+    // looking exactly like an ordinary update from the outside.
+    //
+    // So the weak key is refused only where it cannot mean what it means
+    // elsewhere, and only when the row's own URL is one no fund holds. Callers opt
+    // in; listings keep the behaviour they rely on.
+    if (
+      !(opcoes?.fundirPorTitulo ?? true) &&
+      correspondidas.every((c) => c.tipo === "titulo_norm") &&
+      emFalta.some((c) => c.tipo === "url_canonica")
+    ) {
+      return { tipo: "novo", chaves };
+    }
+
+    return { tipo: "existente", fundId, chavesEmFalta: emFalta };
   }
 
   // Several funds claimed. Attach to whichever holds the strongest key, but flag it.

@@ -49,6 +49,75 @@ describe("construirChaves", () => {
   });
 });
 
+describe("resolverIdentidade — título fraco contra referência nova", () => {
+  const chavesDe = (ref: string | null, url: string, titulo: string) =>
+    construirChaves({
+      sourceId: "pt2030-plano-anual-avisos",
+      referenciaLegal: ref,
+      url,
+      titulo,
+      anoAbertura: 2026,
+    });
+
+  /**
+   * The plan lists the same programme once per region: same title, different
+   * reference, different row. Nine of them were silently folded into seven
+   * survivors — each merge overwriting a real planned notice with another one,
+   * which downstream is indistinguishable from an ordinary update.
+   */
+  it("não funde dois avisos que só partilham o título", () => {
+    // No reference: the plan's row id is a row id, and
+    // `canonicalizarReferenciaLegal` rejects a bare number anyway. The URL is what
+    // tells these two apart, which is exactly the case the rule has to cover.
+    const primeiro = chavesDe(null, "https://p.pt/plano/?aviso=7914", "Medidas de adaptação");
+    const segundo = chavesDe(null, "https://p.pt/plano/?aviso=8084", "Medidas de adaptação");
+
+    const tituloDoPrimeiro = primeiro.find((c) => c.tipo === "titulo_norm")!;
+    const tituloDoSegundo = segundo.find((c) => c.tipo === "titulo_norm")!;
+    // Precondition: they really do collide on the weak key. Without this the test
+    // could pass while proving nothing.
+    expect(tituloDoSegundo.valor).toBe(tituloDoPrimeiro.valor);
+
+    const registado = new Map([[tituloDoPrimeiro.valor, "fund-7914"]]);
+    expect(
+      resolverIdentidade(segundo, registado, { fundirPorTitulo: false }).tipo,
+    ).toBe("novo");
+
+    // And the listing behaviour is untouched by the same input.
+    expect(resolverIdentidade(segundo, registado).tipo).toBe("existente");
+  });
+
+  /**
+   * The counterpart, and the reason the rule is narrow: the same document
+   * re-extracted later, this time yielding a reference it did not produce the
+   * first time. The URL still matches, so it is one notice and must stay one.
+   */
+  it("continua a juntar o mesmo documento quando o URL bate certo", () => {
+    const antes = chavesDe(null, "https://p.pt/aviso-x", "Apoio X");
+    const depois = chavesDe("AVISO 3/2026", "https://p.pt/aviso-x", "Apoio X");
+
+    const registado = new Map(antes.map((c) => [c.valor, "fund-x"]));
+    const r = resolverIdentidade(depois, registado, { fundirPorTitulo: false });
+    expect(r.tipo).toBe("existente");
+    if (r.tipo !== "existente") throw new Error("unreachable");
+    expect(r.fundId).toBe("fund-x");
+    // The reference is new, so it is recorded and strengthens every future match.
+    expect(r.chavesEmFalta.some((c) => c.tipo === "referencia_legal")).toBe(true);
+  });
+
+  /**
+   * A title match still merges when the URL is the one already on file — the
+   * ordinary case of seeing the same page again.
+   */
+  it("funde quando o título e o URL apontam ambos para o mesmo apoio", () => {
+    const a = chavesDe(null, "https://p.pt/a", "Apoio igual");
+    const registado = new Map(a.map((c) => [c.valor, "fund-a"]));
+    expect(
+      resolverIdentidade(a, registado, { fundirPorTitulo: false }).tipo,
+    ).toBe("existente");
+  });
+});
+
 describe("resolverIdentidade", () => {
   it("reconhece um aviso novo", () => {
     const r = resolverIdentidade(construirChaves(base), new Map());
