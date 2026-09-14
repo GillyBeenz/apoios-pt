@@ -710,7 +710,7 @@
   <!-- ================= 6. Depois da base de dados ================= -->
   <section>
     <p class="sub">O que vive na base de dados</p>
-    <h2>Seis tarefas que correm sozinhas</h2>
+    <h2>Sete tarefas que correm sozinhas</h2>
     <div class="leitura">
       <p>O pipeline escreve e vai-se embora. O que mantém o catálogo verdadeiro entre corridas são tarefas <code>pg_cron</code> dentro do próprio Postgres — incluindo o vigia, que está de propósito fora do sistema que vigia.</p>
     </div>
@@ -734,6 +734,11 @@
             <td class="id">assinalar-estados-incoerentes</td>
             <td class="id">06:30</td>
             <td>Apanha o que está marcado como encerrado com prazo no futuro.</td>
+          </tr>
+          <tr>
+            <td class="id">assinalar-conflitos-de-identidade</td>
+            <td class="id">aos :47</td>
+            <td>Um conflito é um apoio que a fonte tem e o catálogo não. Antes disto só existia num log que expira.</td>
           </tr>
           <tr>
             <td class="id">vigia-ingestao</td>
@@ -802,7 +807,7 @@
 
   <footer>
     <p>appoios.guru · monorepo apoios-pt · packages/core · packages/extraction · packages/ingest · apps/web<br>
-    supabase eu-west-1 · 17 tabelas · 6 tarefas pg_cron · 4 workflows<br>
+    supabase eu-west-1 · 17 tabelas · 7 tarefas pg_cron · 4 workflows<br>
     Página escrita a 14 de setembro de 2026.</p>
   </footer>
 

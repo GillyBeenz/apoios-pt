@@ -291,6 +291,17 @@ async function main(): Promise<number> {
         extraccoesFalhadas: m.extraccoesFalhadas,
         chamadasModelo: m.chamadasModelo,
         alarmes: alarmes.map((a) => `${a.gravidade}:${a.regra}`),
+        // Um conflito de identidade é um apoio que não entrou, e até agora só
+        // existia na consola: era impresso e não ia para lado nenhum. O `resumo`
+        // é o que fica em `ingest_runs`, por isso quem olhasse para a base de
+        // dados via uma corrida `ok` e nunca sabia que faltava um apoio — e o
+        // log do Actions, onde a linha estava mesmo, expira.
+        //
+        // Encontrado a ligar a fonte dos avisos do PT2030: a corrida leu cinco
+        // avisos e gravou quatro, e o quinto não deixou rasto em `funds`, em
+        // `fund_identities` nem em `alertas_operador`. Um apoio perdido em
+        // silêncio é o mesmo defeito do plano anual, noutro sítio.
+        conflitos: r.conflitos,
         erro: m.erro,
       });
 
