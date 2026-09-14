@@ -33,6 +33,16 @@ export const pt2030AvisosListagem: Fonte = {
   //
   // Por isso o browser fica desligado: a rota certa é o endpoint, não o HTML
   // renderizado, e é essa que a ronda seguinte vai seguir.
-  renderizarNoNavegador: false,
+  //
+  // Está `true` outra vez, e por pouco tempo. Saber que existe um
+  // `POST /wp-json/avisos/query` não chega para lá bater: falta o corpo que ele
+  // espera e a forma do que devolve, e nada disso se adivinha de fora. A captura
+  // passou a registar as duas coisas, por isso esta corrida serve para aprender o
+  // contrato — e assim que ele estiver escrito num ficheiro, isto volta a `false`
+  // e a fonte passa a falar directamente com o endpoint.
+  //
+  // O HTML de 3 MB que esta corrida produz não é para fundir. O que interessa é o
+  // `.rede.json` ao lado dele.
+  renderizarNoNavegador: true,
   extrair,
 };

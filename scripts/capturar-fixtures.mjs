@@ -255,7 +255,74 @@ async function renderizar(url) {
       // Só o que pode trazer dados. Imagens, tipos de letra e folhas de estilo
       // enchiam o registo sem dizer nada sobre onde estão os avisos.
       if (tipo === "xhr" || tipo === "fetch") {
-        pedidos.push({ metodo: r.method(), url: r.url(), tipo });
+        pedidos.push({
+          metodo: r.method(),
+          url: r.url(),
+          tipo,
+          // O corpo do pedido é metade do contrato e não se adivinha. Saber que
+          // existe um `POST /wp-json/avisos/query` não diz que filtros ele espera;
+          // isto diz.
+          corpo: r.postData() ?? null,
+        });
+      }
+    });
+
+    // A outra metade: o que o endpoint respondeu.
+    //
+    // Guardar corpos de resposta num repositório público pede cuidado, por isso a
+    // regra é estreita e está aqui escrita. Só se guarda o corpo quando:
+    //
+    //   1. o pedido vai para o MESMO host da página — o que exclui à partida
+    //      coisas como o `hub.digitalfundos.pt/api/auth/session` que a página do
+    //      PT2030 também chama, e que é exactamente o género de resposta que não
+    //      pode entrar num commit;
+    //   2. o caminho não parece de autenticação (`auth`, `session`, `token`,
+    //      `login`, `user`, `me`);
+    //   3. o tipo de conteúdo é JSON;
+    //   4. cabe no limite abaixo.
+    //
+    // As que não passam ficam registadas com o motivo, em vez de desaparecerem
+    // caladas: um pedido omitido sem explicação parece um pedido que não existiu.
+    const LIMITE_CORPO = 512 * 1024;
+    const CAMINHO_SENSIVEL = /\b(auth|session|token|login|logout|user|users|me|account)\b/i;
+    const respostas = [];
+    pagina.on("response", async (r) => {
+      const pedido = r.request();
+      const tipo = pedido.resourceType();
+      if (tipo !== "xhr" && tipo !== "fetch") return;
+
+      const alvo = new URL(r.url());
+      const contentType = r.headers()["content-type"] ?? "";
+      const base = { url: r.url(), status: r.status(), contentType };
+
+      if (alvo.host !== new URL(url).host) {
+        respostas.push({ ...base, corpo: null, omitido: "outro host" });
+        return;
+      }
+      if (CAMINHO_SENSIVEL.test(alvo.pathname)) {
+        respostas.push({ ...base, corpo: null, omitido: "caminho de autenticação" });
+        return;
+      }
+      if (!/json/i.test(contentType)) {
+        respostas.push({ ...base, corpo: null, omitido: "não é JSON" });
+        return;
+      }
+
+      try {
+        const texto = await r.text();
+        if (texto.length > LIMITE_CORPO) {
+          respostas.push({
+            ...base,
+            corpo: null,
+            omitido: `${texto.length} bytes, acima do limite de ${LIMITE_CORPO}`,
+          });
+          return;
+        }
+        respostas.push({ ...base, corpo: texto });
+      } catch (erro) {
+        // Uma resposta já consumida pela página não se lê outra vez. Dizer isso é
+        // melhor do que deixar a linha de fora.
+        respostas.push({ ...base, corpo: null, omitido: `ilegível: ${erro.message}` });
       }
     });
 
@@ -270,6 +337,7 @@ async function renderizar(url) {
       status: resposta?.status() ?? 0,
       html,
       pedidos,
+      respostas,
       // Quanto texto visível ficou depois de o JavaScript correr. É o número que
       // diz se valeu a pena: a captura anterior, sem browser, deu 1514 caracteres
       // de navegação e mais nada.
@@ -321,14 +389,20 @@ async function capturarFonte(fonte, dirRaiz) {
         const ficheiroRede = nomeSeguro(render.url, ".rede.json");
         await writeFile(
           join(dirStaging, ficheiroRede),
-          JSON.stringify(render.pedidos, null, 2),
+          JSON.stringify(
+            { pedidos: render.pedidos, respostas: render.respostas },
+            null,
+            2,
+          ),
           "utf8",
         );
         bytesTotais += Buffer.byteLength(render.html);
         resumo.push(
           `- ${render.url}\n  RENDERIZADO status ${render.status}, ` +
             `${render.caracteresVisiveis} caracteres visíveis, ` +
-            `${render.pedidos.length} pedido(s) de dados → ${ficheiroRede}`,
+            `${render.pedidos.length} pedido(s) de dados, ` +
+            `${render.respostas.filter((r) => r.corpo !== null).length} com corpo guardado ` +
+            `→ ${ficheiroRede}`,
         );
         entradas.push({
           url: render.url,
