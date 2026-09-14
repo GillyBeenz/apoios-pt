@@ -103,6 +103,52 @@ describe("correspondeAosFiltros", () => {
     expect(correspondeAosFiltros(apoioDe(), FILTROS_PREDEFINIDOS)).toBe(true);
   });
 
+  /**
+   * Medido antes de mexer: seleccionar «fechados» devolvia 6 apoios de 53. O
+   * teste do `estados` estava certo; o do `needsReview` corria antes dele e
+   * tirava 21 pelo caminho.
+   *
+   * O portão do «por rever» protege quem pode agir sobre um aviso: uma extracção
+   * de que não temos a certeza não deve ser oferecida como se tivéssemos. Pedir
+   * os encerrados é outra pergunta — já não há candidatura a fazer — e esconder
+   * a maior parte deles responde «mostra-me o que fechou» com uma fracção do que
+   * fechou.
+   */
+  it("mostra os encerrados por rever quando só se pedem encerrados", () => {
+    const porRever = apoioDe({ estado: "encerrado", needsReview: true });
+    const soFechados = { ...FILTROS_PREDEFINIDOS, estados: ["encerrado" as const] };
+    expect(correspondeAosFiltros(porRever, soFechados)).toBe(true);
+  });
+
+  /**
+   * O par do teste acima. Misturar aberto com encerrado volta a ser uma pergunta
+   * de quem procura algo a que se candidatar, e aí o aviso serve para alguma
+   * coisa.
+   */
+  it("volta a esconder o por rever assim que se pede também aberto", () => {
+    const porRever = apoioDe({ estado: "encerrado", needsReview: true });
+    const misto = {
+      ...FILTROS_PREDEFINIDOS,
+      estados: ["aberto" as const, "encerrado" as const],
+    };
+    expect(correspondeAosFiltros(porRever, misto)).toBe(false);
+  });
+
+  /** `suspenso` pode reabrir, por isso não é terminal. */
+  it("não trata suspenso como terminado", () => {
+    const porRever = apoioDe({ estado: "suspenso", needsReview: true });
+    const soSuspensos = { ...FILTROS_PREDEFINIDOS, estados: ["suspenso" as const] };
+    expect(correspondeAosFiltros(porRever, soSuspensos)).toBe(false);
+  });
+
+  /** Sem estados escolhidos não há pedido nenhum — é a vista por omissão. */
+  it("uma lista de estados vazia não abre a porta ao por rever", () => {
+    const porRever = apoioDe({ estado: "encerrado", needsReview: true });
+    expect(
+      correspondeAosFiltros(porRever, { ...FILTROS_PREDEFINIDOS, estados: [] }),
+    ).toBe(false);
+  });
+
   it("esconde por omissão os avisos por rever", () => {
     const porRever = apoioDe({ needsReview: true });
     expect(correspondeAosFiltros(porRever, FILTROS_PREDEFINIDOS)).toBe(false);
