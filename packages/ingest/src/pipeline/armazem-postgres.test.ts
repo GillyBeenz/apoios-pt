@@ -129,6 +129,24 @@ describe("a ingestão escreve mesmo", () => {
     expect(cli).not.toMatch(/process\.env\.[A-Z_]*SERVICE_ROLE/i);
   });
 
+  /**
+   * `actualizado_em` cannot be carried by `paraLinha`: `ApoioNovo` omits it by
+   * type, so `colunasDe` never puts it in the UPDATE. It has to be pushed by
+   * hand, next to `visto_pela_ultima_vez`, or the column that says when a fund
+   * last changed keeps answering with the day it was first seen.
+   *
+   * That is worse than having no column, because it is believed: a publication
+   * flag flipped one morning while the row still read the previous night, and
+   * the stale timestamp was enough to rule out the run that had actually done it.
+   */
+  it("carimba a actualização, e não só a última vez que viu o apoio", () => {
+    const armazem = semComentarios(
+      ler("packages/ingest/src/pipeline/armazem-postgres.ts"),
+    );
+    expect(armazem).toContain('atribuicoes.push("visto_pela_ultima_vez = now()")');
+    expect(armazem).toContain('atribuicoes.push("actualizado_em = now()")');
+  });
+
   it("verifica o certificado do servidor, fornecendo a CA em vez de desligar a verificação", () => {
     // Execução #13 falhou aqui com SELF_SIGNED_CERT_IN_CHAIN. A resposta que se
     // encontra por toda a parte é `rejectUnauthorized: false`, e é a troca

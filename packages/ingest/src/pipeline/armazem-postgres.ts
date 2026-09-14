@@ -459,6 +459,19 @@ export class ArmazemPostgres implements Armazem {
 
     const atribuicoes = colunas.map((c, i) => `${c} = $${i + 2}`);
     atribuicoes.push("visto_pela_ultima_vez = now()");
+    // Both, and for different reasons. `visto_pela_ultima_vez` says the source
+    // still lists this notice; `actualizado_em` says something about it changed.
+    //
+    // Neither can come from `paraLinha`: `ApoioNovo` omits both by type, so
+    // `colunasDe` never puts them in the UPDATE. `actualizado_em` was therefore
+    // never written after creation, and the column that says when a fund last
+    // changed was answering with the day it was first seen.
+    //
+    // That is worse than having no column, because it is believed. A publication
+    // flag flipped this morning while the row still read 23:20 the night before,
+    // and the stale timestamp was enough to rule out the run that had actually
+    // done it.
+    atribuicoes.push("actualizado_em = now()");
 
     const linhas = await this.#consulta<Record<string, unknown>>(
       `update funds set ${atribuicoes.join(", ")}
