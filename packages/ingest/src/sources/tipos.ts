@@ -48,6 +48,25 @@ export interface Fonte {
   ehPaginaDeErro?(html: string, urlFinal: string): boolean;
 
   /**
+   * Render this source's entry pages in a browser before capturing them.
+   *
+   * Only the **capture** uses this, never the pipeline. The distinction matters
+   * and this repository had it wrong: the note on `prr-candidaturas` rejected a
+   * headless browser because «every extractor here is pure and testable offline
+   * against a committed fixture, and that property is worth more than this one
+   * listing».
+   *
+   * The property is real and worth keeping — but a browser in the capture does
+   * not cost it. The fixture that lands is still a static file, and the extractor
+   * that reads it is still pure and still runs offline with no network at all.
+   * What changes is only how the bytes got into the file: `fetch` for a page the
+   * server renders, a browser for one the server leaves empty.
+   *
+   * Costs real time and a Chromium download, so it stays opt-in per source.
+   */
+  readonly renderizarNoNavegador?: boolean;
+
+  /**
    * Pure. No fetch, no fs, no Date.now — everything time-dependent arrives via
    * `ctx`. This is what makes every extractor unit-testable against a committed
    * fixture in an environment with no network at all.

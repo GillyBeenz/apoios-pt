@@ -30,5 +30,13 @@ export const prrCandidaturas: Fonte = {
   cadenciaHoras: 24,
   estado: "em-captura",
   candidatosMin: 0,
+  // A página é montada no browser — o `content.rendered` do WordPress tem zero
+  // bytes, e a prova está em comum/fixtures-permanentes/prr-pagina-20182-vazia.json.
+  //
+  // O comentário acima dizia que chegar lá exigiria abdicar da pureza dos
+  // extractores. Não exige: o browser vive na captura, o fixture continua a ser
+  // um ficheiro estático, e o extractor que o lê continua puro e a correr sem
+  // rede. Muda só como é que os bytes entraram no ficheiro.
+  renderizarNoNavegador: true,
   extrair,
 };
