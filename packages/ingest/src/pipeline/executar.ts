@@ -117,7 +117,12 @@ async function resolverEPersistir(
   const existentes = await armazem.procurarIdentidades(
     chaves.map((c) => c.valor),
   );
-  const resolucao = resolverIdentidade(chaves, existentes);
+  const resolucao = resolverIdentidade(chaves, existentes, {
+    // A dataset row is a record, not a page. Two rows sharing a title share a
+    // programme name, not an identity — see the annual plan, which lists the same
+    // programme once per region.
+    fundirPorTitulo: fonte.tipo !== "dataset",
+  });
 
   if (resolucao.tipo === "novo") {
     return {
