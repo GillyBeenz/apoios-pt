@@ -529,3 +529,31 @@ describe("limite de detalhes por execução", () => {
     expect(r.metricas.candidatosIgnorados).toBe(N - 1);
   });
 });
+
+/**
+ * O resumo gravado tem de levar os conflitos.
+ *
+ * `cli.ts` monta o objecto que fica em `ingest_runs.resumo`, e a função
+ * `assinalar_conflitos_de_identidade()` lê os conflitos de lá para levantar um
+ * alerta de operador. Se o campo desaparecer do resumo, o alerta deixa de
+ * disparar — e deixa de disparar em silêncio, que é exactamente o defeito que
+ * ele existe para corrigir.
+ *
+ * Isto não testa o `cli.ts` (que é um ponto de entrada com efeitos), testa o
+ * contrato de que ele depende: `executar()` devolve `conflitos`, e devolve-o
+ * como lista.
+ */
+describe("contrato do resumo", () => {
+  it("devolve sempre uma lista de conflitos, mesmo vazia", async () => {
+    const buscador = new BuscadorMemoria().definir(URL_LISTAGEM, {
+      corpo: "<html><body></body></html>",
+    });
+    const r = await executarFonte(contexto(buscador, new ArmazemMemoria()));
+
+    // Vazia, e é esse o ponto: o campo tem de existir mesmo quando não há
+    // conflito nenhum, senão o `resumo` grava-o só às vezes e a função do
+    // Postgres passa a ler um caminho que não sabe que existe.
+    expect(Array.isArray(r.conflitos)).toBe(true);
+    expect(r.conflitos).toEqual([]);
+  });
+});
