@@ -33,9 +33,43 @@ function intersecta<T>(a: readonly T[], b: readonly T[]): boolean {
  * anything. Empty arrays mean "no constraint" rather than "match nothing" — an
  * unset filter must never silently empty the page.
  */
+/**
+ * States from which nothing can be applied for any more.
+ *
+ * `suspenso` is not one: a suspended notice can reopen, so someone reading it is
+ * still a potential applicant and the review gate still earns its keep.
+ */
+const ESTADOS_TERMINAIS: readonly EstadoApoio[] = ["encerrado"];
+
+/**
+ * Is the user explicitly asking only for things that are over?
+ *
+ * An empty `estados` means "no constraint", which is the default catalogue view —
+ * not a request for history.
+ */
+function soPedeTerminados(f: FiltrosApoio): boolean {
+  return (
+    f.estados.length > 0 &&
+    f.estados.every((e) => ESTADOS_TERMINAIS.includes(e))
+  );
+}
+
 export function correspondeAosFiltros(apoio: Apoio, f: FiltrosApoio): boolean {
   if (!apoio.publicado) return false;
-  if (!f.incluirPorRever && apoio.needsReview) return false;
+
+  // The review gate protects someone who might act on a notice: an extraction we
+  // are unsure about must not be offered as though we were confident. Asking for
+  // closed notices is a different question — there is nothing left to apply to,
+  // so the reason to hide them mostly evaporates, and hiding them instead
+  // answers "show me what closed" with a fraction of what closed.
+  //
+  // Measured before changing it: selecting closed returned 6 of 53 funds. The
+  // `estados` test itself was right; this line ran before it and removed 21.
+  //
+  // The badge stays. Not showing it at all is what was wrong, not the warning.
+  if (!f.incluirPorRever && !soPedeTerminados(f) && apoio.needsReview) {
+    return false;
+  }
   if (f.medidas.length > 0 && !intersecta(apoio.medidas, f.medidas)) return false;
   if (f.estados.length > 0 && !f.estados.includes(apoio.estado)) return false;
   if (f.beneficiarios.length > 0 && !intersecta(apoio.beneficiarios, f.beneficiarios)) {
