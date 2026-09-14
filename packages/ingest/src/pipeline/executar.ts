@@ -415,6 +415,7 @@ export async function executarFonte(
       resultado.extraccao,
       verificacao,
       resultado.stopReason,
+      agora.toISOString().slice(0, 10),
     );
     if (decisao.needsReview) extraccoesRevisao++;
     else extraccoesOk++;

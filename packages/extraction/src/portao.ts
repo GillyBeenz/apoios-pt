@@ -40,6 +40,16 @@ export function decidir(
   e: Extraccao,
   v: ResultadoVerificacao,
   stopReason: string | null,
+  /**
+   * Today, as YYYY-MM-DD, for the `encerrado`-with-a-future-deadline check.
+   *
+   * Optional, and omitting it skips that one check rather than falling back to
+   * the wall clock. Every extractor in this repo is pure for a reason: a
+   * function that reads `Date.now()` cannot be tested against a fixture without
+   * the fixture rotting. The callers that have a date pass it; the ones that
+   * genuinely have none get a gate that says so by doing nothing.
+   */
+  hoje?: string,
 ): Decisao {
   const motivos: string[] = [];
 
@@ -106,6 +116,28 @@ export function decidir(
   // exigir `alta` em estado, prazo de encerramento e admite_particulares para
   // *alertar*, e este campo nunca lá esteve. O que muda é só o direito a aparecer
   // no catálogo, com a fonte oficial ao lado, que é melhor do que não aparecer.
+  // `encerrado` com um prazo que ainda não chegou.
+  //
+  // As duas coisas não podem ser verdade ao mesmo tempo, e a diferença custa
+  // dinheiro a quem lê: um apoio dado por fechado desaparece do catálogo, e se o
+  // prazo é daqui a nove dias então havia ali uma candidatura por fazer. Foi
+  // exactamente isto que se encontrou em produção — `fecha_em = 2026-09-23` numa
+  // linha marcada `encerrado` a 14 de setembro.
+  //
+  // Só assinala, nunca corrige. Um aviso pode mesmo fechar antes do prazo quando
+  // a dotação se esgota, por isso a data não é automaticamente a melhor
+  // testemunha; e trocar o estado com base no relógio seria substituir um erro
+  // possível por outro, sem ninguém dar por nenhum dos dois.
+  const prazoFinal = e.prazos.encerramento.valor.data_iso;
+  if (
+    hoje !== undefined &&
+    e.estado.valor === "encerrado" &&
+    prazoFinal !== null &&
+    prazoFinal > hoje
+  ) {
+    motivos.push(`estado_incoerente:encerrado_com_prazo_${prazoFinal}`);
+  }
+
   const confiancas = [...v.confiancaEfectiva.entries()]
     .filter(([campo]) => !CAMPOS_FORA_DA_CONFIANCA_GLOBAL.has(campo))
     .map(([, confianca]) => confianca);
