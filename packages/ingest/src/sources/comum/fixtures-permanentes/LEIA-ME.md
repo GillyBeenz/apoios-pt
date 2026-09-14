@@ -43,3 +43,22 @@ https://portugal2030.pt/wp-json/avisos/query` devolve os avisos em JSON. A pági
 renderizada também os mostra, mas custa 3 MB numa linha só para 4417 caracteres
 úteis. O endpoint é a rota certa, e este ficheiro é onde ela ficou registada antes
 de alguém a implementar.
+
+## `pt2030-avisos-query-contrato.json` e `...-resposta.json`
+
+O passo seguinte àquele ficheiro de pedidos: não só *que* endpoint a página chama,
+mas **o que lhe manda e o que recebe de volta**.
+
+Saber que existe um `POST /wp-json/avisos/query` não chega para lá bater. Falta o
+corpo — que é `application/x-www-form-urlencoded` com `estadoAvisoId`, vinte e três
+`programaId[]` e dois campos de ordenação — e falta a forma da resposta. Nenhuma das
+duas coisas se adivinha de fora, e tentar adivinhar custa uma ronda de tentativa e
+erro contra um servidor que não é nosso.
+
+O `-contrato.json` tem o pedido tal como a página o enviou, em bruto e descodificado,
+com as três coisas que ainda não se sabem escritas como notas: o que valem os outros
+`estadoAvisoId`, e se há paginação (esta resposta trouxe cinco avisos e nenhum
+parâmetro de página foi observado).
+
+O `-resposta.json` é a resposta inteira, real, de 14/09/2026. Serve de fixture ao
+extractor: é contra ela que ele é escrito e testado, sem rede.

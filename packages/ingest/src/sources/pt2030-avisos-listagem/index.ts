@@ -33,6 +33,23 @@ export const pt2030AvisosListagem: Fonte = {
   //
   // Por isso o browser fica desligado: a rota certa é o endpoint, não o HTML
   // renderizado, e é essa que a ronda seguinte vai seguir.
+  //
+  // A corrida que faltava já foi: o contrato está escrito, e o browser não tem
+  // mais nada a ensinar aqui.
+  //
+  //   POST https://portugal2030.pt/wp-json/avisos/query
+  //   Content-Type: application/x-www-form-urlencoded
+  //   estadoAvisoId=7 & programaId[]×23 & order_by_field=publicacao
+  //                                     & order_by_direction=desc
+  //
+  // devolve `{ status, avisos: [{ aviso, estrutura, calendario, documentos }] }`,
+  // com código, designação, datas de publicação/início/fim e os PDFs de cada
+  // aviso. É melhor do que a página em todos os sentidos: 27 KB de JSON estruturado
+  // contra 3 MB de HTML de onde tudo teria de ser raspado.
+  //
+  // O pedido e a resposta reais estão em comum/fixtures-permanentes/
+  // pt2030-avisos-query-contrato.json e ...-resposta.json — não são uma
+  // reconstrução, são o que a página enviou e recebeu a 14/09/2026.
   renderizarNoNavegador: false,
   extrair,
 };

@@ -1,0 +1,60 @@
+{
+  "observado_em": "2026-09-14",
+  "como": "Captura com Chromium da página https://portugal2030.pt/avisos/ (corrida 20 do capturar-fixtures.yml). O corpo abaixo é o que a própria página enviou, não uma reconstrução.",
+  "pedido": {
+    "metodo": "POST",
+    "url": "https://portugal2030.pt/wp-json/avisos/query",
+    "tipo_conteudo": "application/x-www-form-urlencoded",
+    "corpo_bruto": "estadoAvisoId=7&programaId%5B%5D=100&programaId%5B%5D=101&programaId%5B%5D=102&programaId%5B%5D=103&programaId%5B%5D=104&programaId%5B%5D=105&programaId%5B%5D=106&programaId%5B%5D=107&programaId%5B%5D=108&programaId%5B%5D=109&programaId%5B%5D=110&programaId%5B%5D=111&programaId%5B%5D=112&programaId%5B%5D=113&programaId%5B%5D=114&programaId%5B%5D=115&programaId%5B%5D=116&programaId%5B%5D=117&programaId%5B%5D=118&programaId%5B%5D=119&programaId%5B%5D=120&programaId%5B%5D=121&programaId%5B%5D=122&NUTSIIId=&fundoId=&tipoAvisoId=&tipoModalidadeApresentacaoCandidaturaId=&order_by_field=publicacao&order_by_direction=desc",
+    "corpo_decodificado": {
+      "estadoAvisoId": [
+        "7"
+      ],
+      "programaId[]": [
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "110",
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "120",
+        "121",
+        "122"
+      ],
+      "order_by_field": [
+        "publicacao"
+      ],
+      "order_by_direction": [
+        "desc"
+      ]
+    }
+  },
+  "notas": [
+    "estadoAvisoId=7 é o filtro que a página usa para a sua vista inicial. Não se sabe o que valem os outros valores; descobri-lo exige outra captura com o filtro mudado.",
+    "programaId[] traz 23 identificadores, um por programa operacional. Enviar a lista inteira é o que a página faz e é o que devolve tudo.",
+    "Não se observou nenhum parâmetro de paginação. A resposta trouxe 5 avisos; se houver mais, virão por um pedido que esta captura não provocou."
+  ],
+  "resposta": {
+    "status_http": 200,
+    "tipo_conteudo": "application/json; charset=UTF-8",
+    "forma": {
+      "status": "int, 201 nesta resposta — do próprio corpo, não o HTTP",
+      "avisos": "lista; cada item tem aviso, estrutura, calendario, documentos"
+    },
+    "avisos_devolvidos": 5
+  }
+}
