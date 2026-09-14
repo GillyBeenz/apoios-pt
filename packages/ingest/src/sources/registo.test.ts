@@ -39,18 +39,38 @@ describe("registo de fontes", () => {
         manifesto.entradas ?? [];
 
       let melhor = 0;
-      for (const url of f.urlsEntrada) {
-        const entrada = entradas.find((e) => e.url === url);
-        if (entrada === undefined || !/\.html$/i.test(entrada.ficheiro))
-          continue;
-        const html = readFileSync(join(dir, entrada.ficheiro), "utf8");
-        const n = f.extrair(html, { urlBase: url, agora: AGORA }).length;
-        melhor = Math.max(melhor, n);
+
+      // Uma fonte cuja entrada já é o conjunto de dados prova-se da mesma maneira,
+      // com a mesma exigência: o `lerDataset` corre sobre a captura dela própria e
+      // tem de render o piso. O que muda é só qual é a função que se põe à prova —
+      // o `extrair` dessas fontes devolve lista vazia por construção, e usá-lo
+      // aqui era dar-lhes um exame que passam sem saber a matéria.
+      if (f.entradaEDataset === true) {
+        for (const pedido of f.pedidosEntrada ?? []) {
+          const entrada = entradas.find((e) => e.url === pedido.url);
+          if (entrada === undefined) continue;
+          const bytes = readFileSync(join(dir, entrada.ficheiro));
+          const n =
+            f.lerDataset?.(new Uint8Array(bytes), {
+              urlOrigem: pedido.url,
+              entidade: f.entidade,
+            }).length ?? 0;
+          melhor = Math.max(melhor, n);
+        }
+      } else {
+        for (const url of f.urlsEntrada) {
+          const entrada = entradas.find((e) => e.url === url);
+          if (entrada === undefined || !/\.html$/i.test(entrada.ficheiro))
+            continue;
+          const html = readFileSync(join(dir, entrada.ficheiro), "utf8");
+          const n = f.extrair(html, { urlBase: url, agora: AGORA }).length;
+          melhor = Math.max(melhor, n);
+        }
       }
 
       expect(
         melhor,
-        `${f.id}: o extractor devolve ${melhor} da sua própria captura`,
+        `${f.id}: devolve ${melhor} da sua própria captura`,
       ).toBeGreaterThanOrEqual(f.candidatosMin);
     }
   });
