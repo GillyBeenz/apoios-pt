@@ -30,13 +30,22 @@ export const prrCandidaturas: Fonte = {
   cadenciaHoras: 24,
   estado: "em-captura",
   candidatosMin: 0,
-  // A página é montada no browser — o `content.rendered` do WordPress tem zero
-  // bytes, e a prova está em comum/fixtures-permanentes/prr-pagina-20182-vazia.json.
+  // Esteve `true` durante uma captura, para responder a uma pergunta concreta:
+  // se a página é montada no browser, o browser encontra os avisos?
   //
-  // O comentário acima dizia que chegar lá exigiria abdicar da pureza dos
-  // extractores. Não exige: o browser vive na captura, o fixture continua a ser
-  // um ficheiro estático, e o extractor que o lê continua puro e a correr sem
-  // rede. Muda só como é que os bytes entraram no ficheiro.
-  renderizarNoNavegador: true,
+  // Encontra nada. A captura de 14/09/2026 correu a página num Chromium a sério e
+  // trouxe **1568 caracteres visíveis** contra os 1514 de um `fetch` simples — 54
+  // caracteres de diferença, todos do aviso de cookies. Os únicos pedidos de rede
+  // que a página faz são telemetria (`analytics.google.com` e um endpoint de
+  // eventos), registados em comum/fixtures-permanentes/prr-candidaturas-pedidos-de-dados.json.
+  //
+  // Não há aqui dados a montar: nem no `content.rendered` do WordPress (zero
+  // bytes), nem no HTML do servidor, nem depois de o JavaScript correr, nem em
+  // nenhum pedido que a página faça. Voltar a ligar o browser custa minutos de
+  // captura e 3 MB de fixture por zero avisos, por isso fica desligado — e fica
+  // escrito porquê, para a pergunta não voltar a ser feita às cegas.
+  //
+  // O valor desta fonte está no PDF do plano de avisos, que já é lido.
+  renderizarNoNavegador: false,
   extrair,
 };

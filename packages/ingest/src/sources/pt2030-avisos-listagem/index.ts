@@ -20,6 +20,19 @@ export const pt2030AvisosListagem: Fonte = {
   // limpo, 69 ligações — todas navegação — e zero avisos. O texto visível é o
   // menu e o aviso de cookies. Esta página é montada no browser, tal como a do
   // PRR, e nenhum extractor que leia o HTML do servidor vai encontrar ali nada.
-  renderizarNoNavegador: true,
+  //
+  // A captura seguinte correu-a num Chromium e aí sim: 4417 caracteres visíveis,
+  // os avisos lá estão. Mas o ficheiro que isso produz são 3 MB numa linha só,
+  // quase tudo JavaScript, para 4417 caracteres úteis — uma fixture que ninguém
+  // consegue rever num diff e que muda de hash a cada `deploy` do sítio.
+  //
+  // O browser mostrou também de onde vêm os avisos, e é muito melhor do que a
+  // página: `POST https://portugal2030.pt/wp-json/avisos/query` devolve-os em
+  // JSON. Os pedidos observados estão em
+  // comum/fixtures-permanentes/pt2030-avisos-pedidos-de-dados.json.
+  //
+  // Por isso o browser fica desligado: a rota certa é o endpoint, não o HTML
+  // renderizado, e é essa que a ronda seguinte vai seguir.
+  renderizarNoNavegador: false,
   extrair,
 };
