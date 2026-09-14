@@ -1,0 +1,19 @@
+{
+  "sourceId": "pt2030-avisos-listagem",
+  "capturadoEm": "2026-09-14T16:41:26.084Z",
+  "erro": null,
+  "entradas": [
+    {
+      "url": "https://portugal2030.pt/avisos/",
+      "ficheiro": "pagina-0b6a9cf036.html",
+      "status": 200,
+      "contentType": "text/html",
+      "etag": null,
+      "lastModified": null,
+      "renderizado": true,
+      "caracteresVisiveis": 4417,
+      "pedidosDeDados": "pagina-0b6a9cf036.rede.json",
+      "capturadoEm": "2026-09-14T16:41:26.084Z"
+    }
+  ]
+}
