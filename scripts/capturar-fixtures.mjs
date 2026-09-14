@@ -229,6 +229,59 @@ async function permitido(urlBase, caminho) {
   }
 }
 
+/**
+ * Render a page in a headless browser and report what it asked the network for.
+ *
+ * For pages the server leaves empty. `recuperarportugal.gov.pt/candidaturas-prr/`
+ * is the case that forced this: its WordPress `content.rendered` is zero bytes
+ * (evidence in comum/fixtures-permanentes/prr-pagina-20182-vazia.json), so the
+ * listing exists only after JavaScript has run.
+ *
+ * The request log is the more valuable half. If the page fetches its notices from
+ * a JSON endpoint, that endpoint is a better source than the rendered DOM — plain
+ * `fetch`, no browser, no rendering time — and this is how we find out. The
+ * browser is a way in; the log is a way to stop needing one.
+ */
+async function renderizar(url) {
+  const { chromium } = await import("playwright");
+  const navegador = await chromium.launch();
+  try {
+    const contexto = await navegador.newContext({ userAgent: USER_AGENT });
+    const pagina = await contexto.newPage();
+
+    const pedidos = [];
+    pagina.on("request", (r) => {
+      const tipo = r.resourceType();
+      // Só o que pode trazer dados. Imagens, tipos de letra e folhas de estilo
+      // enchiam o registo sem dizer nada sobre onde estão os avisos.
+      if (tipo === "xhr" || tipo === "fetch") {
+        pedidos.push({ metodo: r.method(), url: r.url(), tipo });
+      }
+    });
+
+    const resposta = await pagina.goto(url, {
+      waitUntil: "networkidle",
+      timeout: 45_000,
+    });
+
+    const html = await pagina.content();
+    return {
+      url: pagina.url(),
+      status: resposta?.status() ?? 0,
+      html,
+      pedidos,
+      // Quanto texto visível ficou depois de o JavaScript correr. É o número que
+      // diz se valeu a pena: a captura anterior, sem browser, deu 1514 caracteres
+      // de navegação e mais nada.
+      caracteresVisiveis: (
+        await pagina.evaluate(() => document.body?.innerText ?? "")
+      ).replace(/\s+/g, " ").trim().length,
+    };
+  } finally {
+    await navegador.close();
+  }
+}
+
 async function capturarFonte(fonte, dirRaiz) {
   // Write into a fresh staging directory and swap it in only once the capture has
   // actually produced something.
@@ -256,6 +309,42 @@ async function capturarFonte(fonte, dirRaiz) {
       }
 
       await dormir(ATRASO_MS);
+
+      if (fonte.renderizarNoNavegador === true && !/\.(pdf|xlsx?|csv)$/i.test(url)) {
+        const render = await renderizar(url);
+        const ficheiroHtml = nomeSeguro(render.url, ".html");
+        await writeFile(
+          join(dirStaging, ficheiroHtml),
+          normalizarConteudo(render.html),
+          "utf8",
+        );
+        const ficheiroRede = nomeSeguro(render.url, ".rede.json");
+        await writeFile(
+          join(dirStaging, ficheiroRede),
+          JSON.stringify(render.pedidos, null, 2),
+          "utf8",
+        );
+        bytesTotais += Buffer.byteLength(render.html);
+        resumo.push(
+          `- ${render.url}\n  RENDERIZADO status ${render.status}, ` +
+            `${render.caracteresVisiveis} caracteres visíveis, ` +
+            `${render.pedidos.length} pedido(s) de dados → ${ficheiroRede}`,
+        );
+        entradas.push({
+          url: render.url,
+          ficheiro: ficheiroHtml,
+          status: render.status,
+          contentType: "text/html",
+          etag: null,
+          lastModified: null,
+          renderizado: true,
+          caracteresVisiveis: render.caracteresVisiveis,
+          pedidosDeDados: ficheiroRede,
+          capturadoEm: new Date().toISOString(),
+        });
+        continue;
+      }
+
       const r = await buscarComReparo(url);
       const tipo = classificar(r.url, r.contentType);
 
