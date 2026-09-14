@@ -3,6 +3,7 @@ import { fundoAmbientalAac } from "./fundo-ambiental-aac/index.ts";
 import { fundoAmbientalNoticias } from "./fundo-ambiental-noticias/index.ts";
 import { prrCandidaturas } from "./prr-candidaturas/index.ts";
 import { pt2030Avisos } from "./pt2030-avisos/index.ts";
+import { pt2030AvisosListagem } from "./pt2030-avisos-listagem/index.ts";
 import { pt2030PlanoAnualAvisos } from "./pt2030-plano-anual-avisos/index.ts";
 
 /**
@@ -28,6 +29,7 @@ export const FONTES: readonly Fonte[] = [
   fundoAmbientalNoticias,
   prrCandidaturas,
   pt2030Avisos,
+  pt2030AvisosListagem,
   pt2030PlanoAnualAvisos,
 ];
 
