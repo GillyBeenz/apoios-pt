@@ -277,6 +277,8 @@ export class ArmazemPostgres implements Armazem {
   static async redecidir(
     pool: Pool,
     simulacao: boolean,
+    /** Today, as YYYY-MM-DD. Defaults to now, which is what a CLI run means. */
+    hoje: string = new Date().toISOString().slice(0, 10),
   ): Promise<RelatorioRedecisao> {
     const linhas = await pool.query<{
       fund_id: string;
@@ -316,7 +318,7 @@ export class ArmazemPostgres implements Armazem {
         confiancaCampos: linha.confianca_campos ?? {},
         evidenciaFalhou: linha.evidencia_falhou ?? [],
         stopReason: linha.stop_reason,
-      });
+      }, hoje);
 
       if (r.estado === "ilegivel") {
         relatorio.ilegiveis.push(`${r.fundId}: ${r.motivo}`);

@@ -56,7 +56,20 @@ const CONFIANCAS = new Set(["alta", "media", "baixa"]);
  * the honest response is to leave the old decision standing and say so — not to
  * coerce a stale shape into the current one and publish the result.
  */
-export function redecidir(linha: ExtraccaoArmazenada): Redecisao {
+export function redecidir(
+  linha: ExtraccaoArmazenada,
+  /**
+   * Today, as YYYY-MM-DD, passed straight through to `decidir`.
+   *
+   * It matters here more than it looks. The gate publishes a closed fund as
+   * history only when it can *check* that the deadline has passed, and without a
+   * date it cannot, so it refuses. A re-decision pass that forgot to pass this
+   * would quietly decide every historical fund the strict way and report "nothing
+   * changed" — the most expensive kind of wrong answer, because it looks like a
+   * finished job.
+   */
+  hoje?: string,
+): Redecisao {
   const analise = EsquemaExtraccao.safeParse(linha.bruto);
   if (!analise.success) {
     return {
@@ -89,6 +102,7 @@ export function redecidir(linha: ExtraccaoArmazenada): Redecisao {
         confiancaEfectiva,
       },
       linha.stopReason,
+      hoje,
     ),
   };
 }
