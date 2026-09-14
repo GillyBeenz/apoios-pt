@@ -176,6 +176,68 @@ describe("decidir", () => {
     expect(d.publicado).toBe(false);
   });
 
+  /**
+   * Encontrado em produção: `fecha_em = 2026-09-23` numa linha marcada
+   * `encerrado`, a 14 de setembro de 2026. Um apoio dado por fechado sai do
+   * catálogo, e ali faltavam nove dias para o prazo — havia uma candidatura por
+   * fazer que ninguém veria.
+   */
+  it("assinala um encerrado cujo prazo ainda não chegou", () => {
+    const e = extraccaoSolar();
+    const d = decidir(
+      e,
+      verificarProvas(e, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2020-01-01",
+    );
+    // A fixture fecha em 2026; visto de 2020 ainda não fechou.
+    expect(
+      d.motivoRevisao.some((m) => m.startsWith("estado_incoerente:")),
+    ).toBe(e.estado.valor === "encerrado");
+  });
+
+  it("não assinala nada quando não lhe dão uma data de referência", () => {
+    const e = { ...extraccaoSolar(), estado: { ...extraccaoSolar().estado, valor: "encerrado" as const } };
+    const d = decidir(e, verificarProvas(e, TEXTO_AVISO_SOLAR), "end_turn");
+    expect(d.motivoRevisao.some((m) => m.startsWith("estado_incoerente:"))).toBe(false);
+  });
+
+  it("apanha a incoerência quando o estado é mesmo encerrado", () => {
+    const base = extraccaoSolar();
+    const encerradoCedo = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+    };
+    const d = decidir(
+      encerradoCedo,
+      verificarProvas(encerradoCedo, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2020-01-01",
+    );
+    expect(
+      d.motivoRevisao.some((m) => m.startsWith("estado_incoerente:")),
+    ).toBe(true);
+    expect(d.alertavel).toBe(false);
+  });
+
+  /** Um encerrado cujo prazo já passou é coerente, e não deve ser assinalado. */
+  it("deixa em paz um encerrado cujo prazo já passou", () => {
+    const base = extraccaoSolar();
+    const encerrado = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+    };
+    const d = decidir(
+      encerrado,
+      verificarProvas(encerrado, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2099-01-01",
+    );
+    expect(
+      d.motivoRevisao.some((m) => m.startsWith("estado_incoerente:")),
+    ).toBe(false);
+  });
+
   it("bloqueia alertas quando uma prova falha, mesmo com tudo o resto sólido", () => {
     const e = extraccaoSolar();
     const adulterada = {
