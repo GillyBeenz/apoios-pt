@@ -1,0 +1,809 @@
+<title>Como o Appoios funciona</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+  :root {
+    --tinta: #13322b;
+    --papel: #f1f3ee;
+    --papel-fundo: #e6eae2;
+    --musgo: #4a7264;
+    --tenue: #7d968b;
+    --linha: #c9d3cb;
+    --portao: #c8791a;
+    --recusa: #9c2f21;
+    --aberto: #1c6b8c;
+    --realce: #e9efe7;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --corpo: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --tinta: #dfe8e1;
+      --papel: #0d1a16;
+      --papel-fundo: #121f1b;
+      --musgo: #8fb0a2;
+      --tenue: #6d8a7e;
+      --linha: #2a3d36;
+      --portao: #e2a24d;
+      --recusa: #e0796a;
+      --aberto: #6fb6d4;
+      --realce: #16241f;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --tinta: #dfe8e1;
+    --papel: #0d1a16;
+    --papel-fundo: #121f1b;
+    --musgo: #8fb0a2;
+    --tenue: #6d8a7e;
+    --linha: #2a3d36;
+    --portao: #e2a24d;
+    --recusa: #e0796a;
+    --aberto: #6fb6d4;
+    --realce: #16241f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: var(--corpo);
+    font-size: 17px;
+    line-height: 1.65;
+    padding-inline: 20px;
+    padding-block: 0;
+    margin: 0;
+  }
+
+  .folha {
+    max-width: 1040px;
+    margin-inline: auto;
+    padding-block: 64px 96px;
+  }
+
+  .leitura { max-width: 64ch; }
+
+  /* ---- cabeçalho ---- */
+
+  .marca {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--musgo);
+    margin: 0 0 20px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+
+  .entrada {
+    font-size: 1.16rem;
+    line-height: 1.55;
+    color: var(--musgo);
+    margin: 0 0 8px;
+    max-width: 58ch;
+  }
+
+  .data-nota {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--tenue);
+    margin-top: 28px;
+    padding-top: 14px;
+    border-top: 1px solid var(--linha);
+    max-width: 58ch;
+  }
+
+  /* ---- secções ---- */
+
+  section { margin-top: 76px; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.62rem;
+    letter-spacing: -0.018em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0 0 6px;
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.04rem;
+    letter-spacing: -0.008em;
+    margin: 32px 0 6px;
+  }
+
+  .sub {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--portao);
+    margin: 0 0 14px;
+  }
+
+  p { margin: 0 0 16px; }
+  p:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--realce);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 600; }
+
+  /* ---- figuras ---- */
+
+  figure {
+    margin: 36px 0 0;
+    overflow-x: auto;
+  }
+
+  figure svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    min-width: 660px;
+    color: var(--tinta);
+  }
+
+  figcaption {
+    font-size: 0.93rem;
+    line-height: 1.5;
+    color: var(--musgo);
+    margin-top: 16px;
+    max-width: 62ch;
+    border-left: 2px solid var(--linha);
+    padding-left: 14px;
+  }
+
+  .svg-mono { font-family: var(--mono); }
+  .svg-disp { font-family: var(--display); font-weight: 600; }
+  .svg-corp { font-family: var(--corpo); }
+
+  /* ---- fases numeradas ---- */
+
+  .fases {
+    list-style: none;
+    padding: 0;
+    margin: 28px 0 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .fases li {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    gap: 18px;
+    align-items: baseline;
+    padding: 15px 0;
+    border-top: 1px solid var(--linha);
+  }
+
+  .fases li:last-child { border-bottom: 1px solid var(--linha); }
+
+  .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--portao);
+    letter-spacing: 0.06em;
+  }
+
+  .fase-t {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1rem;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .fase-d {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--musgo);
+  }
+
+  /* ---- tabelas ---- */
+
+  .quadro { overflow-x: auto; margin-top: 28px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 0.93rem;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--tenue);
+    text-align: left;
+    font-weight: 400;
+    padding: 0 16px 9px 0;
+    border-bottom: 1px solid var(--tinta);
+  }
+
+  td {
+    padding: 11px 16px 11px 0;
+    border-bottom: 1px solid var(--linha);
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+  }
+
+  td.id { font-family: var(--mono); font-size: 0.84rem; }
+  td.num-c { text-align: right; padding-right: 22px; }
+  th.num-c { text-align: right; padding-right: 22px; }
+
+  .pastilha {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+    border: 1px solid;
+  }
+  .p-activa { color: var(--aberto); border-color: var(--aberto); }
+  .p-captura { color: var(--portao); border-color: var(--portao); }
+
+  /* ---- nota lateral ---- */
+
+  .nota {
+    margin-top: 30px;
+    padding: 18px 22px;
+    background: var(--realce);
+    border-left: 3px solid var(--portao);
+    font-size: 0.96rem;
+    line-height: 1.55;
+  }
+
+  .nota p:first-child { margin-top: 0; }
+
+  .nota-t {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--portao);
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  /* ---- rodapé ---- */
+
+  footer {
+    margin-top: 88px;
+    padding-top: 22px;
+    border-top: 1px solid var(--tinta);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--tenue);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    .folha { padding-block: 44px 64px; }
+    .fases li { grid-template-columns: 34px 1fr; gap: 12px; }
+  }
+</style>
+
+<div class="folha">
+
+  <header>
+    <p class="marca">appoios.guru · arquitectura</p>
+    <h1>Como o Appoios funciona</h1>
+    <p class="entrada">Seis fontes do Estado português entram por três caminhos diferentes, passam por dois portões que decidem coisas distintas, e saem num catálogo público e em alertas por email.</p>
+    <p class="data-nota">Este documento vive em <code>docs/como-funciona.html</code> e descreve como o sistema está construído — isso muda devagar. Os números do catálogo mudam todos os dias e estão todos no instantâneo mais abaixo, com a data em que foram lidos; não os procures no meio do texto, porque de propósito não estão lá.</p>
+  </header>
+
+  <!-- ================= 1. A restrição que molda tudo ================= -->
+  <section>
+    <p class="sub">A restrição que molda tudo</p>
+    <h2>O ambiente de desenvolvimento não chega a nenhum sítio do Estado</h2>
+    <div class="leitura">
+      <p>Todos os domínios governamentais portugueses — <code>diariodarepublica.pt</code>, <code>fundoambiental.pt</code>, <code>portugal2030.pt</code> — são recusados pelo proxy de saída deste ambiente, com <code>403</code> ao CONNECT. A recusa vem da <em>gateway</em>, não dos sítios.</p>
+      <p>Isso podia ser só um incómodo. Em vez disso passou a ser a forma do sistema: quem vai à rede são os <em>runners</em> do GitHub Actions, que não estão atrás do proxy, e o que eles trazem é gravado no repositório. Os extractores nunca tocam na rede — lêem ficheiros commitados — e por isso correm em qualquer máquina, em quatro segundos, sem depender de um sítio do Estado estar de pé.</p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 900 372" role="img" aria-label="O proxy de saída separa o ambiente de desenvolvimento dos sítios do Estado. A captura corre no GitHub Actions, que não está atrás do proxy, e grava as fixtures no repositório. Os extractores lêem essas fixtures sem rede.">
+        <defs>
+          <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+          <marker id="seta-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#9c2f21"/>
+          </marker>
+        </defs>
+
+        <!-- coluna esquerda: sandbox -->
+        <rect x="14" y="40" width="240" height="300" fill="none" stroke="currentColor" stroke-width="1" opacity="0.32"/>
+        <text class="svg-mono" x="26" y="28" font-size="11" letter-spacing="1.4" fill="currentColor" opacity="0.6">AMBIENTE DE DESENVOLVIMENTO</text>
+
+        <rect x="38" y="72" width="192" height="52" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="134" y="94" font-size="13" text-anchor="middle" fill="currentColor">extractores</text>
+        <text class="svg-mono" x="134" y="111" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">puros, sem rede</text>
+
+        <rect x="38" y="148" width="192" height="52" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="134" y="170" font-size="13" text-anchor="middle" fill="currentColor">417 testes</text>
+        <text class="svg-mono" x="134" y="187" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">4 segundos, offline</text>
+
+        <rect x="38" y="224" width="192" height="52" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="134" y="246" font-size="13" text-anchor="middle" fill="currentColor">fixtures</text>
+        <text class="svg-mono" x="134" y="263" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">commitadas no repo</text>
+
+        <path d="M 134 224 L 134 205" stroke="currentColor" stroke-width="1.4" marker-end="url(#seta)" fill="none"/>
+        <path d="M 134 148 L 134 129" stroke="currentColor" stroke-width="1.4" marker-end="url(#seta)" fill="none"/>
+
+        <!-- a barreira -->
+        <line x1="300" y1="14" x2="300" y2="358" stroke="#9c2f21" stroke-width="1.6" stroke-dasharray="7 5"/>
+        <text class="svg-mono" x="306" y="196" font-size="11" fill="#9c2f21" letter-spacing="0.6">proxy de saída</text>
+        <text class="svg-mono" x="306" y="212" font-size="10.5" fill="#9c2f21" opacity="0.8">403 ao CONNECT</text>
+
+        <!-- tentativa bloqueada -->
+        <path d="M 240 300 L 292 300" stroke="#9c2f21" stroke-width="1.4" fill="none"/>
+        <line x1="280" y1="292" x2="296" y2="308" stroke="#9c2f21" stroke-width="1.8"/>
+        <line x1="296" y1="292" x2="280" y2="308" stroke="#9c2f21" stroke-width="1.8"/>
+        <text class="svg-mono" x="38" y="304" font-size="10.5" fill="#9c2f21">pedido directo</text>
+
+        <!-- coluna direita: actions -->
+        <rect x="430" y="40" width="240" height="140" fill="none" stroke="currentColor" stroke-width="1" opacity="0.32"/>
+        <text class="svg-mono" x="442" y="28" font-size="11" letter-spacing="1.4" fill="currentColor" opacity="0.6">GITHUB ACTIONS</text>
+
+        <rect x="454" y="72" width="192" height="80" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="550" y="99" font-size="13" text-anchor="middle" fill="currentColor">capturar-fixtures</text>
+        <text class="svg-mono" x="550" y="117" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">semanal + a pedido</text>
+        <text class="svg-mono" x="550" y="133" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">Chromium quando preciso</text>
+
+        <rect x="454" y="228" width="192" height="80" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="550" y="255" font-size="13" text-anchor="middle" fill="currentColor">ingerir</text>
+        <text class="svg-mono" x="550" y="273" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">diário, 05:30 UTC</text>
+        <text class="svg-mono" x="550" y="289" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">este chama o modelo</text>
+
+        <!-- sítios do Estado -->
+        <rect x="726" y="72" width="160" height="236" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="806" y="166" font-size="13" text-anchor="middle" fill="currentColor">sítios do Estado</text>
+        <text class="svg-mono" x="806" y="186" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">fundoambiental.pt</text>
+        <text class="svg-mono" x="806" y="202" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">portugal2030.pt</text>
+        <text class="svg-mono" x="806" y="218" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.62">recuperarportugal</text>
+
+        <path d="M 646 112 L 720 112" stroke="currentColor" stroke-width="1.4" marker-end="url(#seta)" fill="none"/>
+        <text class="svg-mono" x="683" y="104" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">busca</text>
+
+        <path d="M 646 268 L 720 268" stroke="currentColor" stroke-width="1.4" marker-end="url(#seta)" fill="none"/>
+        <text class="svg-mono" x="683" y="260" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">busca</text>
+
+        <!-- volta ao repo -->
+        <path d="M 454 124 L 400 124 L 400 250 L 240 250" stroke="currentColor" stroke-width="1.4" marker-end="url(#seta)" fill="none"/>
+        <text class="svg-mono" x="332" y="242" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">abre PR com as fixtures</text>
+
+        <text class="svg-mono" x="454" y="340" font-size="10.5" fill="currentColor" opacity="0.62">os runners não estão atrás do proxy</text>
+      </svg>
+      <figcaption>A barreira a vermelho é o proxy de saída. Tudo o que precisa de rede vive do lado direito dela; do lado esquerdo só existem ficheiros. É por isso que a captura é um passo separado com o seu próprio workflow, e não uma chamada dentro do extractor.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 2. Três caminhos ================= -->
+  <section>
+    <p class="sub">Onde é mais fácil perder o fio</p>
+    <h2>Três caminhos diferentes até ao mesmo catálogo</h2>
+    <div class="leitura">
+      <p>Nem toda a fonte diz a mesma coisa da mesma maneira, e tratá-las todas como páginas de HTML era pagar ao modelo para ler tabelas que já vinham estruturadas. Há três caminhos, e <strong>só um custa dinheiro</strong>.</p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 900 428" role="img" aria-label="Três caminhos até à tabela funds. O caminho do modelo passa por listagem, candidatos, busca do documento, extracção pelo Claude e verificação de citações. O caminho da folha passa por página, candidato folha, ficheiro xlsx e leitura determinista. O caminho da API faz um POST e lê o JSON directamente. Só o primeiro chama o modelo.">
+        <defs>
+          <marker id="s2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- via A: modelo -->
+        <text class="svg-mono" x="14" y="26" font-size="11" letter-spacing="1.3" fill="currentColor" opacity="0.6">VIA DO MODELO</text>
+        <text class="svg-mono" x="14" y="42" font-size="10.5" fill="#c8791a">fundo-ambiental-aac · noticias · pt2030-avisos</text>
+
+        <rect x="14" y="56" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="66" y="76" font-size="12" text-anchor="middle" fill="currentColor">listagem</text>
+        <text class="svg-mono" x="66" y="92" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">HTML</text>
+
+        <rect x="152" y="56" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="204" y="76" font-size="12" text-anchor="middle" fill="currentColor">candidatos</text>
+        <text class="svg-mono" x="204" y="92" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">extrair()</text>
+
+        <rect x="290" y="56" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="342" y="76" font-size="12" text-anchor="middle" fill="currentColor">documento</text>
+        <text class="svg-mono" x="342" y="92" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">HTML ou PDF</text>
+
+        <rect x="428" y="56" width="104" height="46" fill="none" stroke="#c8791a" stroke-width="2"/>
+        <text class="svg-disp" x="480" y="76" font-size="12" text-anchor="middle" fill="#c8791a">Claude</text>
+        <text class="svg-mono" x="480" y="92" font-size="9.5" text-anchor="middle" fill="#c8791a">custa dinheiro</text>
+
+        <rect x="566" y="56" width="118" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="625" y="76" font-size="12" text-anchor="middle" fill="currentColor">verificar</text>
+        <text class="svg-mono" x="625" y="92" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">citações no texto</text>
+
+        <path d="M 118 79 L 146 79" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 256 79 L 284 79" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 394 79 L 422 79" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 532 79 L 560 79" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+
+        <!-- via B: folha -->
+        <text class="svg-mono" x="14" y="166" font-size="11" letter-spacing="1.3" fill="currentColor" opacity="0.6">VIA DA FOLHA</text>
+        <text class="svg-mono" x="14" y="182" font-size="10.5" fill="#1c6b8c">pt2030-plano-anual-avisos</text>
+
+        <rect x="14" y="196" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="66" y="216" font-size="12" text-anchor="middle" fill="currentColor">página</text>
+        <text class="svg-mono" x="66" y="232" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">HTML</text>
+
+        <rect x="152" y="196" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="204" y="216" font-size="12" text-anchor="middle" fill="currentColor">candidato</text>
+        <text class="svg-mono" x="204" y="232" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">tipo folha</text>
+
+        <rect x="290" y="196" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="342" y="216" font-size="12" text-anchor="middle" fill="currentColor">.xlsx</text>
+        <text class="svg-mono" x="342" y="232" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">388 linhas</text>
+
+        <rect x="428" y="196" width="256" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="556" y="216" font-size="12" text-anchor="middle" fill="currentColor">lerDataset() — leitura determinista</text>
+        <text class="svg-mono" x="556" y="232" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">sem modelo, sem custo</text>
+
+        <path d="M 118 219 L 146 219" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 256 219 L 284 219" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 394 219 L 422 219" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+
+        <!-- via C: API -->
+        <text class="svg-mono" x="14" y="306" font-size="11" letter-spacing="1.3" fill="currentColor" opacity="0.6">VIA DA API</text>
+        <text class="svg-mono" x="14" y="322" font-size="10.5" fill="#1c6b8c">pt2030-avisos-listagem</text>
+
+        <rect x="14" y="336" width="242" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-mono" x="135" y="356" font-size="11" text-anchor="middle" fill="currentColor">POST /wp-json/avisos/query</text>
+        <text class="svg-mono" x="135" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">corpo form-encoded</text>
+
+        <rect x="290" y="336" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="342" y="356" font-size="12" text-anchor="middle" fill="currentColor">JSON</text>
+        <text class="svg-mono" x="342" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">27 KB</text>
+
+        <rect x="428" y="336" width="256" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="556" y="356" font-size="12" text-anchor="middle" fill="currentColor">lerDataset() — a entrada já são os dados</text>
+        <text class="svg-mono" x="556" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">nem listagem nem segundo pedido</text>
+
+        <path d="M 256 359 L 284 359" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 394 359 L 422 359" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+
+        <!-- confluência -->
+        <rect x="748" y="150" width="138" height="138" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text class="svg-disp" x="817" y="206" font-size="15" text-anchor="middle" fill="currentColor">funds</text>
+        <text class="svg-mono" x="817" y="226" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">identidade</text>
+        <text class="svg-mono" x="817" y="241" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">resolvida antes</text>
+        <text class="svg-mono" x="817" y="256" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">de gravar</text>
+
+        <path d="M 684 79 L 716 79 L 716 176 L 742 176" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 684 219 L 742 219" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+        <path d="M 684 359 L 716 359 L 716 262 L 742 262" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
+      </svg>
+      <figcaption>A caixa a âmbar é a única que chama o modelo. As outras duas vias lêem estrutura que a fonte já dá — e a via da API não tem sequer listagem: a resposta ao POST <em>é</em> o conjunto de dados.</figcaption>
+    </figure>
+
+    <div class="nota">
+      <span class="nota-t">porque é que isto importa</span>
+      <p>O plano anual do PT2030 esteve meses a ser lido e deitado fora: o pipeline descartava o candidato do tipo <code>folha</code> com um comentário a dizer que as folhas «tinham o seu próprio leitor determinista». O leitor existia, estava testado, lia todas as linhas — e nada o chamava. É de longe a maior fonte do catálogo.</p>
+    </div>
+  </section>
+
+  <!-- ================= 3. As fases ================= -->
+  <section>
+    <p class="sub">A corrida diária, por ordem</p>
+    <h2>O que acontece às 05:30</h2>
+    <div class="leitura">
+      <p>Estas fases são mesmo uma sequência, e cada uma tem um travão próprio. A ordem importa porque os passos caros estão no fim: quando o conteúdo não mudou, a corrida acaba antes de chegar lá.</p>
+    </div>
+
+    <ol class="fases">
+      <li>
+        <span class="num">01</span>
+        <span>
+          <span class="fase-t">Buscar a entrada</span>
+          <span class="fase-d">Um <code>GET</code> com <code>if-none-match</code>, ou um <code>POST</code> com corpo declarado pela fonte. Num POST não vão validadores condicionais — a resposta depende do corpo enviado, não de uma versão guardada.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <span>
+          <span class="fase-t">Portão da mudança</span>
+          <span class="fase-d">Hash do conteúdo normalizado contra o último snapshot. Igual, a fonte acaba aqui. É este portão que faz uma corrida diária custar quase nada.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <span>
+          <span class="fase-t">Extrair candidatos</span>
+          <span class="fase-d">Determinista e local. Corre mesmo quando a listagem não mudou, porque analisar é gratuito e um prazo pode ter sido prolongado só na página de detalhe.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">04</span>
+        <span>
+          <span class="fase-t">Extracção pelo modelo</span>
+          <span class="fase-d">Só na via do modelo, e só para documentos que mudaram. A resposta é obrigada a citar o texto de onde tirou cada campo.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">05</span>
+        <span>
+          <span class="fase-t">Verificar as citações</span>
+          <span class="fase-d">Cada citação é procurada no documento original. Uma que não exista faz cair a confiança do campo — o modelo não fica com a última palavra sobre se leu bem.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">06</span>
+        <span>
+          <span class="fase-t">Decidir</span>
+          <span class="fase-d">O portão de publicação e o de alerta, que não são o mesmo. É a figura a seguir.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">07</span>
+        <span>
+          <span class="fase-t">Resolver identidade e gravar</span>
+          <span class="fase-d">Referência legal, depois URL canónico, depois título normalizado. O mesmo aviso visto por duas fontes funde-se em vez de duplicar.</span>
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ================= 4. Os dois portões ================= -->
+  <section>
+    <p class="sub">A decisão que o produto é</p>
+    <h2>Aparecer e avisar são duas permissões</h2>
+    <div class="leitura">
+      <p>Um apoio de que não temos certeza continua a valer a pena <em>mostrar</em> — com a fonte oficial ao lado e um aviso de que a elegibilidade está por confirmar. O que não pode é ser <em>empurrado</em> para o email de alguém como se tivéssemos certeza.</p>
+      <p>A assimetria está toda aqui: um alerta que falta é uma oportunidade perdida; um alerta errado manda alguém gastar dez mil euros num apoio a que nunca teve direito.</p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 860 336" role="img" aria-label="Dois portões. A confiança global, que é o mínimo de todos os campos, decide a publicação. Os três campos críticos em alta mais zero motivos de revisão decidem o alerta. A permissão de alertar está contida na de publicar.">
+        <defs>
+          <marker id="s3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+          <marker id="s3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#c8791a"/>
+          </marker>
+        </defs>
+
+        <rect x="14" y="120" width="132" height="62" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-corp" x="80" y="146" font-size="12.5" text-anchor="middle" fill="currentColor">extracção</text>
+        <text class="svg-mono" x="80" y="164" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">campo a campo</text>
+
+        <!-- portão 1 -->
+        <rect x="206" y="52" width="196" height="88" fill="none" stroke="#c8791a" stroke-width="2"/>
+        <text class="svg-disp" x="304" y="78" font-size="13" text-anchor="middle" fill="#c8791a">confiança global</text>
+        <text class="svg-mono" x="304" y="98" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">o MÍNIMO de todos</text>
+        <text class="svg-mono" x="304" y="114" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">os campos</text>
+        <text class="svg-mono" x="304" y="130" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">baixa = não publica</text>
+
+        <!-- portão 2 -->
+        <rect x="206" y="176" width="196" height="104" fill="none" stroke="#c8791a" stroke-width="2"/>
+        <text class="svg-disp" x="304" y="202" font-size="13" text-anchor="middle" fill="#c8791a">campos críticos</text>
+        <text class="svg-mono" x="304" y="222" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">estado</text>
+        <text class="svg-mono" x="304" y="238" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">prazo de encerramento</text>
+        <text class="svg-mono" x="304" y="254" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.72">admite particulares</text>
+        <text class="svg-mono" x="304" y="272" font-size="10" text-anchor="middle" fill="#c8791a">os três em ALTA</text>
+
+        <path d="M 146 138 L 176 138 L 176 96 L 200 96" stroke="currentColor" stroke-width="1.4" marker-end="url(#s3)" fill="none"/>
+        <path d="M 146 160 L 176 160 L 176 228 L 200 228" stroke="currentColor" stroke-width="1.4" marker-end="url(#s3)" fill="none"/>
+
+        <!-- resultados -->
+        <rect x="466" y="52" width="164" height="88" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="548" y="82" font-size="14" text-anchor="middle" fill="currentColor">publicado</text>
+        <text class="svg-mono" x="548" y="102" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">aparece no catálogo</text>
+        <text class="svg-mono" x="548" y="120" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">com a fonte oficial</text>
+
+        <rect x="466" y="192" width="164" height="72" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text class="svg-disp" x="548" y="222" font-size="14" text-anchor="middle" fill="currentColor">alertável</text>
+        <text class="svg-mono" x="548" y="242" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.62">pode gerar email</text>
+
+        <path d="M 402 96 L 460 96" stroke="#c8791a" stroke-width="1.6" marker-end="url(#s3a)" fill="none"/>
+        <path d="M 402 228 L 460 228" stroke="#c8791a" stroke-width="1.6" marker-end="url(#s3a)" fill="none"/>
+
+        <!-- contenção -->
+        <path d="M 548 192 L 548 146" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#s3)" fill="none"/>
+        <text class="svg-mono" x="560" y="174" font-size="10" fill="currentColor" opacity="0.75">alertável ⊂ publicado</text>
+
+        <text class="svg-mono" x="666" y="86" font-size="10" fill="currentColor" opacity="0.6">quase todos</text>
+        <text class="svg-mono" x="666" y="226" font-size="10" fill="currentColor" opacity="0.6">muito poucos</text>
+
+        <text class="svg-mono" x="14" y="316" font-size="10.5" fill="currentColor" opacity="0.6">todas as condições falham fechadas: em dúvida, não passa</text>
+      </svg>
+      <figcaption>Os dois portões lêem coisas diferentes da mesma extracção. A seta a tracejado é a invariante que faltava até hoje: havia um apoio invisível no catálogo com direito a email — o sentido errado das duas.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 5. As fontes ================= -->
+  <section>
+    <p class="sub">Quem alimenta o catálogo</p>
+    <h2>Seis fontes</h2>
+
+    <div class="quadro">
+      <table>
+        <thead>
+          <tr>
+            <th>Fonte</th>
+            <th>Via</th>
+            <th>Estado</th>
+            <th>O que traz</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">pt2030-plano-anual-avisos</td>
+            <td>folha</td>
+            <td><span class="pastilha p-activa">activa</span></td>
+            <td>Avisos <em>previstos</em> para o ano. É um plano, não uma abertura.</td>
+          </tr>
+          <tr>
+            <td class="id">fundo-ambiental-aac</td>
+            <td>modelo</td>
+            <td><span class="pastilha p-activa">activa</span></td>
+            <td>Os avisos de concurso do Fundo Ambiental. A fonte mais próxima do utilizador final.</td>
+          </tr>
+          <tr>
+            <td class="id">pt2030-avisos</td>
+            <td>modelo</td>
+            <td><span class="pastilha p-activa">activa</span></td>
+            <td>Categoria de notícias do WordPress. Artigos <em>sobre</em> avisos, não os avisos.</td>
+          </tr>
+          <tr>
+            <td class="id">fundo-ambiental-noticias</td>
+            <td>modelo</td>
+            <td><span class="pastilha p-activa">activa</span></td>
+            <td>Notícias que às vezes anunciam um apoio antes do aviso sair.</td>
+          </tr>
+          <tr>
+            <td class="id">pt2030-avisos-listagem</td>
+            <td>API</td>
+            <td><span class="pastilha p-activa">activa</span></td>
+            <td>Os avisos <em>abertos</em> — a única fonte que responde à pergunta «o que posso pedir agora?».</td>
+          </tr>
+          <tr>
+            <td class="id">prr-candidaturas</td>
+            <td>modelo</td>
+            <td><span class="pastilha p-captura">em-captura</span></td>
+            <td>A página não tem dados por rota nenhuma. O valor está no PDF do plano de avisos.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="nota">
+      <span class="nota-t">o buraco que falta tapar</span>
+      <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. Abertos há sempre muito poucos. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz. Ver o instantâneo: é a proporção a vigiar.</p>
+    </div>
+  </section>
+
+  <!-- ================= 6. Depois da base de dados ================= -->
+  <section>
+    <p class="sub">O que vive na base de dados</p>
+    <h2>Seis tarefas que correm sozinhas</h2>
+    <div class="leitura">
+      <p>O pipeline escreve e vai-se embora. O que mantém o catálogo verdadeiro entre corridas são tarefas <code>pg_cron</code> dentro do próprio Postgres — incluindo o vigia, que está de propósito fora do sistema que vigia.</p>
+    </div>
+
+    <div class="quadro">
+      <table>
+        <thead>
+          <tr>
+            <th>Tarefa</th>
+            <th>Quando</th>
+            <th>Para quê</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">varrimento-temporal</td>
+            <td class="id">06:00</td>
+            <td>Um aviso cujo prazo passou deixa de estar aberto sem ninguém lhe tocar.</td>
+          </tr>
+          <tr>
+            <td class="id">assinalar-estados-incoerentes</td>
+            <td class="id">06:30</td>
+            <td>Apanha o que está marcado como encerrado com prazo no futuro.</td>
+          </tr>
+          <tr>
+            <td class="id">vigia-ingestao</td>
+            <td class="id">de hora a hora</td>
+            <td>Se a ingestão parar, alguém tem de reparar — e não pode ser a própria ingestão.</td>
+          </tr>
+          <tr>
+            <td class="id">emparelhar-alertas</td>
+            <td class="id">15 em 15 min</td>
+            <td>Cruza apoios alertáveis com as preferências de cada subscritor.</td>
+          </tr>
+          <tr>
+            <td class="id">enviar-alertas</td>
+            <td class="id">5 em 5 min</td>
+            <td>Esvazia a caixa de saída para o serviço de email.</td>
+          </tr>
+          <tr>
+            <td class="id">confirmar-envios</td>
+            <td class="id">5 em 5 min</td>
+            <td>Regista o que foi mesmo entregue.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>E do outro lado</h3>
+    <div class="leitura">
+      <p>A aplicação web (Next.js, na Vercel) lê apenas os apoios publicados, através da chave anónima e das políticas de segurança ao nível da linha. Nada do que escreve no catálogo passa por ali: a ingestão liga-se ao Postgres com um papel restrito, sem qualquer permissão sobre perfis, subscrições ou emails enviados — e corre num repositório público, onde um registo de execução é visível para toda a gente.</p>
+    </div>
+  </section>
+
+
+  <!-- ================= 7. Instantâneo ================= -->
+  <section>
+    <p class="sub">Tudo o que apodrece, num sítio só</p>
+    <h2>Instantâneo do catálogo</h2>
+    <div class="leitura">
+      <p>Estes números não estão em mais lado nenhum da página, e é de propósito. Um número gravado a meio de um parágrafo ou dentro de um desenho envelhece sem ninguém dar por isso; aqui envelhece à vista, com a data ao lado.</p>
+    </div>
+
+    <div class="quadro">
+      <table>
+        <thead>
+          <tr>
+            <th>Medida</th>
+            <th class="num-c">14/09/2026</th>
+            <th>O que quer dizer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Apoios no catálogo</td><td class="num-c">448</td><td>Tudo o que alguma vez foi lido e resolvido como distinto.</td></tr>
+          <tr><td>Publicados</td><td class="num-c">434</td><td>Visíveis, com a fonte oficial ao lado.</td></tr>
+          <tr><td><strong>Abertos agora</strong></td><td class="num-c">6</td><td><strong>O número que interessa a quem procura financiamento.</strong></td></tr>
+          <tr><td>Previstos</td><td class="num-c">388</td><td>Do plano anual. Ainda não abriram.</td></tr>
+          <tr><td>Encerrados</td><td class="num-c">53</td><td>Histórico, visível desde que se saiba quando fecharam.</td></tr>
+          <tr><td>Alertáveis</td><td class="num-c">6</td><td>Os únicos que podem gerar email.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="nota">
+      <span class="nota-t">como voltar a medir</span>
+      <p>Uma consulta a <code>funds</code>, agrupada por <code>estado</code>, <code>publicado</code> e <code>alertavel</code>. Se algum número aqui estiver desactualizado, o que está errado é esta tabela — não o sistema.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>appoios.guru · monorepo apoios-pt · packages/core · packages/extraction · packages/ingest · apps/web<br>
+    supabase eu-west-1 · 17 tabelas · 6 tarefas pg_cron · 4 workflows<br>
+    Página escrita a 14 de setembro de 2026.</p>
+  </footer>
+
+</div>
