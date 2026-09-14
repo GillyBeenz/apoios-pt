@@ -1,0 +1,8 @@
+[
+  {
+    "metodo": "POST",
+    "url": "https://mpc-prod-24-s6uit34pua-uw.a.run.app/events?cee=no",
+    "tipo": "fetch",
+    "nota": "Telemetria, não dados. Nenhum pedido desta página traz avisos."
+  }
+]

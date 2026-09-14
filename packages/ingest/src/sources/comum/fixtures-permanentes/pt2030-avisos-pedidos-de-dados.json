@@ -1,0 +1,12 @@
+[
+  {
+    "metodo": "POST",
+    "url": "https://portugal2030.pt/wp-json/avisos/query",
+    "tipo": "xhr"
+  },
+  {
+    "metodo": "GET",
+    "url": "https://hub.digitalfundos.pt/api/auth/session",
+    "tipo": "fetch"
+  }
+]
