@@ -220,6 +220,199 @@ describe("decidir", () => {
     expect(d.alertavel).toBe(false);
   });
 
+  /**
+   * A regra do histórico: 29 apoios encerrados estavam invisíveis por confiança
+   * `baixa` em campos que já não podem magoar ninguém — a data de abertura (16) e
+   * as medidas (13). Num aviso fechado não há candidatura a fazer, e esconder a
+   * linha só apaga a resposta a "isto já existiu?".
+   */
+  it("publica um encerrado de prazo vencido apesar de a abertura estar em baixa", () => {
+    const base = extraccaoSolar();
+    const historico = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      historico,
+      verificarProvas(historico, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      // A fixture fecha em 2026-09-30; visto de 2027 já fechou mesmo.
+      "2027-01-01",
+    );
+    expect(d.confiancaGlobal).toBe("baixa");
+    expect(d.publicado).toBe(true);
+    // Publicar não é confiar. Aparecer no catálogo com a fonte oficial ao lado é
+    // uma coisa; entrar no email de alguém é outra, e a confiança global em
+    // `baixa` fecha essa porta mesmo sem nenhum motivo de revisão.
+    expect(d.alertavel).toBe(false);
+  });
+
+  /**
+   * A invariante que o próprio ficheiro afirma — `alertavel` é estritamente mais
+   * forte do que `publicado` — e que não era verdade. `motivos` cobre os campos
+   * críticos, a recusa, o OCR e a prova, mas nunca olhou para a confiança global,
+   * por isso um apoio retido por um campo não-crítico ficava invisível no
+   * catálogo e continuava com direito a email.
+   *
+   * Estava em produção: `C13-i01; 02; 03 — Comunidades de Energia Renovável`,
+   * `publicado = false`, `alertavel = true`, zero motivos de revisão.
+   */
+  it("nunca deixa alertar o que não publica", () => {
+    const base = extraccaoSolar();
+    const naoCritico = {
+      ...base,
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      naoCritico,
+      verificarProvas(naoCritico, TEXTO_AVISO_SOLAR),
+      "end_turn",
+    );
+    expect(d.motivoRevisao).toEqual([]);
+    expect(d.confiancaGlobal).toBe("baixa");
+    expect(d.publicado).toBe(false);
+    expect(d.alertavel).toBe(false);
+  });
+
+  /**
+   * Quem testemunha o fecho é a data, não a palavra. Nove apoios em produção
+   * tinham prazo `alta` já vencido e `estado` em `media`, e ficavam de fora se a
+   * regra exigisse `alta` nos dois — sem que isso tornasse nenhum deles mais
+   * verdadeiro.
+   */
+  it("aceita estado em média quando a data de fecho é firme e já passou", () => {
+    const base = extraccaoSolar();
+    const palavraIncerta = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const, confianca: "media" as const },
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      palavraIncerta,
+      verificarProvas(palavraIncerta, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2027-01-01",
+    );
+    expect(d.publicado).toBe(true);
+    expect(d.alertavel).toBe(false);
+  });
+
+  /** Mas `baixa` no estado não: aí não há leitura nenhuma em que assentar a etiqueta. */
+  it("recusa o histórico quando nem o estado se consegue ler", () => {
+    const base = extraccaoSolar();
+    const semLeitura = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const, confianca: "baixa" as const },
+    };
+    const d = decidir(
+      semLeitura,
+      verificarProvas(semLeitura, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2027-01-01",
+    );
+    expect(d.publicado).toBe(false);
+  });
+
+  /**
+   * O contrapeso, e o teste que interessa: a condição é a data de fecho. Sem ela
+   * com confiança `alta`, um encerrado não tem por onde provar que fechou, e a
+   * excepção não se aplica.
+   */
+  it("não publica um encerrado cuja própria data de fecho está em baixa", () => {
+    const base = extraccaoSolar();
+    const semDataFiavel = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+      prazos: {
+        ...base.prazos,
+        encerramento: { ...base.prazos.encerramento, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      semDataFiavel,
+      verificarProvas(semDataFiavel, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2027-01-01",
+    );
+    expect(d.publicado).toBe(false);
+  });
+
+  /**
+   * Um prazo que ainda não chegou não prova que fechou — prova que há uma
+   * incoerência. A excepção do histórico não pode ser a porta por onde essa
+   * incoerência entra no catálogo.
+   */
+  it("não publica como histórico um encerrado cujo prazo ainda não passou", () => {
+    const base = extraccaoSolar();
+    const incoerente = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      incoerente,
+      verificarProvas(incoerente, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2020-01-01",
+    );
+    expect(d.publicado).toBe(false);
+    expect(
+      d.motivoRevisao.some((m) => m.startsWith("estado_incoerente:")),
+    ).toBe(true);
+  });
+
+  /**
+   * Sem data de referência não há como verificar que o prazo passou. A
+   * alternativa seria acreditar no campo `estado` sozinho, que é exactamente o
+   * que a condição existe para não fazer.
+   */
+  it("sem data de referência, o histórico não se aplica", () => {
+    const base = extraccaoSolar();
+    const historico = {
+      ...base,
+      estado: { ...base.estado, valor: "encerrado" as const },
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(historico, verificarProvas(historico, TEXTO_AVISO_SOLAR), "end_turn");
+    expect(d.publicado).toBe(false);
+  });
+
+  /** Um aberto em baixa continua fora. A excepção é dos encerrados, e só. */
+  it("não estende o histórico a um aviso aberto", () => {
+    const base = extraccaoSolar();
+    const aberto = {
+      ...base,
+      estado: { ...base.estado, valor: "aberto" as const },
+      prazos: {
+        ...base.prazos,
+        abertura: { ...base.prazos.abertura, confianca: "baixa" as const },
+      },
+    };
+    const d = decidir(
+      aberto,
+      verificarProvas(aberto, TEXTO_AVISO_SOLAR),
+      "end_turn",
+      "2027-01-01",
+    );
+    expect(d.publicado).toBe(false);
+  });
+
   /** Um encerrado cujo prazo já passou é coerente, e não deve ser assinalado. */
   it("deixa em paz um encerrado cujo prazo já passou", () => {
     const base = extraccaoSolar();

@@ -89,7 +89,14 @@ export function CartaoApoio({ apoio }: { apoio: Apoio }) {
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-linha pt-4 text-sm">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-tenue">Prazo</dt>
+          {/* Um apoio encerrado com "Prazo: 30/11/2025" lê-se como se ainda houvesse
+              tempo — a data é a mesma, mas a palavra diz o contrário do que se
+              passa. O catálogo passou a publicar encerrados como histórico, e a
+              condição para isso foi precisamente sabermos quando fecharam; a
+              etiqueta tem de dizer isso. */}
+          <dt className="text-xs font-medium uppercase tracking-wide text-tenue">
+            {apoio.estado === "encerrado" ? "Encerrou em" : "Prazo"}
+          </dt>
           <dd className="mt-0.5">
             {formatarPrazo(apoio.fechaEm)}
             {/* Say so out loud when the date is approximate, rather than letting a

@@ -147,14 +147,74 @@ export function decidir(
       ? "media"
       : "alta";
 
-  const bloqueiaPublicacao =
+  // Um apoio encerrado continua a valer como histórico — mas só se souber dizer
+  // quando fechou.
+  //
+  // Vinte e nove apoios estavam retidos por confiança `baixa` em campos que já
+  // não podem magoar ninguém: a data de abertura (16) e as medidas elegíveis
+  // (13). O custo de errar nesses campos é assimétrico e muda com o estado. Num
+  // aviso aberto, uma medida elegível mal lida manda alguém gastar dinheiro numa
+  // obra que o apoio não cobre. Num aviso fechado não há candidatura a fazer, e
+  // esconder a linha só apaga a resposta à pergunta "isto já existiu?".
+  //
+  // A condição é a data de fecho, e é literal: o prazo tem de estar lá, com
+  // confiança `alta`, e tem de já ter passado. Uma data que não passou não prova
+  // que fechou — prova que há uma incoerência, e essa já está assinalada acima.
+  //
+  // `hoje` em falta reprova. Sem data de referência não há como verificar que o
+  // prazo passou, e a alternativa seria acreditar no campo `estado` sozinho — que
+  // é precisamente o que esta condição existe para não fazer.
+  //
+  // Ao `estado` pede-se só que não esteja em `baixa`, e a assimetria é de
+  // propósito. Quem testemunha o fecho aqui é a *data*, não a palavra: um prazo
+  // com confiança `alta` que já passou diz que fechou, independentemente de o
+  // modelo ter ficado `media` sobre a palavra "encerrado". Exigir `alta` nos dois
+  // deixava de fora nove apoios em produção cuja única fraqueza era essa, e não
+  // tornava nenhum deles mais verdadeiro.
+  //
+  // Vale a pena ver de onde vem o risco. Estes apoios estão invisíveis hoje, por
+  // isso publicá-los não esconde nada que já não estivesse escondido — a única
+  // falha nova possível é dizer "encerrado" a quem lê a listagem dos fechados. E
+  // se o aviso tiver sido prorrogado, o que temos é fiel ao documento que temos;
+  // uma prorrogação é outro documento, com outra extracção.
+  //
+  // `baixa` no estado continua a reprovar: aí não há sequer uma leitura do
+  // documento em que assentar a etiqueta.
+  const confiancaDe = (campo: string): Confianca =>
+    v.confiancaEfectiva.get(campo) ?? "baixa";
+  const historicoVerificavel =
+    e.estado.valor === "encerrado" &&
+    confiancaDe("estado") !== "baixa" &&
+    confiancaDe("prazos.encerramento") === "alta" &&
+    prazoFinal !== null &&
+    hoje !== undefined &&
+    prazoFinal <= hoje;
+
+  // A recusa do modelo e o "isto nem sequer é um aviso" continuam a bloquear. Ter
+  // valor histórico não é desculpa para publicar um documento que ninguém
+  // conseguiu ler, ou que não é um apoio.
+  const bloqueiaPublicacaoEstrito =
     stopReason === "refusal" ||
     !e.auto_avaliacao.documento_e_aviso_de_apoio ||
     confiancaGlobal === "baixa";
 
+  const bloqueiaPublicacao = bloqueiaPublicacaoEstrito && !historicoVerificavel;
+
   return {
     publicado: !bloqueiaPublicacao,
-    alertavel: motivos.length === 0,
+    // `alertavel` diz-se "estritamente mais forte do que `publicado`" desde o
+    // início, e não era: `motivos` cobre os três campos críticos, a recusa, o OCR
+    // e a prova, mas nunca olhou para a confiança global. Um apoio retido por
+    // `baixa` num campo não-crítico ficava invisível no catálogo e continuava com
+    // direito a email — o sentido errado dos dois. Havia um em produção:
+    // `C13-i01; 02; 03 — Comunidades de Energia Renovável`, `publicado = false`,
+    // `alertavel = true`, sem um único motivo de revisão.
+    //
+    // Repara que isto lê o teste **estrito**, não o `bloqueiaPublicacao`. O
+    // histórico acima é uma licença para *aparecer*, nunca para *escrever a
+    // alguém*: se fosse por `bloqueiaPublicacao`, a excepção do histórico tinha
+    // acabado de abrir a porta dos alertas a tudo o que ela publica.
+    alertavel: motivos.length === 0 && !bloqueiaPublicacaoEstrito,
     needsReview: motivos.length > 0,
     motivoRevisao: motivos,
     confiancaGlobal,
