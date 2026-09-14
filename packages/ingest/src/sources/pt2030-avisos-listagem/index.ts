@@ -63,20 +63,21 @@ export const pt2030AvisosListagem: Fonte = {
   tipo: "dataset",
   cadenciaHoras: 24,
 
-  // `em-captura`, e a distinção é a mesma de sempre: o contrato foi observado e a
-  // resposta real está commitada, mas nenhuma captura chegou ainda a fazer este
-  // POST — a captura só o aprendeu a fazer neste mesmo PR. `activa` diria que o
-  // caminho inteiro já correu de ponta a ponta, e não correu.
-  //
-  // Promove-se quando a captura tiver escrito a fixture em `fixtures/`, que é
-  // exactamente o que o invariante do `registo.test.ts` exige a quem está activa.
-  estado: "em-captura",
+  // `activa`. A captura nº 21 fez o POST a sério e trouxe 26 858 bytes de JSON —
+  // ao byte, a mesma resposta que o browser tinha visto. O caminho inteiro correu
+  // de ponta a ponta, que era a condição.
+  estado: "activa",
 
-  // Zero, e com uma razão que não é preguiça: o piso de saúde conta *candidatos*,
-  // e uma fonte cuja entrada já é o conjunto de dados não produz nenhum — os
-  // apoios saem do `lerDataset` sem passar por candidato nenhum. Pôr aqui um
-  // número faria a fonte parecer partida em todas as corridas.
-  candidatosMin: 0,
+  // Um, e agora quer dizer alguma coisa: numa fonte cuja entrada já é o conjunto
+  // de dados, a métrica `candidatos` passou a contar os apoios que a resposta
+  // rendeu, porque candidatos a sério não há nenhum.
+  //
+  // Um e não cinco. Cinco é quantos estavam abertos no dia da captura, e é um
+  // número sobre o calendário do Estado, não sobre a saúde desta fonte: uma
+  // semana em que só abre um aviso é uma semana normal, não uma avaria. Zero é
+  // que não é — o endpoint devolver lista vazia significa que alguma coisa mudou
+  // do lado de lá.
+  candidatosMin: 1,
 
   // Não há markup para analisar. O contrato do `Fonte` pede um `extrair`, e a
   // resposta honesta desta fonte a essa pergunta é uma lista vazia.

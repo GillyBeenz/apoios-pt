@@ -542,9 +542,27 @@ export async function executarFonte(
       httpStatus: statusFinal,
       bytes: bytesTotais,
       duracaoMs: Date.now() - inicio,
-      candidatos: candidatos.length,
+      // Numa fonte cuja entrada já é o conjunto de dados, o número que quer dizer
+      // «isto funcionou» são os apoios que a resposta rendeu, não os candidatos —
+      // que são sempre zero, porque não há listagem por onde passar.
+      //
+      // Contado aqui, e não num campo novo, porque é a mesma pergunta: o piso de
+      // saúde existe para distinguir uma fonte que produziu pouco de uma que
+      // partiu, e com `candidatos.length` fixo em zero essa pergunta ficava sem
+      // resposta possível — um piso que dispara sempre ensina a ignorá-lo, que é
+      // pior do que não ter piso nenhum.
+      candidatos:
+        fonte.entradaEDataset === true
+          ? apoiosDaEntrada.length
+          : candidatos.length,
       candidatosIgnorados: ignorados,
-      candidatosComData: candidatos.filter((c) => c.dataBruta !== null).length,
+      // Estes apoios trazem as datas em campos próprios, já verificadas pelo
+      // `lerDataset`. A regra do «analisa mas perdeu as datas» é sobre uma
+      // listagem cujo selector de data partiu, e aqui não há selector nenhum.
+      candidatosComData:
+        fonte.entradaEDataset === true
+          ? apoiosDaEntrada.filter((a) => a.fechaEm.iso !== null).length
+          : candidatos.filter((c) => c.dataBruta !== null).length,
       extraccoesOk,
       extraccoesRevisao,
       extraccoesFalhadas,
