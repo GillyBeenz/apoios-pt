@@ -55,6 +55,18 @@ export class BuscadorHttp implements Buscador {
     if (pedido.lastModified)
       cabecalhos["if-modified-since"] = pedido.lastModified;
 
+    // `if-none-match` e `if-modified-since` são perguntas sobre um recurso que se
+    // lê, e um POST não é isso: a resposta depende do corpo que se envia, não de
+    // uma versão que o servidor guarde. Mandá-los num POST é, na melhor das
+    // hipóteses, ruído — e na pior, um 304 a uma pergunta que ninguém fez.
+    //
+    // O portão da mudança não perde nada com isto. Quem decide se houve mudança é
+    // o hash do conteúdo, e esse continua a ser calculado na mesma.
+    if ((pedido.metodo ?? "GET") !== "GET") {
+      delete cabecalhos["if-none-match"];
+      delete cabecalhos["if-modified-since"];
+    }
+
     const vazio = {
       url: pedido.url,
       corpo: null,
@@ -65,8 +77,15 @@ export class BuscadorHttp implements Buscador {
     };
 
     try {
+      const metodo = pedido.metodo ?? "GET";
+      if (pedido.tipoConteudo !== undefined) {
+        cabecalhos["content-type"] = pedido.tipoConteudo;
+      }
+
       const resposta = await fetch(pedido.url, {
+        method: metodo,
         headers: cabecalhos,
+        body: metodo === "GET" ? undefined : pedido.corpo,
         redirect: "follow",
         signal: AbortSignal.timeout(60_000),
       });

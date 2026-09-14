@@ -74,13 +74,44 @@ describe("registo de fontes", () => {
 
   it("tem urls de entrada absolutas e em https, dentro do próprio domínio", () => {
     for (const f of FONTES) {
-      expect(f.urlsEntrada.length, f.id).toBeGreaterThan(0);
+      // Os dois tipos de entrada juntos, e não só `urlsEntrada`.
+      //
+      // Quando o POST apareceu, uma fonte passou a poder ter `urlsEntrada` vazio e
+      // ir buscar tudo a um `pedidosEntrada` — e um invariante que só olhasse para
+      // a primeira lista deixava o URL que de facto é chamado sair do domínio sem
+      // ninguém reparar. É precisamente o URL que leva um corpo que merece mais
+      // atenção, não menos.
+      const entradas = [
+        ...f.urlsEntrada,
+        ...(f.pedidosEntrada ?? []).map((p) => p.url),
+      ];
+      expect(entradas.length, `${f.id} não tem entrada nenhuma`).toBeGreaterThan(
+        0,
+      );
+
       const base = new URL(f.urlBase).hostname.replace(/^www\./, "");
-      for (const u of f.urlsEntrada) {
+      for (const u of entradas) {
         const url = new URL(u);
         expect(url.protocol, `${f.id} ${u}`).toBe("https:");
         expect(url.hostname.replace(/^www\./, ""), `${f.id} ${u}`).toBe(base);
       }
+    }
+  });
+
+  /**
+   * Uma fonte cuja entrada já é o conjunto de dados não tem listagem nem segundo
+   * pedido: se lhe faltar o `lerDataset`, a resposta é buscada, guardada e
+   * deitada fora em silêncio — que foi exactamente o que aconteceu ao plano anual
+   * durante meses.
+   */
+  it("exige lerDataset a quem diz que a entrada já é o conjunto de dados", () => {
+    for (const f of FONTES) {
+      if (f.entradaEDataset !== true) continue;
+      expect(f.lerDataset, `${f.id} sem lerDataset`).toBeDefined();
+      expect(
+        [...f.urlsEntrada, ...(f.pedidosEntrada ?? [])].length,
+        `${f.id} sem entrada`,
+      ).toBeGreaterThan(0);
     }
   });
 

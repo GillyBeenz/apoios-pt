@@ -2,6 +2,15 @@ export interface PedidoCondicional {
   readonly url: string;
   readonly etag?: string | null;
   readonly lastModified?: string | null;
+  /**
+   * HTTP method. Omitted means `GET`, which is what every source did until the
+   * PT2030 avisos endpoint turned out to be a `POST`.
+   */
+  readonly metodo?: "GET" | "POST";
+  /** Request body. Only meaningful with `POST`. */
+  readonly corpo?: string;
+  /** `content-type` for `corpo`, e.g. `application/x-www-form-urlencoded`. */
+  readonly tipoConteudo?: string;
 }
 
 export interface RespostaHttp {

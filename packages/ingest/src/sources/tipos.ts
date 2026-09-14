@@ -13,6 +13,28 @@ export interface Fonte {
   readonly entidade: string;
   readonly urlBase: string;
   readonly urlsEntrada: readonly string[];
+  /**
+   * Entry points that are not a plain `GET`.
+   *
+   * `urlsEntrada` assumed the only way to ask a site for its notices was to
+   * request a page. The Portugal 2030 listing is not built that way: its avisos
+   * come from `POST /wp-json/avisos/query` with a form-encoded body, and no URL on
+   * its own will ever return them.
+   *
+   * Declarative rather than a function, deliberately. Both the pipeline and the
+   * capture script read this, and the capture script is a standalone `.mjs` that
+   * imports the registry — a field it can serialise and print is worth more than a
+   * callback it would have to call.
+   *
+   * The body is committed as written evidence, not composed here: the exact
+   * request is in `comum/fixtures-permanentes/pt2030-avisos-query-contrato.json`,
+   * recorded from what the site's own page sent.
+   *
+   * One request per URL. The snapshot ledger is keyed by URL, so two entries
+   * sharing one would overwrite each other's change gate and each look
+   * permanently changed to the other.
+   */
+  readonly pedidosEntrada?: readonly PedidoDeEntrada[];
   readonly tipo: "listagem" | "noticias" | "legal" | "dataset";
   /**
    * Has this source's extractor been verified against markup captured from the
@@ -87,6 +109,31 @@ export interface Fonte {
    * nonsense.
    */
   lerDataset?(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[];
+
+  /**
+   * The entry response **is** the dataset. No listing, no second fetch.
+   *
+   * The spreadsheet path gets here in two hops: a listing page is parsed, it
+   * yields a `folha` candidate, and the file behind it is fetched and read. That
+   * shape assumes the data lives at the end of a link.
+   *
+   * An API answers in one hop. `POST /wp-json/avisos/query` returns the avisos
+   * themselves, so there is no listing to parse and nothing further to fetch —
+   * and asking for it twice would mean posting the same body again to get the
+   * same bytes.
+   *
+   * A source that sets this needs `lerDataset` and gets no `extrair` call: there
+   * is no markup to extract from.
+   */
+  readonly entradaEDataset?: boolean;
+}
+
+/** A non-`GET` entry request, declared by a source and issued verbatim. */
+export interface PedidoDeEntrada {
+  readonly url: string;
+  readonly metodo: "POST";
+  readonly corpo: string;
+  readonly tipoConteudo: string;
 }
 
 export interface ContextoDataset {
