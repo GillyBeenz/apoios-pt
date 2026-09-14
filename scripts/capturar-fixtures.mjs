@@ -134,7 +134,19 @@ async function repararCadeia(host) {
   return resultado;
 }
 
-async function buscar(url, caExtra = undefined) {
+async function buscar(url, caExtra = undefined, pedido = {}) {
+  const metodo = pedido.metodo ?? "GET";
+  const cabecalhosBase = {
+    "user-agent": USER_AGENT,
+    accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+    "accept-language": "pt-PT,pt;q=0.9",
+    ...(pedido.tipoConteudo === undefined
+      ? {}
+      : { "content-type": pedido.tipoConteudo }),
+  };
+  const opcoesCorpo =
+    metodo === "GET" ? {} : { method: metodo, body: pedido.corpo };
+
   if (caExtra !== undefined) {
     // undici's OWN fetch, not the global one. Node embeds its own private copy of
     // undici, and handing it a dispatcher built from the standalone package fails
@@ -147,11 +159,8 @@ async function buscar(url, caExtra = undefined) {
     // omitting the roots here is what turned a one-link gap into a dead end.
     const dispatcher = new Agent({ connect: { ca: await combinarComRaizes(caExtra) } });
     const r = await fetchUndici(url, {
-      headers: {
-        "user-agent": USER_AGENT,
-        accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
-        "accept-language": "pt-PT,pt;q=0.9",
-      },
+      ...opcoesCorpo,
+      headers: cabecalhosBase,
       redirect: "follow",
       dispatcher,
       signal: AbortSignal.timeout(60_000),
@@ -168,11 +177,8 @@ async function buscar(url, caExtra = undefined) {
   }
 
   const resposta = await fetch(url, {
-    headers: {
-      "user-agent": USER_AGENT,
-      accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
-      "accept-language": "pt-PT,pt;q=0.9",
-    },
+    ...opcoesCorpo,
+    headers: cabecalhosBase,
     redirect: "follow",
     signal: AbortSignal.timeout(60_000),
   });
@@ -370,6 +376,60 @@ async function capturarFonte(fonte, dirRaiz) {
   let erroFatal = null;
 
   try {
+    // Os pedidos que não são GET. Vão primeiro porque numa fonte como a dos avisos
+    // do PT2030 são a única coisa que traz dados — `urlsEntrada` está vazio.
+    for (const pedido of fonte.pedidosEntrada ?? []) {
+      await dormir(ATRASO_MS);
+
+      const r = await buscar(pedido.url, undefined, {
+        metodo: pedido.metodo,
+        corpo: pedido.corpo,
+        tipoConteudo: pedido.tipoConteudo,
+      });
+
+      // O mesmo cuidado do ramo do GET: uma resposta que não é 200 nunca escreve
+      // por cima de uma fixture boa.
+      if (r.status !== 200) {
+        resumo.push(
+          `- ${pedido.metodo} ${pedido.url}\n  status ${r.status} — não escrito`,
+        );
+        entradas.push({
+          url: pedido.url,
+          ficheiro: null,
+          status: r.status,
+          contentType: r.contentType,
+          etag: null,
+          lastModified: null,
+          metodo: pedido.metodo,
+          capturadoEm: new Date().toISOString(),
+        });
+        continue;
+      }
+
+      const ficheiro = nomeSeguro(pedido.url, ".json");
+      await writeFile(join(dirStaging, ficheiro), r.bytes);
+      bytesTotais += r.bytes.byteLength;
+
+      resumo.push(
+        `- ${pedido.metodo} ${pedido.url}\n  status ${r.status}, ` +
+          `${r.bytes.byteLength} bytes (${r.contentType ?? "?"})`,
+      );
+
+      entradas.push({
+        url: pedido.url,
+        ficheiro,
+        status: r.status,
+        contentType: r.contentType,
+        // Um POST não tem validadores condicionais que valham alguma coisa: a
+        // resposta depende do corpo enviado, não de uma versão que o servidor
+        // guarde. Nulos aqui, e o portão da mudança continua a ser o hash.
+        etag: null,
+        lastModified: null,
+        metodo: pedido.metodo,
+        capturadoEm: new Date().toISOString(),
+      });
+    }
+
     for (const url of fonte.urlsEntrada) {
       if (!(await permitido(fonte.urlBase, new URL(url).pathname))) {
         resumo.push(`- ${url} — IGNORADO por robots.txt`);

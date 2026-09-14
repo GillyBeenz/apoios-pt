@@ -13,7 +13,7 @@ import {
   verificarProvas,
   type ExtractorLike,
 } from "@apoios/extraction";
-import type { Buscador } from "../http/tipos.ts";
+import type { Buscador, PedidoCondicional } from "../http/tipos.ts";
 import {
   decodificarEntidades,
   hashBytes,
@@ -171,10 +171,24 @@ export async function executarFonte(
   // --- 1-3. Listing fetch, conditional GET, change gate -----------------------
   let listagemInalterada = true;
 
-  for (const url of fonte.urlsEntrada) {
+  // Apoios que vieram directamente da resposta de entrada, sem listagem pelo meio.
+  //
+  // Recolhidos aqui e resolvidos na secção 6, ao lado dos que vêm de uma folha:
+  // é o mesmo trabalho — identidade, persistência, eventos — e fazê-lo duas vezes
+  // era convidar as duas cópias a divergirem.
+  const apoiosDaEntrada: ApoioNovo[] = [];
+
+  // `urlsEntrada` são GETs simples; `pedidosEntrada` são os que não são.
+  const entradas: PedidoCondicional[] = [
+    ...fonte.urlsEntrada.map((url) => ({ url })),
+    ...(fonte.pedidosEntrada ?? []),
+  ];
+
+  for (const entrada of entradas) {
+    const url = entrada.url;
     const anterior = await armazem.snapshotAnterior(url);
     const resposta = await buscador.buscar({
-      url,
+      ...entrada,
       etag: anterior?.etag ?? null,
       lastModified: anterior?.lastModified ?? null,
     });
@@ -238,6 +252,21 @@ export async function executarFonte(
       html =
         guardado === null ? null : new TextDecoder("utf-8").decode(guardado);
     }
+    // Uma fonte cuja entrada já É o conjunto de dados não tem listagem para
+    // analisar. Ler o corpo como markup e passá-lo ao `extrair` daria zero
+    // candidatos e um silêncio que se confundiria com uma semana parada.
+    if (fonte.entradaEDataset === true && fonte.lerDataset !== undefined) {
+      if (html !== null) {
+        apoiosDaEntrada.push(
+          ...fonte.lerDataset(new TextEncoder().encode(html), {
+            urlOrigem: url,
+            entidade: fonte.entidade,
+          }),
+        );
+      }
+      continue;
+    }
+
     if (html !== null) {
       candidatos.push(
         ...fonte.extrair(html, { urlBase: fonte.urlBase, agora }),
@@ -271,6 +300,33 @@ export async function executarFonte(
         `${ignorados} ignorados. Uma listagem maior que o limite é sinal de que ` +
         `o limite está errado, não de que a listagem está.`,
     );
+  }
+
+
+  // Os apoios que vieram da própria resposta de entrada, resolvidos com o mesmo
+  // caminho que os da folha: identidade, persistência, eventos.
+  //
+  // Sem linha em `fund_extractions`, e pela mesma razão que a folha: essa tabela
+  // regista o que um modelo foi perguntado e o que respondeu, e aqui não se
+  // perguntou nada a modelo nenhum. Uma linha com modelo nulo tornava a tabela um
+  // sítio onde umas entradas querem dizer «o modelo disse» e outras «uma coluna
+  // dizia», e distinguir as duas é a razão de ela existir.
+  for (const novo of apoiosDaEntrada) {
+    const r = await resolverEPersistir(armazem, fonte, novo, {
+      referenciaLegal: novo.referenciaLegal,
+      url: novo.urlOficial,
+    });
+
+    if (r.tipo === "novo") {
+      apoiosNovos.push(r.apoio);
+      eventos.push(...diferenciar(null, r.apoio, agora.toISOString()));
+    } else if (r.tipo === "conflito") {
+      conflitos.push(r.conflito);
+      apoiosActualizados.push(r.apoio);
+    } else {
+      apoiosActualizados.push(r.apoio);
+      eventos.push(...diferenciar(r.anterior, r.apoio, agora.toISOString()));
+    }
   }
 
   for (const candidato of candidatos.slice(0, limite)) {
