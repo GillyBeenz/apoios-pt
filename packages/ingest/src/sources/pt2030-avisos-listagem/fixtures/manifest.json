@@ -1,0 +1,17 @@
+{
+  "sourceId": "pt2030-avisos-listagem",
+  "capturadoEm": "2026-09-14T17:04:16.353Z",
+  "erro": null,
+  "entradas": [
+    {
+      "url": "https://portugal2030.pt/wp-json/avisos/query",
+      "ficheiro": "query-e13530a64f.json",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "etag": null,
+      "lastModified": null,
+      "metodo": "POST",
+      "capturadoEm": "2026-09-14T17:04:16.353Z"
+    }
+  ]
+}
