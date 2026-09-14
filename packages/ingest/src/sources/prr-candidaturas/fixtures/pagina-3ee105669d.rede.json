@@ -1,0 +1,12 @@
+[
+  {
+    "metodo": "POST",
+    "url": "https://analytics.google.com/g/collect?v=2&tid=G-LZBF2436B1&gtm=45je6992v9183754836za200zd9183754836&_p=1789390417498&_gaz=1&gcd=13l3l3l3l1l1&npa=0&dma=0&ecid=1002994367&_eu=AAAAAGAC&cid=420213033.1789390418&ec_mode=a&frm=0&pscdl=noapi&rcb=6&sr=1280x720&uaa=x86&uab=64&uafvl=HeadlessChrome%3B153.0.8010.12%7CNot_A%2520Brand%3B8.0.0.0%7CChromium%3B153.0.8010.12&uam=&uamb=0&uap=Windows&uapv=&uaw=0&ul=en-us&gaf=2&_s=1&tag_exp=115616986~115938466~115938468~118897920~118897930~120213116~120385422~120469145~120469153&sid=1789390417&sct=1&seg=0&dl=https%3A%2F%2Frecuperarportugal.gov.pt%2Fcandidaturas-prr%2F&dt=Candidaturas%20-%20Plano%20de%20Recupera%C3%A7%C3%A3o%20e%20Resili%C3%AAncia%20-%20Recuperar%20Portugal&en=page_view&_fv=1&_nsi=1&_ss=1&_ee=1&tfd=773",
+    "tipo": "fetch"
+  },
+  {
+    "metodo": "POST",
+    "url": "https://mpc-prod-24-s6uit34pua-uw.a.run.app/events?cee=no",
+    "tipo": "fetch"
+  }
+]
