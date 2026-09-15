@@ -689,7 +689,7 @@
             <td class="id">pt2030-avisos-listagem</td>
             <td>API</td>
             <td><span class="pastilha p-activa">activa</span></td>
-            <td>Os avisos <em>abertos</em> — a única fonte que responde à pergunta «o que posso pedir agora?».</td>
+            <td>Os avisos <em>abertos</em> — mas só cinco de cada vez, e é a nota abaixo que explica porquê.</td>
           </tr>
           <tr>
             <td class="id">prr-candidaturas</td>
@@ -703,7 +703,9 @@
 
     <div class="nota">
       <span class="nota-t">o buraco que falta tapar</span>
-      <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. Abertos há sempre muito poucos. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz. Ver o instantâneo: é a proporção a vigiar.</p>
+      <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz.</p>
+      <p><strong>Parte desse buraco é nosso, e não do calendário do Estado.</strong> O endpoint dos avisos abertos respondeu cinco avisos a 14/09 e cinco a 15/09, e os dois que desapareceram entre um dia e o outro foram exactamente os dois mais antigos por data de publicação — enquanto dois, publicados a 15/09, entravam pelo topo. Um deles, o <code>NORTE2030-2026-22</code>, tem prazo até 31/12/2026: não saiu por ter encerrado, saiu por ter sido empurrado. O pedido leva <code>order_by_field=publicacao</code> com <code>direction=desc</code> e nunca se observou nenhum parâmetro de página.</p>
+      <p>Ou seja: aquilo que a fonte devolve não são «os avisos abertos», são os <em>cinco abertos publicados mais recentemente</em>, e cada aviso novo que o PT2030 publica empurra um antigo para fora do catálogo em silêncio. Qual é o parâmetro que pagina isto — se é que existe — ainda não se sabe, e adivinhá-lo seria inventar um campo que o documento não diz. <code>scripts/sondar-paginacao-pt2030.mjs</code> vai perguntá-lo ao servidor e escrever a resposta em <code>fixtures-permanentes/</code>.</p>
     </div>
   </section>
 

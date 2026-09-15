@@ -62,3 +62,34 @@ parâmetro de página foi observado).
 
 O `-resposta.json` é a resposta inteira, real, de 14/09/2026. Serve de fixture ao
 extractor: é contra ela que ele é escrito e testado, sem rede.
+
+## `pt2030-avisos-query-paginacao.json`
+
+A nota do contrato dizia que não se tinha observado paginação nenhuma. A 15/09/2026
+isso deixou de ser uma curiosidade e passou a ser uma perda: os dois avisos mais
+antigos por data de publicação saíram da resposta no dia em que dois novos entraram,
+e um deles — o `NORTE2030-2026-22` — tem prazo até 31/12/2026, por isso não pode ter
+saído por ter encerrado.
+
+Este ficheiro é o que o servidor respondeu quando lhe perguntámos. `sondar-paginacao.yml`
+corre `scripts/sondar-paginacao-pt2030.mjs`, que manda o corpo real da fonte com um
+parâmetro acrescentado de cada vez — `page`, `limit`, `offset` e mais uns quantos
+nomes de três convenções diferentes — e regista o que voltou.
+
+**Só aparece depois de o workflow correr**, e é `workflow_dispatch`: isto é uma
+investigação com um fim, não uma tarefa semanal contra um servidor que não é nosso.
+
+Duas coisas a ler antes do resto:
+
+- **`base.estavel`.** A base é pedida no princípio e no fim. Se o PT2030 publicar um
+  aviso a meio da sonda, todas as variantes seguintes parecem reconhecidas — uma
+  pista falsa que custaria a sessão seguinte inteira.
+- **`controlo_positivo.passou`.** Inverter `order_by_direction` tem de mudar a
+  resposta, porque é o único parâmetro que se sabe que o endpoint lê. Se não mudar,
+  a sonda não consegue detectar um parâmetro que funcione — e aí um resultado todo
+  `ignorado` não prova ausência de paginação nenhuma, prova só que a sonda está
+  partida. Sem este controlo, a conclusão errada mais cara desta investigação era
+  indistinguível da certa.
+
+Um nome que não foi experimentado continua por experimentar. O ficheiro leva a lista
+completa dos que foram, precisamente para que a próxima pessoa não repita os mesmos.
