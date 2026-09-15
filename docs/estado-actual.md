@@ -13,77 +13,47 @@ descobrem a ler o código.
 
 ---
 
-## 1. Perda de dados activa: códigos do PT2030 colidem na chave mais forte
+## 1. `canonicalizarReferenciaLegal` mutila os códigos do PT2030
 
-**Isto é o mais importante da nota, e é um defeito introduzido a 14/09/2026 com a
-fonte `pt2030-avisos-listagem`.**
+**A perda está estancada; a causa de fundo não.**
 
-`canonicalizarReferenciaLegal` (em `packages/core/src/normalizar/texto.ts`) exige
-que o corpo da referência **comece por um dígito**:
+A função (em `packages/core/src/normalizar/texto.ts`) exige que o corpo da
+referência comece por um dígito:
 
 ```js
 const corpoMatch = t.match(/\b\d[\dA-Z]*(?:[/-][\dA-Z.]+)+\b/);
 ```
 
-Está certo para as referências para que foi escrita — em `AVISO N.º 03/2026` o
-prefixo é ruído e deve mesmo ser deitado fora. Está errado para os códigos do
-Portugal 2030, onde **o prefixo é a parte que distingue**:
+Certo para `AVISO N.º 03/2026`, onde o prefixo é ruído. Errado para os códigos do
+Portugal 2030, onde **o prefixo é a parte que distingue**: `CENTRO2030-2026-23` e
+`NORTE2030-2026-23` dão os dois `2026-23`, com força 100.
 
-| Código | Chave que produz |
-| --- | --- |
-| `CENTRO2030-2026-23` | `2026-23` |
-| `NORTE2030-2026-23` | `2026-23` |
+Custou um apoio: a 15/09/2026 o `CENTRO2030-2026-23` substituiu o
+`NORTE2030-2026-23` — saúde, cuidados de saúde primários — que saiu do catálogo
+sem deixar rasto.
 
-O `2030` de `CENTRO2030` não está numa fronteira de palavra, por isso a captura
-só começa em `2026`. Os dois códigos dão a mesma chave, com **força 100** — a
-mais forte que existe, a que `resolverIdentidade` respeita acima de todas.
+### O que já foi feito (15/09/2026)
 
-**O que isso já custou.** A 14/09 o catálogo tinha
-`NORTE2030-2026-23 — Saúde, cuidados de saúde primários`. A 15/09 chegou o
-`CENTRO2030-2026-23`, bateu na mesma chave, e o pipeline tratou-os como o mesmo
-apoio. O aviso do Norte **já não está no catálogo**. Não foi duplicado: foi
-substituído.
+- `pt2030-avisos-listagem` deixou de usar o código como `referenciaLegal`. A
+  identidade assenta no `url_canonica`, que é único porque o URL leva
+  `?aviso=<codigo>`. Um teste guarda a regra, e outro verifica que dois códigos
+  que canonicalizam para o mesmo continuam a dar dois apoios.
+- As seis chaves `referencia_legal` mutiladas foram apagadas de
+  `fund_identities`.
+- As chaves do aviso do Norte que tinham ficado gravadas no apoio do Centro
+  também. Sem isso a fusão repetia-se sozinha assim que o Norte voltasse —
+  exactamente como este repositório já perdeu apoios antes.
+- O `NORTE2030-2026-23` volta a entrar como apoio próprio na primeira corrida em
+  que o endpoint o devolva. Não há nada a restaurar à mão.
 
-A prova está nas chaves da fonte: sete `titulo_norm` distintos e sete
-`url_canonica` distintos, contra **seis** `referencia_legal` e seis apoios. Sete
-avisos vistos, um perdido.
+### O que falta
 
-### Porque é que nada avisou
-
-O alerta de conflitos de identidade (migração 0017) **não apanha isto**, e é
-importante perceber porquê antes de confiar nele: ele regista quando duas chaves
-apontam para apoios *diferentes* e o apoio não é gravado. Aqui não houve
-conflito nenhum do ponto de vista do código — as chaves concordaram. O sistema
-fez exactamente o que lhe foi pedido, com uma chave errada.
-
-### Duas saídas, e a escolha não é óbvia
-
-**A — não usar `codigoAviso` como `referenciaLegal` nesta fonte.**
-Em `packages/ingest/src/sources/pt2030-avisos-listagem/paraApoio.ts`, pôr
-`referenciaLegal: null`. A identidade passa a assentar no `url_canonica`, que é
-único porque o URL leva `?aviso=<codigo>`. Pára a perda imediatamente, não toca
-em nada partilhado. Custo: perde-se a fusão entre fontes — o mesmo aviso visto
-pelo `pt2030-avisos` e pela API deixa de se reconhecer.
-
-**B — corrigir o `canonicalizarReferenciaLegal` para preservar o prefixo.**
-Mais correcto no geral, e provavelmente o que está certo a prazo. Mas essa
-função decide a identidade dos **450 apoios** do catálogo, e mudá-la muda chaves
-que já estão gravadas em `fund_identities`. Há precedente nesta base de dados de
-uma correcção de identidade feita a meio ter deixado chaves erradas escritas nas
-sobreviventes, que depois repetiam a fusão a cada corrida. Se for por aqui, tem
-de ser com uma passagem de reparação e com as chaves antigas contadas antes e
-depois.
-
-**Recomendação:** A agora, para parar a perda; B a seguir, com calma e com
-medição. A próxima corrida é às 05:30 UTC.
-
-### Recuperar o que se perdeu
-
-O `NORTE2030-2026-23` volta sozinho se ainda estiver na resposta do endpoint na
-próxima corrida depois de a chave ser corrigida. Se já não estiver (o prazo era
-31/12/2026, por isso deve estar), fica perdido — não há cópia do que tinha.
-
----
+A função continua errada para qualquer código com prefixo alfanumérico, e mais
+nenhuma fonte lhe dá um hoje — mas a próxima que der volta a perder apoios.
+Corrigi-la é o trabalho a sério, e tem de ser com cuidado: essa função decide a
+identidade dos 450 apoios já gravados, e mudá-la muda chaves em
+`fund_identities`. Tem de levar uma passagem de reparação e as chaves contadas
+antes e depois.
 
 ## 2. A hora de fecho é truncada
 

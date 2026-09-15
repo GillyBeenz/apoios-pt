@@ -47,12 +47,37 @@ export function avisoAbertoParaApoio(
     programaPai: a.programa,
     entidadeGestora: opcoes.entidade,
 
-    // `codigoAviso` is a real notice reference — `ALT2030-2026-44` — unlike the
-    // annual plan's row id, which was a bare number and rightly refused. It has a
-    // separator, so `canonicalizarReferenciaLegal` accepts it, and it is the
-    // strongest identity key there is: the same notice seen later by any other
-    // source will carry the same code and merge rather than duplicate.
-    referenciaLegal: a.codigo,
+    // Nulo, e o código fica só no `urlOficial`. Isto é uma correcção, e a razão
+    // interessa mais do que a linha.
+    //
+    // O comentário que aqui estava dizia que `codigoAviso` é uma referência a
+    // sério, que `canonicalizarReferenciaLegal` a aceita, e que é a chave de
+    // identidade mais forte que existe. As três coisas são verdade, e juntas
+    // apagaram um apoio do catálogo.
+    //
+    // Essa função exige que o corpo da referência comece por um dígito — o que
+    // está certo para `AVISO N.º 03/2026`, onde o prefixo é ruído, e errado aqui,
+    // onde o prefixo é a parte que distingue:
+    //
+    //     CENTRO2030-2026-23  →  2026-23
+    //     NORTE2030-2026-23   →  2026-23
+    //
+    // O `2030` de `CENTRO2030` não está numa fronteira de palavra, por isso a
+    // captura só começa em `2026`. Os dois códigos dão a mesma chave, com força
+    // 100, e a 15/09/2026 o segundo a chegar substituiu o primeiro: o aviso de
+    // cuidados de saúde primários do Norte 2030 desapareceu.
+    //
+    // A identidade passa a assentar no `url_canonica`, que é único porque o URL
+    // leva `?aviso=<codigo>`. É uma chave mais fraca (70), e o custo real é esse:
+    // o mesmo aviso visto por outra fonte deixa de se reconhecer por referência.
+    // Uma fusão que não acontece é uma linha a mais no catálogo; uma chave que
+    // colide é uma linha a menos, em silêncio. Entre as duas, esta.
+    //
+    // A correcção de fundo é ensinar `canonicalizarReferenciaLegal` a guardar o
+    // prefixo. Não é feita aqui de propósito: essa função decide a identidade dos
+    // 450 apoios já gravados, e mudá-la sem uma passagem de reparação é como este
+    // repositório já perdeu apoios antes. Fica em `docs/estado-actual.md`.
+    referenciaLegal: null,
 
     // `aberto`, and this is the point of the whole source.
     //
