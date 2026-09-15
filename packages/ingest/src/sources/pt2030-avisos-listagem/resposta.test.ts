@@ -147,9 +147,48 @@ describe("avisoAbertoParaApoio", () => {
     expect(apoios.every((a) => !a.urlOficial.includes("wp-json"))).toBe(true);
   });
 
-  /** `ALT2030-2026-44` tem separador, ao contrário do id nu do plano anual. */
-  it("usa o código do aviso como referência legal", () => {
-    expect(apoios.map((a) => a.referenciaLegal)).toContain("ALT2030-2026-44");
+  /**
+   * Não usa o código como referência legal, e este é o teste que guarda um apoio
+   * apagado a 15/09/2026.
+   *
+   * `canonicalizarReferenciaLegal` exige que o corpo comece por um dígito, o que
+   * está certo para `AVISO N.º 03/2026` e errado para estes códigos, onde o
+   * prefixo é a parte que distingue: `CENTRO2030-2026-23` e `NORTE2030-2026-23`
+   * dão os dois `2026-23`, com força 100. O segundo a chegar substituiu o
+   * primeiro, e o aviso de cuidados de saúde primários do Norte 2030 saiu do
+   * catálogo sem deixar rasto.
+   */
+  it("não usa o código do aviso como referência legal", () => {
+    expect(apoios.every((a) => a.referenciaLegal === null)).toBe(true);
+  });
+
+  /**
+   * O que substitui a referência tem de ser realmente único — senão a correcção
+   * troca uma colisão por outra.
+   */
+  it("distingue avisos cujo código canonicaliza para a mesma coisa", () => {
+    const corpo = JSON.stringify({
+      avisos: [
+        {
+          aviso: { codigoAviso: "CENTRO2030-2026-23", designacaoPT: "Centro" },
+          estrutura: [],
+          calendario: {},
+        },
+        {
+          aviso: { codigoAviso: "NORTE2030-2026-23", designacaoPT: "Norte" },
+          estrutura: [],
+          calendario: {},
+        },
+      ],
+    });
+
+    const dois = lerAvisos(corpo).map((a) =>
+      avisoAbertoParaApoio(a, { urlListagem: LISTAGEM, entidade: "AD&C" }),
+    );
+
+    expect(dois).toHaveLength(2);
+    // Os dois URLs têm de ser diferentes: é a única chave que lhes resta.
+    expect(new Set(dois.map((a) => a.urlOficial)).size).toBe(2);
   });
 
   it("não lista documentos que não consegue endereçar", () => {
