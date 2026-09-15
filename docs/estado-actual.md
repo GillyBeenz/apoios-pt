@@ -108,15 +108,52 @@ abrir um PR e esperar por um workflow.
 
 ---
 
-## 5. Por saber sobre o endpoint do PT2030
+## 5. O endpoint do PT2030 devolve cinco, e está a perder avisos abertos
 
-Registado em `comum/fixtures-permanentes/pt2030-avisos-query-contrato.json`, e
-repetido aqui porque é o que limita a fonte:
+**Isto já não é uma dúvida de contrato: é perda activa.**
 
-- **Paginação**: não foi observado nenhum parâmetro de página. A resposta trouxe
-  cinco avisos. Se houver mais, vêm por um pedido que a captura não provocou.
+A 14/09 o endpoint devolveu cinco avisos; a 15/09 devolveu cinco outros. Os dois
+que desapareceram — `NORTE2030-2026-22` e `NORTE2030-2026-23` — são exactamente
+os dois mais antigos por data de publicação, e entraram pelo topo dois publicados
+a 15/09. O `NORTE2030-2026-22` tem prazo até **31/12/2026**: não saiu por ter
+encerrado.
+
+O pedido leva `order_by_field=publicacao&order_by_direction=desc`. O que a fonte
+devolve não são «os avisos abertos», são os **cinco abertos publicados mais
+recentemente** — e cada aviso novo empurra um antigo para fora do catálogo sem
+deixar rasto. É a pergunta que o produto existe para responder, truncada em cinco.
+
+Isto também responde à outra metade do mistério da sessão anterior: o
+`NORTE2030-2026-23` não voltou depois da limpeza das chaves, e não volta —
+a limpeza estava certa, o endpoint é que deixou de o devolver.
+
+### O que já foi feito
+
+`scripts/sondar-paginacao-pt2030.mjs` (workflow `sondar-paginacao.yml`,
+`workflow_dispatch`) pergunta ao servidor. Manda o corpo real da fonte com um
+parâmetro acrescentado de cada vez — 20 nomes de três convenções — e escreve o que
+voltou em `fixtures-permanentes/pt2030-avisos-query-paginacao.json`. Leva um
+controlo positivo (`order_by_direction=asc`) sem o qual «nenhum reconhecido» não
+distinguiria um endpoint sem paginação de uma sonda partida.
+
+### O que falta
+
+- **Correr o workflow.** Ainda não correu nenhuma vez.
+- **Implementar o que ele encontrar.** E há aí uma decisão de desenho já visível:
+  se o parâmetro for de *página* e não de *limite*, paginar quer dizer vários POSTs
+  ao mesmo URL — e o livro de snapshots é indexado por URL, por isso dois pedidos a
+  partilhar um sobrescrevem o portão da mudança um do outro e ficam os dois a
+  parecer permanentemente mudados. Está escrito em `tipos.ts`, em
+  `pedidosEntrada`. Um parâmetro de limite não tem este problema.
+- **Se nenhum nome for reconhecido**, a saída provável é o `estadoAvisoId` aqui em
+  baixo.
+
+### O que continua por saber do mesmo endpoint
+
 - **`estadoAvisoId`**: o `7` é o que a página usa na vista inicial. O que valem os
-  outros valores não se sabe, e é aí que devem estar os avisos encerrados.
+  outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda
+  não lhes toca de propósito — uma investigação de cada vez, senão não se sabe qual
+  das duas mudanças produziu a diferença.
 - **Documentos**: cada aviso traz PDFs com `path` e `container`, mas **sem URL**.
   O endereço de descarga não é derivável desses dois campos, por isso
   `documentos` fica vazio — ligar a um ficheiro que não se consegue endereçar é

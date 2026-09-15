@@ -2,37 +2,10 @@ import type { ApoioNovo } from "@apoios/core";
 import type { ContextoDataset, Fonte } from "../tipos.ts";
 import { lerAvisos } from "./resposta.ts";
 import { avisoAbertoParaApoio } from "./paraApoio.ts";
+import { corpoDoPedido, TIPO_CONTEUDO, URL_QUERY } from "./pedido.ts";
 
 /** A página humana. É para aqui que um leitor deve ser mandado. */
 const LISTAGEM = "https://portugal2030.pt/avisos/";
-
-/**
- * Os 23 programas operacionais, tal como a própria página os envia.
- *
- * Copiados do pedido observado, não escolhidos: mandar a lista inteira é o que o
- * sítio faz, e é o que devolve tudo. Uma lista mais curta seria um filtro nosso
- * disfarçado de contrato deles.
- */
-const PROGRAMAS = [
-  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
-] as const;
-
-/**
- * O corpo do pedido, montado a partir das mesmas partes que a página envia.
- *
- * `estadoAvisoId=7` é o filtro da vista inicial do sítio — os avisos com
- * candidaturas a decorrer. Não se sabe o que valem os outros valores, e isso está
- * escrito como nota em `comum/fixtures-permanentes/pt2030-avisos-query-contrato.json`
- * em vez de adivinhado aqui.
- */
-function corpoDoPedido(): string {
-  const p = new URLSearchParams();
-  p.set("estadoAvisoId", "7");
-  for (const id of PROGRAMAS) p.append("programaId[]", String(id));
-  p.set("order_by_field", "publicacao");
-  p.set("order_by_direction", "desc");
-  return p.toString();
-}
 
 export const pt2030AvisosListagem: Fonte = {
   id: "pt2030-avisos-listagem",
@@ -48,10 +21,10 @@ export const pt2030AvisosListagem: Fonte = {
 
   pedidosEntrada: [
     {
-      url: "https://portugal2030.pt/wp-json/avisos/query",
+      url: URL_QUERY,
       metodo: "POST",
       corpo: corpoDoPedido(),
-      tipoConteudo: "application/x-www-form-urlencoded; charset=UTF-8",
+      tipoConteudo: TIPO_CONTEUDO,
     },
   ],
 

@@ -1,0 +1,84 @@
+name: Sondar a paginação do PT2030
+
+# O ambiente de desenvolvimento não chega a `portugal2030.pt` — o proxy de saída
+# recusa todos os domínios do Estado com 403 ao CONNECT. Os runners do GitHub não
+# estão atrás desse proxy, por isso é aqui que se pergunta ao endpoint o que ele
+# sabe fazer.
+#
+# `workflow_dispatch` e mais nada, de propósito. Isto é uma investigação com um
+# fim: assim que o contrato da paginação estiver escrito, a sonda passa a ser
+# histórico e não tem nada que voltar a correr sozinha contra um servidor que não
+# é nosso.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sem `version:`. A versão vive no `packageManager` do package.json da raiz,
+      # que o Vercel também lê, e o pnpm/action-setup falha se os dois a declararem.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Sem Chromium: a sonda fala com o endpoint directamente, que é o que a
+      # página faz depois de carregar.
+      - name: Sondar
+        run: node --experimental-strip-types scripts/sondar-paginacao-pt2030.mjs
+
+      # Incondicional: uma sonda que falhou o controlo positivo é exactamente a que
+      # é preciso conseguir ler.
+      - name: Carregar como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-paginacao-${{ github.run_id }}
+          path: packages/ingest/src/sources/comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Abrir PR com a prova
+        if: always()
+        id: pr
+        continue-on-error: true
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: sonda/paginacao-pt2030
+          base: main
+          title: "O que o endpoint do PT2030 responde sobre paginação"
+          commit-message: "Registar o que o endpoint do PT2030 respondeu à sonda de paginação"
+          body: |
+            Prova recolhida por `scripts/sondar-paginacao-pt2030.mjs` no Actions.
+
+            Ler o `conclusao` do ficheiro primeiro: se a base não ficou estável, ou
+            se o controlo positivo não passou, o resto não vale nada.
+          add-paths: |
+            packages/ingest/src/sources/comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json
+          delete-branch: true
+
+      - name: Resultado
+        if: always()
+        run: |
+          if [ "${{ steps.pr.outcome }}" = "success" ]; then
+            echo "::notice::Sonda corrida e PR aberto."
+          else
+            echo "::warning::Sonda corrida, mas não foi possível abrir o PR."
+            echo "A prova está no artefacto sonda-paginacao-${{ github.run_id }}."
+            echo "Para o PR automático, ligar em Settings -> Actions -> General:"
+            echo "  \"Allow GitHub Actions to create and approve pull requests\""
+          fi
