@@ -29,7 +29,7 @@ import { paresDoPedido } from "./pedido.ts";
  * que faz os pedidos é `scripts/sondar-paginacao-pt2030.mjs`.
  */
 
-export type Familia = "controlo" | "pagina" | "limite" | "deslocamento";
+export type Familia = "controlo" | "pagina" | "indexacao" | "limite" | "deslocamento";
 
 export interface Variante {
   /** `page=2`. Serve de nome na tabela de resultados. */
@@ -86,6 +86,21 @@ export function variantes(): Variante[] {
 
   for (const chave of ["page", "paged", "pagina", "page_number", "pageIndex", "numeroPagina"]) {
     lista.push({ nome: `${chave}=2`, familia: "pagina", corpo: comPar(chave, "2") });
+  }
+
+  // Saber que o parametro existe nao chega: falta saber por onde comeca a contar.
+  //
+  // Um parametro 0-indexado lido como 1-indexado salta a segunda pagina do
+  // conjunto sem dar erro nenhum — a varredura devolve menos avisos e parece
+  // completa. Foi exactamente o que aconteceu aqui: a primeira leitura desta
+  // sonda concluiu que dois avisos tinham saido do conjunto, quando o que se
+  // tinha passado era que a pagina onde eles estavam nunca foi pedida.
+  //
+  // `page=0` e a prova, e le-se ao contrario das outras: um veredicto
+  // `ignorado` aqui quer dizer que a resposta e igual a base, ou seja que o
+  // zero JA E a primeira pagina. Um `reconhecido` quereria dizer o oposto.
+  for (const valor of ["0", "1"]) {
+    lista.push({ nome: `page=${valor}`, familia: "indexacao", corpo: comPar("page", valor) });
   }
 
   for (const chave of ["limit", "per_page", "perPage", "posts_per_page", "pageSize", "page_size", "length", "rows", "take", "numeroRegistos"]) {

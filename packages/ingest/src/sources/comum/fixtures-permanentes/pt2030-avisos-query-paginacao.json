@@ -144,6 +144,36 @@
       "erro": null
     },
     {
+      "nome": "page=0",
+      "familia": "indexacao",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "page=1",
+      "familia": "indexacao",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "NORTE2030-2026-23",
+        "NORTE2030-2026-22",
+        "NORTE2030-2026-32",
+        "CENTRO2030-2026-22",
+        "ACORES2030-2026-23"
+      ],
+      "veredicto": "reconhecido",
+      "erro": null
+    },
+    {
       "nome": "limit=50",
       "familia": "limite",
       "status": 200,
@@ -354,5 +384,5 @@
       "erro": null
     }
   ],
-  "conclusao": "Reconhecidos: page=2."
+  "conclusao": "Reconhecidos: page=2, page=1."
 }
