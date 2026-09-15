@@ -7,6 +7,11 @@ três caminhos, quem decide o que aparece no catálogo e o que pode gerar email.
 Abre-a antes de mexer no pipeline. É um ficheiro único, sem dependências — abre
 num browser directamente do disco.
 
+`docs/estado-actual.md` é a outra metade: os fios por atar, datados. Apodrece de
+propósito — cada ponto lá dentro é para ser **apagado** quando for resolvido, não
+actualizado. Se um item ainda lá estiver dali a um mês, é isso mesmo que ele está
+a dizer.
+
 ## Mantém essa página verdadeira
 
 Documentação apodrece em silêncio, e este repositório já tem a prova de como isso
