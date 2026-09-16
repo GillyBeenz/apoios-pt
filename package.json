@@ -12,7 +12,6 @@
     "typecheck": "tsc --build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint .",
     "ingerir": "node --experimental-strip-types packages/ingest/src/cli.ts"
   },
   "devDependencies": {
