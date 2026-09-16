@@ -63,6 +63,16 @@ describe("variantes", () => {
     expect(p.getAll("order_by_direction")).toEqual(["asc"]);
   });
 
+  it("pergunta por onde comeca a contagem das paginas", () => {
+    // O `page=0` e o que distingue um parametro 0-indexado de um 1-indexado, e
+    // ler isso ao contrario salta uma pagina inteira em silencio — que foi o
+    // erro que esta familia existe para nao deixar repetir.
+    const nomes = variantes()
+      .filter((v) => v.familia === "indexacao")
+      .map((v) => v.nome);
+    expect(nomes).toEqual(["page=0", "page=1"]);
+  });
+
   it("não repete nomes", () => {
     const nomes = variantes().map((v) => v.nome);
     expect(new Set(nomes).size).toBe(nomes.length);

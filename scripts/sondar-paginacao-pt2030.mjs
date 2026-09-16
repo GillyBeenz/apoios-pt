@@ -5,9 +5,10 @@
  * Toda a decisão — que corpos enviar, o que cada resposta quer dizer — vive lá e
  * corre sem rede; aqui só se fazem os pedidos e se escreve o que voltou.
  *
- * Corre no GitHub Actions porque o ambiente de desenvolvimento não chega a
- * `portugal2030.pt`: o proxy de saída recusa todos os domínios do Estado com 403
- * ao CONNECT.
+ * Corre no GitHub Actions ou à mão. O ambiente de desenvolvimento chega hoje a
+ * `portugal2030.pt` — a lista de domínios permitidos do proxy de saída passou a
+ * incluí-lo — e correr isto à mão é a forma rápida de iterar. As fixtures que
+ * ficam no repositório continuam a vir do workflow, com PR e revisão.
  *
  * O resultado é um ficheiro de prova em `fixtures-permanentes/`. Não é um
  * relatório para ler uma vez e deitar fora: é o que impede a próxima pessoa de
@@ -32,6 +33,10 @@ const USER_AGENT =
 
 /** Entre pedidos. O servidor não é nosso e a sonda faz duas dezenas deles. */
 const ATRASO_MS = 1500;
+
+const ONDE = process.env.GITHUB_ACTIONS
+  ? "no GitHub Actions"
+  : "à mão, num ambiente de desenvolvimento com acesso de saída à rede";
 
 const DESTINO = new URL(
   "../packages/ingest/src/sources/comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json",
@@ -113,7 +118,7 @@ async function principal() {
   const prova = {
     observado_em: new Date().toISOString().slice(0, 10),
     como:
-      "scripts/sondar-paginacao-pt2030.mjs, no GitHub Actions. Cada variante é o corpo " +
+      `scripts/sondar-paginacao-pt2030.mjs, ${ONDE}. Cada variante é o corpo ` +
       "que a fonte envia mesmo, com um parâmetro acrescentado. Um parâmetro que o " +
       "servidor não percebe é ignorado e devolve a mesma resposta; qualquer diferença " +
       "quer dizer que alguém do outro lado leu aquele nome.",

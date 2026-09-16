@@ -1,0 +1,388 @@
+{
+  "observado_em": "2026-09-15",
+  "como": "scripts/sondar-paginacao-pt2030.mjs, à mão, num ambiente de desenvolvimento com acesso de saída à rede. Cada variante é o corpo que a fonte envia mesmo, com um parâmetro acrescentado. Um parâmetro que o servidor não percebe é ignorado e devolve a mesma resposta; qualquer diferença quer dizer que alguém do outro lado leu aquele nome.",
+  "pedido": {
+    "url": "https://portugal2030.pt/wp-json/avisos/query",
+    "metodo": "POST",
+    "tipo_conteudo": "application/x-www-form-urlencoded; charset=UTF-8",
+    "corpo_base": "estadoAvisoId=7&programaId%5B%5D=100&programaId%5B%5D=101&programaId%5B%5D=102&programaId%5B%5D=103&programaId%5B%5D=104&programaId%5B%5D=105&programaId%5B%5D=106&programaId%5B%5D=107&programaId%5B%5D=108&programaId%5B%5D=109&programaId%5B%5D=110&programaId%5B%5D=111&programaId%5B%5D=112&programaId%5B%5D=113&programaId%5B%5D=114&programaId%5B%5D=115&programaId%5B%5D=116&programaId%5B%5D=117&programaId%5B%5D=118&programaId%5B%5D=119&programaId%5B%5D=120&programaId%5B%5D=121&programaId%5B%5D=122&NUTSIIId=&fundoId=&tipoAvisoId=&tipoModalidadeApresentacaoCandidaturaId=&order_by_field=publicacao&order_by_direction=desc"
+  },
+  "base": {
+    "primeira": {
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ]
+    },
+    "ultima": {
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ]
+    },
+    "estavel": true
+  },
+  "controlo_positivo": {
+    "nome": "order_by_direction=asc",
+    "passou": true,
+    "porque": "`order_by_direction` é o único parâmetro que se sabe que o endpoint lê. Se invertê-lo não mudar a resposta, a sonda não consegue detectar um parâmetro que funcione, e um resultado todo `ignorado` não prova ausência de paginação."
+  },
+  "variantes": [
+    {
+      "nome": "order_by_direction=asc",
+      "familia": "controlo",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "MAR2030-2023-4",
+        "MAR2030-2023-14",
+        "MAR2030-2023-11",
+        "MAR2030-2023-13",
+        "MAR2030-2023-18"
+      ],
+      "veredicto": "reconhecido",
+      "erro": null
+    },
+    {
+      "nome": "page=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "FAMI2030-2026-37",
+        "ACORES2030-2026-22",
+        "ALT2030-2026-43",
+        "MAR2030-2026-25",
+        "NORTE2030-2026-20"
+      ],
+      "veredicto": "reconhecido",
+      "erro": null
+    },
+    {
+      "nome": "paged=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "pagina=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "page_number=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "pageIndex=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "numeroPagina=2",
+      "familia": "pagina",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "page=0",
+      "familia": "indexacao",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "page=1",
+      "familia": "indexacao",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "NORTE2030-2026-23",
+        "NORTE2030-2026-22",
+        "NORTE2030-2026-32",
+        "CENTRO2030-2026-22",
+        "ACORES2030-2026-23"
+      ],
+      "veredicto": "reconhecido",
+      "erro": null
+    },
+    {
+      "nome": "limit=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "per_page=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "perPage=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "posts_per_page=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "pageSize=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "page_size=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "length=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "rows=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "take=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "numeroRegistos=50",
+      "familia": "limite",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "offset=5",
+      "familia": "deslocamento",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "skip=5",
+      "familia": "deslocamento",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "start=5",
+      "familia": "deslocamento",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    },
+    {
+      "nome": "inicio=5",
+      "familia": "deslocamento",
+      "status": 200,
+      "avisos": 5,
+      "codigos": [
+        "ALT2030-2026-45",
+        "ALT2030-2026-46",
+        "ALT2030-2026-44",
+        "PESSOAS-2026-15",
+        "CENTRO2030-2026-23"
+      ],
+      "veredicto": "ignorado",
+      "erro": null
+    }
+  ],
+  "conclusao": "Reconhecidos: page=2, page=1."
+}
