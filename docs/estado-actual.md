@@ -69,18 +69,28 @@ deitada fora.
 
 ---
 
-## 3. Três benefícios fiscais à espera de revisão humana
+## 3. Três benefícios fiscais publicados sem revisão humana
 
-Na tabela `beneficios`, três linhas com `publicado = false` e
-`verificado_por = 'IA - Modelo LLM claude-opus-5'`:
+Na tabela `beneficios`, as três linhas estão agora `publicado = true` e assinadas
+`Revisto por IA contra o texto legal publicado, pendente de revisão humana final`:
 
-- Redução de IMI até 25% para prédios com eficiência energética
-- Isenção de IMI para prédios reabilitados
-- Obras de valorização reduzem a mais-valia tributada na venda da casa
+- Redução de IMI até 25% para prédios com eficiência energética (EBF 44.º-B)
+- Isenção de IMI para prédios reabilitados (EBF 45.º)
+- Obras de valorização reduzem a mais-valia tributada na venda da casa (CIRS 51.º)
 
-A primeira revisão foi feita por um modelo e está assinada como tal. **Uma IA a
-verificar-se a si própria não é verificação independente**, e isto é matéria
-fiscal: alguém tem de ler os três e pôr `publicado = true` nos que aprovar.
+A 16/09 foram lidas contra o texto legal no Portal das Finanças — o que a primeira
+revisão não pôde fazer, porque o ambiente ainda não chegava lá. Nenhuma estava
+errada; **as três estavam incompletas**, e em cada uma faltava precisamente a parte
+accionável: o prazo de 60 dias para o requerimento ao serviço de finanças no
+44.º-B; o facto de o reconhecimento no 45.º ter de ser pedido *com* o pedido de
+licença, antes das obras; e, no 51.º, o n.º 2, que corta os encargos na parte
+coberta por apoio público a fundo perdido — que é exactamente o caso de quem usa
+este catálogo.
+
+**Continua a faltar um humano.** Uma IA a rever o trabalho de outra IA não é
+verificação independente, por mais que desta vez tenha lido a fonte primária. A
+etiqueta diz isso a quem lê o site; o que falta é alguém com responsabilidade
+fiscal confirmar e reassinar.
 
 ⚠️ **O IVA a 6% em painéis solares não está semeado, e é de propósito.** Expirou a
 30/06/2025 e não foi reposto para 2026. É a coisa mais provável de alguém voltar
@@ -105,66 +115,12 @@ respondem. Sobram duas arestas pequenas, verificadas no mesmo dia:
 
 ---
 
-## 5. A fonte dos avisos abertos lê cinco de 228
+## 5. O que continua por saber do endpoint do PT2030
 
-**Isto já não é uma dúvida de contrato: é perda activa, e está medida.**
-
-A 14/09 o endpoint devolveu cinco avisos; a 15/09 devolveu cinco outros. Os dois
-que desapareceram — `NORTE2030-2026-22` e `NORTE2030-2026-23` — são exactamente
-os dois mais antigos por data de publicação, e entraram pelo topo dois publicados
-a 15/09. O `NORTE2030-2026-22` tem prazo até **31/12/2026**: não saiu por ter
-encerrado.
-
-O pedido leva `order_by_field=publicacao&order_by_direction=desc`. O que a fonte
-devolve não são «os avisos abertos», são os **cinco abertos publicados mais
-recentemente** — e cada aviso novo empurra um antigo para fora do catálogo sem
-deixar rasto. É a pergunta que o produto existe para responder, truncada em cinco.
-
-Isto também responde à outra metade do mistério da sessão anterior: o
-`NORTE2030-2026-23` não voltou depois da limpeza das chaves porque deixou de vir
-na resposta, não porque a limpeza tenha falhado. A limpeza estava certa. O aviso
-está vivo e volta sozinho assim que a fonte pedir a segunda página.
-
-### O contrato, já observado
-
-A sonda (`scripts/sondar-paginacao-pt2030.mjs`) correu a 15/09 e o endpoint
-respondeu. Dos 20 nomes experimentados só **um** foi reconhecido:
-
-- **O parâmetro é `page`**, e é **0-indexado**. `page=0` devolve byte a byte o
-  mesmo que o pedido sem `page` nenhum; a segunda página é `page=1`. Isto não é
-  um detalhe: ler o `page` como 1-indexado salta a segunda página inteira, e foi
-  assim que se chegou a concluir, por engano, que dois avisos tinham desaparecido
-  do conjunto quando estavam na página que não foi pedida.
-- **46 páginas**, de `page=0` a `page=45`, cinco por página e três na última.
-- **228 avisos** no `estadoAvisoId=7`, todos distintos, zero duplicados. A fonte
-  tem estado a ingerir **cinco**.
-- **O fim da paginação não é um erro HTTP**: `page=46` devolve `200` com
-  `{code: 404, info: "No data found"}` no corpo. O envelope continua a ser
-  `{avisos, status}` e **não traz total** — quem varre tem de andar até ao
-  sentinela.
-- Ignorados: `paged`, `pagina`, `page_number`, `pageIndex`, `numeroPagina`,
-  `limit`, `per_page`, `perPage`, `posts_per_page`, `pageSize`, `page_size`,
-  `length`, `rows`, `take`, `numeroRegistos`, `offset`, `skip`, `start`, `inicio`.
-
-Os dois `NORTE2030-2026-22` e `-23` estão vivos em `page=1`, nas duas primeiras
-posições. Foram empurrados das posições 4 e 5 para as 6 e 7, tal como a teoria
-previa — não saíram do conjunto. Voltam ao catálogo no dia em que a fonte pedir
-a segunda página.
-
-### O que falta
-
-**Implementar a paginação**, e a decisão de desenho que estava por confirmar
-confirmou-se na pior das duas hipóteses: o parâmetro é de *página* e não de
-*limite*, por isso varrer quer dizer **46 POSTs ao mesmo URL**. O livro de
-snapshots é indexado por URL, e 46 pedidos a partilhar um sobrescrevem o portão
-da mudança uns dos outros e ficam todos a parecer permanentemente mudados. Está
-escrito no comentário de `pedidosEntrada`, em `tipos.ts`.
-
-Isto não se resolve com uma linha e é matéria para quem decide a arquitectura:
-o portão da mudança tem de passar a ter uma chave que distinga páginas do mesmo
-URL, ou a fonte tem de deixar de usar `pedidosEntrada` para isto.
-
-### O que continua por saber do mesmo endpoint
+A paginação foi resolvida — `page`, 0-indexado, 46 páginas, 228 avisos — e o que
+se aprendeu ficou no contrato da fonte e em
+`comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json`. Sobram duas
+coisas por saber do mesmo endpoint.
 
 - **`estadoAvisoId`**: o `7` é o que a página usa na vista inicial. O que valem os
   outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda

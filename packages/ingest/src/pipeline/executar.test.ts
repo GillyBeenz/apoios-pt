@@ -9,6 +9,8 @@ import { extraccaoSolar } from "@apoios/extraction/teste";
 import { executarFonte } from "./executar.ts";
 import { ArmazemMemoria } from "./armazem.ts";
 import { BuscadorMemoria } from "../http/replay.ts";
+import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
+import { pt2030AvisosListagem } from "../sources/pt2030-avisos-listagem/index.ts";
 import type { Fonte } from "../sources/tipos.ts";
 import { extrair } from "../sources/fundo-ambiental-aac/extract.ts";
 
@@ -555,5 +557,107 @@ describe("contrato do resumo", () => {
     // Postgres passa a ler um caminho que não sabe que existe.
     expect(Array.isArray(r.conflitos)).toBe(true);
     expect(r.conflitos).toEqual([]);
+  });
+});
+
+/**
+ * Uma fonte paginada é varrida até ao fim, e cada página fica arrumada sozinha.
+ *
+ * O defeito que isto guarda custou 223 avisos abertos: o livro de snapshots é
+ * indexado por URL, e as 46 páginas do PT2030 partilham um URL. Sem uma chave
+ * por página, a segunda sobrescrevia o portão da primeira e todas ficavam a
+ * parecer permanentemente mudadas — mas antes disso nem sequer eram pedidas,
+ * porque não havia como as pedir.
+ *
+ * Usa-se aqui a fonte real, e não uma inventada: o que se quer provar é que o
+ * `pedidosEntrada` dela, tal como está declarado, produz mesmo um varrimento.
+ */
+describe("varrimento paginado", () => {
+  /** Responde por página, porque é o corpo que as distingue e não o URL. */
+  class BuscadorPaginado implements Buscador {
+    readonly pedidas: number[] = [];
+    constructor(private readonly ultimaComDados: number) {}
+
+    async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
+      const pagina = Number(new URLSearchParams(pedido.corpo ?? "").get("page"));
+      this.pedidas.push(pagina);
+      // O sentinela do PT2030: `200` com `{code:404}` e sem `avisos`.
+      const corpo =
+        pagina > this.ultimaComDados
+          ? '{"code":404,"info":"No data found"}'
+          : JSON.stringify({
+              status: 201,
+              avisos: [
+                {
+                  aviso: { codigoAviso: `X-${pagina}`, designacaoPT: `Aviso ${pagina}` },
+                  estrutura: [],
+                  calendario: { dataInicio: "2026-09-01T00:00:00" },
+                  documentos: [],
+                },
+              ],
+            });
+      return {
+        url: pedido.url,
+        status: 200,
+        naoModificado: false,
+        corpo,
+        bytes: null,
+        contentType: "application/json",
+        etag: null,
+        lastModified: null,
+        erro: null,
+      };
+    }
+  }
+
+  function contextoPt2030(buscador: Buscador, armazem: ArmazemMemoria) {
+    return {
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    };
+  }
+
+  it("pede páginas até uma vir vazia, e não mais", async () => {
+    const buscador = new BuscadorPaginado(2);
+    await executarFonte(contextoPt2030(buscador, new ArmazemMemoria()));
+
+    // Zero a dois trazem avisos; a três é o sentinela e fecha o varrimento.
+    // Que comece no ZERO é metade do que este teste guarda: começar no um
+    // saltava a segunda página do conjunto sem dar erro nenhum.
+    expect(buscador.pedidas).toEqual([0, 1, 2, 3]);
+  });
+
+  it("lê os apoios de todas as páginas, não só da primeira", async () => {
+    const armazem = new ArmazemMemoria();
+    const r = await executarFonte(contextoPt2030(new BuscadorPaginado(2), armazem));
+
+    // Um aviso distinto por página, três páginas com dados.
+    expect(r.apoiosNovos).toHaveLength(3);
+  });
+
+  it("dá a cada página a sua própria chave no livro de snapshots", async () => {
+    const armazem = new ArmazemMemoria();
+    await executarFonte(contextoPt2030(new BuscadorPaginado(2), armazem));
+
+    // É esta a correcção. Com uma chave só, a última página escrita apagava o
+    // portão das anteriores e o varrimento seguinte relia tudo de novo.
+    const chaves = [...armazem.snapshots.keys()];
+    expect(new Set(chaves).size).toBe(chaves.length);
+    expect(chaves.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("não repete o trabalho quando nenhuma página mudou", async () => {
+    const armazem = new ArmazemMemoria();
+    await executarFonte(contextoPt2030(new BuscadorPaginado(2), armazem));
+    const segunda = await executarFonte(
+      contextoPt2030(new BuscadorPaginado(2), armazem),
+    );
+
+    // O portão da mudança tem de continuar a funcionar por página: se as chaves
+    // colidissem, a segunda corrida via tudo como mudado.
+    expect(segunda.apoiosNovos).toHaveLength(0);
   });
 });

@@ -20,9 +20,30 @@ import {
   hashConteudo,
   normalizarConteudo,
 } from "../http/normalizar.ts";
-import type { Fonte } from "../sources/tipos.ts";
+import type { Fonte, Paginacao } from "../sources/tipos.ts";
 import type { Armazem } from "./armazem.ts";
 import type { MetricasFonte } from "./saude.ts";
+import {
+  atingiuOTecto,
+  chaveDePagina,
+  corpoDaPagina,
+  haMaisPaginas,
+} from "./paginacao.ts";
+
+/**
+ * Uma entrada por visitar nesta corrida.
+ *
+ * O que a distingue de um `PedidoCondicional` é a `chaveSnapshot`: o endereço a
+ * que se bate e a chave com que o resultado fica arrumado deixaram de ser a
+ * mesma coisa, porque 46 páginas do PT2030 partilham um URL e precisavam de 46
+ * chaves. Numa entrada não paginada as duas coincidem, e nada muda.
+ */
+interface EntradaDeCorrida extends PedidoCondicional {
+  readonly chaveSnapshot: string;
+  readonly paginacao?: Paginacao;
+  /** Presente só numa entrada paginada. É o valor enviado no parâmetro. */
+  readonly pagina?: number;
+}
 
 export interface OpcoesExecucao {
   readonly fonte: Fonte;
@@ -179,16 +200,37 @@ export async function executarFonte(
   const apoiosDaEntrada: ApoioNovo[] = [];
 
   // `urlsEntrada` são GETs simples; `pedidosEntrada` são os que não são.
-  const entradas: PedidoCondicional[] = [
-    ...fonte.urlsEntrada.map((url) => ({ url })),
-    ...(fonte.pedidosEntrada ?? []),
+  //
+  // Uma entrada paginada entra aqui como a sua primeira página, e as seguintes
+  // são acrescentadas à medida que cada uma rende. É por isso uma fila que se
+  // consome, e não um `for` sobre um array fixo: quantas páginas existem só se
+  // sabe ao chegar à primeira que vem vazia.
+  const porVisitar: EntradaDeCorrida[] = [
+    ...fonte.urlsEntrada.map((url) => ({ url, chaveSnapshot: url })),
+    ...(fonte.pedidosEntrada ?? []).map((p) =>
+      p.paginacao === undefined
+        ? { ...p, chaveSnapshot: p.url }
+        : {
+            ...p,
+            pagina: p.paginacao.primeiraPagina,
+            corpo: corpoDaPagina(p.corpo, p.paginacao, p.paginacao.primeiraPagina),
+            chaveSnapshot: chaveDePagina(p.url, p.paginacao.primeiraPagina),
+          },
+    ),
   ];
 
-  for (const entrada of entradas) {
+  while (porVisitar.length > 0) {
+    const entrada = porVisitar.shift() as EntradaDeCorrida;
     const url = entrada.url;
-    const anterior = await armazem.snapshotAnterior(url);
+    // O endereço a que se bate e a chave com que se arruma deixaram de ser a
+    // mesma coisa. Numa entrada não paginada continuam a coincidir.
+    const chave = entrada.chaveSnapshot;
+    const anterior = await armazem.snapshotAnterior(chave);
     const resposta = await buscador.buscar({
-      ...entrada,
+      url: entrada.url,
+      metodo: entrada.metodo,
+      corpo: entrada.corpo,
+      tipoConteudo: entrada.tipoConteudo,
       etag: anterior?.etag ?? null,
       lastModified: anterior?.lastModified ?? null,
     });
@@ -225,7 +267,7 @@ export async function executarFonte(
       listagemInalterada = false;
       if (!op.simulacao && hash !== null) {
         await armazem.guardarSnapshot(
-          url,
+          chave,
           {
             hashConteudo: hash,
             etag: resposta.etag,
@@ -237,7 +279,7 @@ export async function executarFonte(
         // A listing is finished the moment it is stored: parsing it is local,
         // free, and happens unconditionally a few lines below. Nothing
         // downstream can fail in a way that should make us read it again.
-        await armazem.marcarProcessado(url, hash);
+        await armazem.marcarProcessado(chave, hash);
       }
     }
 
@@ -248,7 +290,7 @@ export async function executarFonte(
     // an unchanged listing would miss a deadline extended only on the detail page.
     let html = corpo;
     if (html === null) {
-      const guardado = await armazem.conteudoSnapshot(url);
+      const guardado = await armazem.conteudoSnapshot(chave);
       html =
         guardado === null ? null : new TextDecoder("utf-8").decode(guardado);
     }
@@ -256,13 +298,38 @@ export async function executarFonte(
     // analisar. Ler o corpo como markup e passá-lo ao `extrair` daria zero
     // candidatos e um silêncio que se confundiria com uma semana parada.
     if (fonte.entradaEDataset === true && fonte.lerDataset !== undefined) {
+      let rendeu = 0;
       if (html !== null) {
-        apoiosDaEntrada.push(
-          ...fonte.lerDataset(new TextEncoder().encode(html), {
-            urlOrigem: url,
-            entidade: fonte.entidade,
-          }),
-        );
+        const apoios = fonte.lerDataset(new TextEncoder().encode(html), {
+          // A página humana, não a chave: `urlOrigem` é para onde se manda um
+          // leitor, e `?_pagina=3` não é sítio nenhum.
+          urlOrigem: url,
+          entidade: fonte.entidade,
+        });
+        rendeu = apoios.length;
+        apoiosDaEntrada.push(...apoios);
+      }
+
+      const p = entrada.paginacao;
+      if (p !== undefined && entrada.pagina !== undefined) {
+        if (atingiuOTecto(rendeu, entrada.pagina, p)) {
+          // Alto, porque a alternativa é um varrimento truncado que se parece
+          // exactamente com um varrimento completo.
+          console.warn(
+            `[${fonte.id}] tecto de ${p.maxPaginas} páginas atingido com a ` +
+              `página ${entrada.pagina} ainda a render ${rendeu} apoios. ` +
+              `O varrimento está truncado: ou a fonte cresceu, ou o sentinela ` +
+              `de fim mudou.`,
+          );
+        } else if (haMaisPaginas(rendeu, entrada.pagina, p)) {
+          const seguinte = entrada.pagina + 1;
+          porVisitar.push({
+            ...entrada,
+            pagina: seguinte,
+            corpo: corpoDaPagina(entrada.corpo ?? "", p, seguinte),
+            chaveSnapshot: chaveDePagina(url, seguinte),
+          });
+        }
       }
       continue;
     }

@@ -493,7 +493,7 @@
 
         <rect x="428" y="336" width="256" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <text class="svg-corp" x="556" y="356" font-size="12" text-anchor="middle" fill="currentColor">lerDataset() — a entrada já são os dados</text>
-        <text class="svg-mono" x="556" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">nem listagem nem segundo pedido</text>
+        <text class="svg-mono" x="556" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">sem listagem, mas com 46 páginas</text>
 
         <path d="M 256 359 L 284 359" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
         <path d="M 394 359 L 422 359" stroke="currentColor" stroke-width="1.4" marker-end="url(#s2)" fill="none"/>
@@ -531,7 +531,7 @@
         <span class="num">01</span>
         <span>
           <span class="fase-t">Buscar a entrada</span>
-          <span class="fase-d">Um <code>GET</code> com <code>if-none-match</code>, ou um <code>POST</code> com corpo declarado pela fonte. Num POST não vão validadores condicionais — a resposta depende do corpo enviado, não de uma versão guardada.</span>
+          <span class="fase-d">Um <code>GET</code> com <code>if-none-match</code>, ou um <code>POST</code> com corpo declarado pela fonte. Num POST não vão validadores condicionais — a resposta depende do corpo enviado, não de uma versão guardada. Uma fonte paginada pede aqui uma página de cada vez, até uma vir vazia; cada página tem a sua própria chave no livro de snapshots, senão sobrescreviam o portão umas das outras.</span>
         </span>
       </li>
       <li>
@@ -691,7 +691,7 @@
             <td class="id">pt2030-avisos-listagem</td>
             <td>API</td>
             <td><span class="pastilha p-activa">activa</span></td>
-            <td>Os avisos <em>abertos</em> — mas lê cinco dos 228 que existem. A nota abaixo explica porquê.</td>
+            <td>Os avisos <em>abertos</em>, os 229 que o endpoint tem. Leu cinco durante meses; a nota abaixo explica porquê.</td>
           </tr>
           <tr>
             <td class="id">prr-candidaturas</td>
@@ -708,7 +708,7 @@
       <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz.</p>
       <p><strong>A maior parte desse buraco é nossa, e não do calendário do Estado.</strong> O endpoint dos avisos abertos responde cinco avisos, sempre — e tem <strong>228</strong>. O pedido leva <code>order_by_field=publicacao</code> com <code>direction=desc</code>, por isso os cinco que chegam são os cinco publicados mais recentemente, e cada aviso novo empurra um antigo para fora da resposta. A 15/09 saíram assim dois avisos do Norte que estavam no catálogo, um deles com prazo até 31/12/2026.</p>
       <p>Uma sonda perguntou ao servidor que parâmetros ele reconhece, em vez de os adivinhar. De vinte nomes experimentados só um passou: <code>page</code>, e é <strong>0-indexado</strong> — <code>page=0</code> devolve exactamente o mesmo que não mandar <code>page</code> nenhum, e a segunda página é <code>page=1</code>. São 46 páginas, e o fim não é um erro HTTP: <code>page=46</code> devolve <code>200</code> com <code>{code: 404, info: "No data found"}</code> no corpo. O envelope não traz total, por isso quem varre tem de andar até ao sentinela. A prova está em <code>fixtures-permanentes/pt2030-avisos-query-paginacao.json</code>.</p>
-      <p>A paginação <em>ainda não está implementada</em>, e a razão está escrita ao lado do sítio onde vai doer: varrer 46 páginas são 46 <code>POST</code> ao mesmo URL, e o livro de snapshots que decide o portão da mudança é indexado por URL. Enquanto isso não for resolvido, a fonte continua a ler cinco.</p>
+      <p><strong>Está resolvido desde 16/09/2026.</strong> Varrer 46 páginas são 46 <code>POST</code> ao mesmo URL, e o livro de snapshots que decide o portão da mudança era indexado por URL — as páginas sobrescreviam-se umas às outras. A saída foi separar duas coisas que até aqui eram a mesma: <em>o endereço a que se bate</em> e <em>a chave com que o resultado fica arrumado</em>. O pedido continua a ir ao URL real; cada página fica guardada debaixo de uma chave própria. Corrido contra o endpoint ao vivo, a fonte passou de 5 para 229 apoios numa corrida.</p>
     </div>
   </section>
 
