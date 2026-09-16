@@ -88,29 +88,26 @@ a acrescentar sem confirmar.
 
 ---
 
-## 4. O ambiente não chega aos sítios do Estado
+## 4. Dois apex fora da lista, e uma cadeia de certificados partida
 
-Continua a dar `403` ao CONNECT em `diariodarepublica.pt`,
-`info.portaldasfinancas.gov.pt`, `sce.pt` e nos restantes. O 403 vem da
-*gateway*, não dos sítios: é a política de rede do ambiente.
+O ponto grande — o ambiente não chegar a sítio nenhum do Estado — **está
+resolvido**: a lista de domínios permitidos passou a Custom a 15/09 e os sítios
+respondem. Sobram duas arestas pequenas, verificadas no mesmo dia:
 
-A lista de domínios permitidos altera-se em claude.ai/code → ícone de nuvem →
-engrenagem no ambiente → **Custom** → **Allowed domains**. Ao mudar para Custom é
-preciso marcar **«Also include default list of common package managers»**, senão a
-lista substitui a de origem e o `pnpm install` deixa de funcionar.
-
-**Uma sessão a correr nunca relê a configuração** — a documentação é explícita.
-Mudar a política só faz efeito em sessões novas; reabrir ou retomar uma sessão
-existente traz o histórico mas mantém o ambiente com que nasceu.
-
-Enquanto isto não mudar, toda a verificação contra fontes primárias passa por
-abrir um PR e esperar por um workflow.
+- `sce.pt` e `fundoambiental.pt` **sem `www`** continuam a dar 403; só as formas
+  com `www` estão na lista. Não afecta a ingestão — as três fontes usam mesmo o
+  `www.` — mas apanha quem escrever um URL à mão.
+- `recuperarportugal.gov.pt` passa o proxy e **falha o TLS**: «unable to get
+  local issuer certificate». Não é política de rede, é a cadeia servida por eles
+  que vem incompleta. O `capturar-fixtures.mjs` já trata disto sozinho, com o
+  `buscarComReparo` a ir buscar o intermediário em falta — mas um `curl` ou um
+  `fetch` escrito à pressa vai bater nisto e parecer um bloqueio que não é.
 
 ---
 
-## 5. O endpoint do PT2030 devolve cinco, e está a perder avisos abertos
+## 5. A fonte dos avisos abertos lê cinco de 228
 
-**Isto já não é uma dúvida de contrato: é perda activa.**
+**Isto já não é uma dúvida de contrato: é perda activa, e está medida.**
 
 A 14/09 o endpoint devolveu cinco avisos; a 15/09 devolveu cinco outros. Os dois
 que desapareceram — `NORTE2030-2026-22` e `NORTE2030-2026-23` — são exactamente
@@ -124,29 +121,48 @@ recentemente** — e cada aviso novo empurra um antigo para fora do catálogo se
 deixar rasto. É a pergunta que o produto existe para responder, truncada em cinco.
 
 Isto também responde à outra metade do mistério da sessão anterior: o
-`NORTE2030-2026-23` não voltou depois da limpeza das chaves, e não volta —
-a limpeza estava certa, o endpoint é que deixou de o devolver.
+`NORTE2030-2026-23` não voltou depois da limpeza das chaves porque deixou de vir
+na resposta, não porque a limpeza tenha falhado. A limpeza estava certa. O aviso
+está vivo e volta sozinho assim que a fonte pedir a segunda página.
 
-### O que já foi feito
+### O contrato, já observado
 
-`scripts/sondar-paginacao-pt2030.mjs` (workflow `sondar-paginacao.yml`,
-`workflow_dispatch`) pergunta ao servidor. Manda o corpo real da fonte com um
-parâmetro acrescentado de cada vez — 20 nomes de três convenções — e escreve o que
-voltou em `fixtures-permanentes/pt2030-avisos-query-paginacao.json`. Leva um
-controlo positivo (`order_by_direction=asc`) sem o qual «nenhum reconhecido» não
-distinguiria um endpoint sem paginação de uma sonda partida.
+A sonda (`scripts/sondar-paginacao-pt2030.mjs`) correu a 15/09 e o endpoint
+respondeu. Dos 20 nomes experimentados só **um** foi reconhecido:
+
+- **O parâmetro é `page`**, e é **0-indexado**. `page=0` devolve byte a byte o
+  mesmo que o pedido sem `page` nenhum; a segunda página é `page=1`. Isto não é
+  um detalhe: ler o `page` como 1-indexado salta a segunda página inteira, e foi
+  assim que se chegou a concluir, por engano, que dois avisos tinham desaparecido
+  do conjunto quando estavam na página que não foi pedida.
+- **46 páginas**, de `page=0` a `page=45`, cinco por página e três na última.
+- **228 avisos** no `estadoAvisoId=7`, todos distintos, zero duplicados. A fonte
+  tem estado a ingerir **cinco**.
+- **O fim da paginação não é um erro HTTP**: `page=46` devolve `200` com
+  `{code: 404, info: "No data found"}` no corpo. O envelope continua a ser
+  `{avisos, status}` e **não traz total** — quem varre tem de andar até ao
+  sentinela.
+- Ignorados: `paged`, `pagina`, `page_number`, `pageIndex`, `numeroPagina`,
+  `limit`, `per_page`, `perPage`, `posts_per_page`, `pageSize`, `page_size`,
+  `length`, `rows`, `take`, `numeroRegistos`, `offset`, `skip`, `start`, `inicio`.
+
+Os dois `NORTE2030-2026-22` e `-23` estão vivos em `page=1`, nas duas primeiras
+posições. Foram empurrados das posições 4 e 5 para as 6 e 7, tal como a teoria
+previa — não saíram do conjunto. Voltam ao catálogo no dia em que a fonte pedir
+a segunda página.
 
 ### O que falta
 
-- **Correr o workflow.** Ainda não correu nenhuma vez.
-- **Implementar o que ele encontrar.** E há aí uma decisão de desenho já visível:
-  se o parâmetro for de *página* e não de *limite*, paginar quer dizer vários POSTs
-  ao mesmo URL — e o livro de snapshots é indexado por URL, por isso dois pedidos a
-  partilhar um sobrescrevem o portão da mudança um do outro e ficam os dois a
-  parecer permanentemente mudados. Está escrito em `tipos.ts`, em
-  `pedidosEntrada`. Um parâmetro de limite não tem este problema.
-- **Se nenhum nome for reconhecido**, a saída provável é o `estadoAvisoId` aqui em
-  baixo.
+**Implementar a paginação**, e a decisão de desenho que estava por confirmar
+confirmou-se na pior das duas hipóteses: o parâmetro é de *página* e não de
+*limite*, por isso varrer quer dizer **46 POSTs ao mesmo URL**. O livro de
+snapshots é indexado por URL, e 46 pedidos a partilhar um sobrescrevem o portão
+da mudança uns dos outros e ficam todos a parecer permanentemente mudados. Está
+escrito no comentário de `pedidosEntrada`, em `tipos.ts`.
+
+Isto não se resolve com uma linha e é matéria para quem decide a arquitectura:
+o portão da mudança tem de passar a ter uma chave que distinga páginas do mesmo
+URL, ou a fonte tem de deixar de usar `pedidosEntrada` para isto.
 
 ### O que continua por saber do mesmo endpoint
 

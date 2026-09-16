@@ -323,11 +323,13 @@
 
   <!-- ================= 1. A restrição que molda tudo ================= -->
   <section>
-    <p class="sub">A restrição que molda tudo</p>
-    <h2>O ambiente de desenvolvimento não chega a nenhum sítio do Estado</h2>
+    <p class="sub">A restrição que moldou tudo</p>
+    <h2>O ambiente só chega aos sítios que alguém autorizou um a um</h2>
     <div class="leitura">
-      <p>Todos os domínios governamentais portugueses — <code>diariodarepublica.pt</code>, <code>fundoambiental.pt</code>, <code>portugal2030.pt</code> — são recusados pelo proxy de saída deste ambiente, com <code>403</code> ao CONNECT. A recusa vem da <em>gateway</em>, não dos sítios.</p>
-      <p>Isso podia ser só um incómodo. Em vez disso passou a ser a forma do sistema: quem vai à rede são os <em>runners</em> do GitHub Actions, que não estão atrás do proxy, e o que eles trazem é gravado no repositório. Os extractores nunca tocam na rede — lêem ficheiros commitados — e por isso correm em qualquer máquina, em quatro segundos, sem depender de um sítio do Estado estar de pé.</p>
+      <p>O proxy de saída deste ambiente recusa tudo o que não esteja numa lista explícita, com <code>403</code> ao CONNECT — e a recusa vem da <em>gateway</em>, não dos sítios. Durante quase todo o tempo em que este sistema foi construído a lista estava vazia de domínios do Estado, e nenhum deles era alcançável.</p>
+      <p><strong>Desde 15/09/2026 já não é assim</strong>: <code>portugal2030.pt</code>, <code>www.fundoambiental.pt</code>, <code>diariodarepublica.pt</code>, <code>info.portaldasfinancas.gov.pt</code> e <code>www.sce.pt</code> estão autorizados. Continua a ser uma lista, não acesso livre — as formas sem <code>www</code> de duas delas ficam de fora, e o <code>recuperarportugal.gov.pt</code> passa o proxy mas serve uma cadeia de certificados incompleta.</p>
+      <p>O que <em>não</em> mudou é a forma do sistema, e é de propósito. Quem vai à rede para alimentar o catálogo continuam a ser os <em>runners</em> do GitHub Actions, e o que eles trazem fica gravado no repositório. Os extractores nunca tocam na rede — lêem ficheiros commitados — e por isso correm em qualquer máquina, em quatro segundos, sem depender de um sítio do Estado estar de pé. Isso começou por ser uma imposição e ficou por ser melhor: um extractor que fizesse um pedido deixaria de ser testável, e os testes deixariam de poder correr enquanto o Estado tem o sítio em baixo.</p>
+      <p>A rede no ambiente serve agora para <em>investigar</em> — interrogar um endpoint, confirmar um contrato, ver o que um sítio responde hoje — e não para ingerir.</p>
     </div>
 
     <figure>
@@ -363,13 +365,13 @@
         <!-- a barreira -->
         <line x1="300" y1="14" x2="300" y2="358" stroke="#9c2f21" stroke-width="1.6" stroke-dasharray="7 5"/>
         <text class="svg-mono" x="306" y="196" font-size="11" fill="#9c2f21" letter-spacing="0.6">proxy de saída</text>
-        <text class="svg-mono" x="306" y="212" font-size="10.5" fill="#9c2f21" opacity="0.8">403 ao CONNECT</text>
+        <text class="svg-mono" x="306" y="212" font-size="10.5" fill="#9c2f21" opacity="0.8">403 fora da lista</text>
 
         <!-- tentativa bloqueada -->
         <path d="M 240 300 L 292 300" stroke="#9c2f21" stroke-width="1.4" fill="none"/>
         <line x1="280" y1="292" x2="296" y2="308" stroke="#9c2f21" stroke-width="1.8"/>
         <line x1="296" y1="292" x2="280" y2="308" stroke="#9c2f21" stroke-width="1.8"/>
-        <text class="svg-mono" x="38" y="304" font-size="10.5" fill="#9c2f21">pedido directo</text>
+        <text class="svg-mono" x="38" y="304" font-size="10.5" fill="#9c2f21">domínio não autorizado</text>
 
         <!-- coluna direita: actions -->
         <rect x="430" y="40" width="240" height="140" fill="none" stroke="currentColor" stroke-width="1" opacity="0.32"/>
@@ -404,7 +406,7 @@
 
         <text class="svg-mono" x="454" y="340" font-size="10.5" fill="currentColor" opacity="0.62">os runners não estão atrás do proxy</text>
       </svg>
-      <figcaption>A barreira a vermelho é o proxy de saída. Tudo o que precisa de rede vive do lado direito dela; do lado esquerdo só existem ficheiros. É por isso que a captura é um passo separado com o seu próprio workflow, e não uma chamada dentro do extractor.</figcaption>
+      <figcaption>A barreira a vermelho é o proxy de saída, que deixa passar só os domínios autorizados um a um. A ingestão vive toda do lado direito — é por isso que a captura é um passo separado com o seu próprio workflow, e não uma chamada dentro do extractor. O ambiente de desenvolvimento passou a poder atravessar a barreira para investigar, mas nenhum extractor o faz: o que alimenta o catálogo continua a entrar por ficheiros commitados.</figcaption>
     </figure>
   </section>
 
@@ -689,7 +691,7 @@
             <td class="id">pt2030-avisos-listagem</td>
             <td>API</td>
             <td><span class="pastilha p-activa">activa</span></td>
-            <td>Os avisos <em>abertos</em> — mas só cinco de cada vez, e é a nota abaixo que explica porquê.</td>
+            <td>Os avisos <em>abertos</em> — mas lê cinco dos 228 que existem. A nota abaixo explica porquê.</td>
           </tr>
           <tr>
             <td class="id">prr-candidaturas</td>
@@ -704,8 +706,9 @@
     <div class="nota">
       <span class="nota-t">o buraco que falta tapar</span>
       <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz.</p>
-      <p><strong>Parte desse buraco é nosso, e não do calendário do Estado.</strong> O endpoint dos avisos abertos respondeu cinco avisos a 14/09 e cinco a 15/09, e os dois que desapareceram entre um dia e o outro foram exactamente os dois mais antigos por data de publicação — enquanto dois, publicados a 15/09, entravam pelo topo. Um deles, o <code>NORTE2030-2026-22</code>, tem prazo até 31/12/2026: não saiu por ter encerrado, saiu por ter sido empurrado. O pedido leva <code>order_by_field=publicacao</code> com <code>direction=desc</code> e nunca se observou nenhum parâmetro de página.</p>
-      <p>Ou seja: aquilo que a fonte devolve não são «os avisos abertos», são os <em>cinco abertos publicados mais recentemente</em>, e cada aviso novo que o PT2030 publica empurra um antigo para fora do catálogo em silêncio. Qual é o parâmetro que pagina isto — se é que existe — ainda não se sabe, e adivinhá-lo seria inventar um campo que o documento não diz. <code>scripts/sondar-paginacao-pt2030.mjs</code> vai perguntá-lo ao servidor e escrever a resposta em <code>fixtures-permanentes/</code>.</p>
+      <p><strong>A maior parte desse buraco é nossa, e não do calendário do Estado.</strong> O endpoint dos avisos abertos responde cinco avisos, sempre — e tem <strong>228</strong>. O pedido leva <code>order_by_field=publicacao</code> com <code>direction=desc</code>, por isso os cinco que chegam são os cinco publicados mais recentemente, e cada aviso novo empurra um antigo para fora da resposta. A 15/09 saíram assim dois avisos do Norte que estavam no catálogo, um deles com prazo até 31/12/2026.</p>
+      <p>Uma sonda perguntou ao servidor que parâmetros ele reconhece, em vez de os adivinhar. De vinte nomes experimentados só um passou: <code>page</code>, e é <strong>0-indexado</strong> — <code>page=0</code> devolve exactamente o mesmo que não mandar <code>page</code> nenhum, e a segunda página é <code>page=1</code>. São 46 páginas, e o fim não é um erro HTTP: <code>page=46</code> devolve <code>200</code> com <code>{code: 404, info: "No data found"}</code> no corpo. O envelope não traz total, por isso quem varre tem de andar até ao sentinela. A prova está em <code>fixtures-permanentes/pt2030-avisos-query-paginacao.json</code>.</p>
+      <p>A paginação <em>ainda não está implementada</em>, e a razão está escrita ao lado do sítio onde vai doer: varrer 46 páginas são 46 <code>POST</code> ao mesmo URL, e o livro de snapshots que decide o portão da mudança é indexado por URL. Enquanto isso não for resolvido, a fonte continua a ler cinco.</p>
     </div>
   </section>
 
@@ -786,16 +789,16 @@
         <thead>
           <tr>
             <th>Medida</th>
-            <th class="num-c">14/09/2026</th>
+            <th class="num-c">16/09/2026</th>
             <th>O que quer dizer</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Apoios no catálogo</td><td class="num-c">448</td><td>Tudo o que alguma vez foi lido e resolvido como distinto.</td></tr>
-          <tr><td>Publicados</td><td class="num-c">434</td><td>Visíveis, com a fonte oficial ao lado.</td></tr>
-          <tr><td><strong>Abertos agora</strong></td><td class="num-c">6</td><td><strong>O número que interessa a quem procura financiamento.</strong></td></tr>
+          <tr><td>Apoios no catálogo</td><td class="num-c">450</td><td>Tudo o que alguma vez foi lido e resolvido como distinto.</td></tr>
+          <tr><td>Publicados</td><td class="num-c">436</td><td>Visíveis, com a fonte oficial ao lado.</td></tr>
+          <tr><td><strong>Abertos agora</strong></td><td class="num-c">8</td><td><strong>O número que interessa a quem procura financiamento — e o endpoint do PT2030 sozinho tem 228.</strong></td></tr>
           <tr><td>Previstos</td><td class="num-c">388</td><td>Do plano anual. Ainda não abriram.</td></tr>
-          <tr><td>Encerrados</td><td class="num-c">53</td><td>Histórico, visível desde que se saiba quando fecharam.</td></tr>
+          <tr><td>Encerrados</td><td class="num-c">52</td><td>Histórico, visível desde que se saiba quando fecharam.</td></tr>
           <tr><td>Alertáveis</td><td class="num-c">6</td><td>Os únicos que podem gerar email.</td></tr>
         </tbody>
       </table>
@@ -810,7 +813,7 @@
   <footer>
     <p>appoios.guru · monorepo apoios-pt · packages/core · packages/extraction · packages/ingest · apps/web<br>
     supabase eu-west-1 · 17 tabelas · 7 tarefas pg_cron · 4 workflows<br>
-    Página escrita a 14 de setembro de 2026.</p>
+    Página escrita a 14 de setembro de 2026, revista a 16.</p>
   </footer>
 
 </div>
