@@ -40,11 +40,24 @@ describe("registo de fontes", () => {
 
       let melhor = 0;
 
-      // Uma fonte cuja entrada já é o conjunto de dados prova-se da mesma maneira,
-      // com a mesma exigência: o `lerDataset` corre sobre a captura dela própria e
-      // tem de render o piso. O que muda é só qual é a função que se põe à prova —
-      // o `extrair` dessas fontes devolve lista vazia por construção, e usá-lo
-      // aqui era dar-lhes um exame que passam sem saber a matéria.
+      // Numa fonte paginada, a captura é de **uma página** e o piso é de **uma
+      // corrida**. São grandezas diferentes, e compará-las prendia o piso ao que
+      // cabe numa página: o PT2030 traz 229 avisos em 46 páginas, e exigir os 229
+      // de uma captura de cinco punha a build vermelha sem haver nada partido.
+      //
+      // O que esta captura consegue provar é que o leitor funciona sobre bytes
+      // reais, e é isso que se lhe pede: pelo menos um apoio de uma página que
+      // trouxe avisos. O piso da corrida fica livre para ser o número certo, e
+      // quem o guarda é o pipeline, que vê a corrida inteira.
+      //
+      // Isto enfraquece o exame, e enfraquece-o de propósito: a alternativa era
+      // manter uma exigência que a captura não consegue sustentar, e o preço dessa
+      // era um piso de saúde a um — incapaz de distinguir um varrimento truncado
+      // na primeira página de uma corrida sã.
+      const paginada = (f.pedidosEntrada ?? []).some(
+        (pedido) => pedido.paginacao !== undefined,
+      );
+
       if (f.entradaEDataset === true) {
         for (const pedido of f.pedidosEntrada ?? []) {
           const entrada = entradas.find((e) => e.url === pedido.url);
@@ -56,6 +69,14 @@ describe("registo de fontes", () => {
               entidade: f.entidade,
             }).length ?? 0;
           melhor = Math.max(melhor, n);
+        }
+
+        if (paginada) {
+          expect(
+            melhor,
+            `${f.id}: o leitor devolve ${melhor} da captura de uma página`,
+          ).toBeGreaterThanOrEqual(1);
+          continue;
         }
       } else {
         for (const url of f.urlsEntrada) {
@@ -82,8 +103,17 @@ describe("registo de fontes", () => {
         // forty entries to one would pass — so it has to be higher. A dataset source
         // is different in kind: it expects a single file, and 1 genuinely means "the
         // download link is still there".
+        //
+        // Salvo se for paginada, e aí volta a ser uma listagem em tudo menos no
+        // nome: o que chega é a soma de dezenas de páginas, e a falha que interessa
+        // é o varrimento parar a meio. Um piso que uma página sozinha satisfaz não
+        // distingue isso de uma corrida inteira — que é exactamente o buraco em que
+        // esta fonte esteve enquanto o piso ficou preso ao que a captura mostrava.
+        const paginada = (f.pedidosEntrada ?? []).some(
+          (pedido) => pedido.paginacao !== undefined,
+        );
         expect(f.candidatosMin, f.id).toBeGreaterThan(
-          f.tipo === "dataset" ? 0 : 1,
+          f.tipo === "dataset" && !paginada ? 0 : 1,
         );
       } else {
         // Any other number would be invented rather than measured.

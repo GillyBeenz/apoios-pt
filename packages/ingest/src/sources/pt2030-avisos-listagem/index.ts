@@ -57,16 +57,24 @@ export const pt2030AvisosListagem: Fonte = {
   // de ponta a ponta, que era a condição.
   estado: "activa",
 
-  // Um, e agora quer dizer alguma coisa: numa fonte cuja entrada já é o conjunto
-  // de dados, a métrica `candidatos` passou a contar os apoios que a resposta
-  // rendeu, porque candidatos a sério não há nenhum.
+  // Cinquenta, e o número mudou quando a fonte passou a varrer.
   //
-  // Um e não cinco. Cinco é quantos estavam abertos no dia da captura, e é um
-  // número sobre o calendário do Estado, não sobre a saúde desta fonte: uma
-  // semana em que só abre um aviso é uma semana normal, não uma avaria. Zero é
-  // que não é — o endpoint devolver lista vazia significa que alguma coisa mudou
-  // do lado de lá.
-  candidatosMin: 1,
+  // Era um, e um estava certo enquanto isto lia uma página: cinco era quantos
+  // estavam abertos no dia da captura, um número sobre o calendário do Estado e
+  // não sobre a saúde da fonte. Com o varrimento a resposta real tem 229 avisos,
+  // e «zero» deixou de ser o modo de falha que interessa.
+  //
+  // O que interessa agora é a truncagem. Uma página que não responde é pedida
+  // segunda vez e, se voltar a falhar, a corrida regista erro — isso vê-se. O que
+  // não se vê é o varrimento parar cedo e sair uma corrida bem formada com os
+  // cinco da primeira página e nenhum erro. É a falha silenciosa que este
+  // repositório já pagou duas vezes, e um piso de um deixava-a passar inteira.
+  //
+  // Cinquenta está muito acima de uma página e muito abaixo dos 229 medidos. Não
+  // é uma previsão do calendário do Estado: é a fronteira entre «uma semana fraca»
+  // e «isto está partido». Um dia em que os avisos abertos do PT2030 caiam abaixo
+  // de cinquenta é, ele próprio, coisa para alguém ir ver.
+  candidatosMin: 50,
 
   // Não há markup para analisar. O contrato do `Fonte` pede um `extrair`, e a
   // resposta honesta desta fonte a essa pergunta é uma lista vazia.
