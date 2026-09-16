@@ -13,7 +13,7 @@ import {
   verificarProvas,
   type ExtractorLike,
 } from "@apoios/extraction";
-import type { Buscador, PedidoCondicional } from "../http/tipos.ts";
+import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
 import {
   decodificarEntidades,
   hashBytes,
@@ -28,6 +28,7 @@ import {
   chaveDePagina,
   corpoDaPagina,
   haMaisPaginas,
+  TENTATIVAS_POR_PAGINA,
 } from "./paginacao.ts";
 
 /**
@@ -226,14 +227,33 @@ export async function executarFonte(
     // mesma coisa. Numa entrada não paginada continuam a coincidir.
     const chave = entrada.chaveSnapshot;
     const anterior = await armazem.snapshotAnterior(chave);
-    const resposta = await buscador.buscar({
-      url: entrada.url,
-      metodo: entrada.metodo,
-      corpo: entrada.corpo,
-      tipoConteudo: entrada.tipoConteudo,
-      etag: anterior?.etag ?? null,
-      lastModified: anterior?.lastModified ?? null,
-    });
+    const pedirPagina = (): Promise<RespostaHttp> =>
+      buscador.buscar({
+        url: entrada.url,
+        metodo: entrada.metodo,
+        corpo: entrada.corpo,
+        tipoConteudo: entrada.tipoConteudo,
+        etag: anterior?.etag ?? null,
+        lastModified: anterior?.lastModified ?? null,
+      });
+
+    let resposta = await pedirPagina();
+
+    // Numa entrada paginada, uma falha de rede não é só esta página que se
+    // perde: é o resto do varrimento. A página seguinte é enfileirada mais
+    // abaixo, depois do `continue` que um erro dispara, por isso um `timeout`
+    // a meio pára o ciclo como se o conjunto tivesse acabado — só que sem o
+    // sentinela e sem ninguém ter decidido isso.
+    //
+    // Isto não é hipótese: o primeiro varrimento a sério morreu na página 44
+    // de 46 assim. Só nas entradas paginadas, de propósito — numa entrada
+    // normal uma falha custa essa fonte nesta corrida, e o comportamento de
+    // cinco fontes não se muda de passagem por causa de uma.
+    if (resposta.erro !== null && entrada.paginacao !== undefined) {
+      for (let t = 1; t < TENTATIVAS_POR_PAGINA && resposta.erro !== null; t++) {
+        resposta = await pedirPagina();
+      }
+    }
 
     statusFinal = resposta.status;
 

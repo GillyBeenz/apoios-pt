@@ -130,3 +130,24 @@ coisas por saber do mesmo endpoint.
   O endereço de descarga não é derivável desses dois campos, por isso
   `documentos` fica vazio — ligar a um ficheiro que não se consegue endereçar é
   pior do que não o listar.
+
+---
+
+## 6. O piso de saúde do `pt2030-avisos-listagem` está baixo de mais
+
+`candidatosMin: 1`, e com o varrimento a resposta normal tem 229 apoios.
+
+As falhas de rede já não passam despercebidas: uma página que falha é pedida
+segunda vez e, se voltar a falhar, a corrida regista `erro` na saúde da fonte.
+O que continua sem guarda é o caso que o próprio `paginacao.ts` assinala — uma
+página vazia **a meio** trunca o varrimento, e aí sai uma corrida bem formada
+com meia dúzia de apoios e nenhum erro. Um piso à volta de 50 apanhava isso: bem
+acima de uma página, bem abaixo dos 229 medidos.
+
+**Porque não subiu já:** o `registo.test.ts` mede este piso contra a captura
+committada da fonte, e essa captura é de uma página — o que está certo, porque o
+`lerDataset` recebe mesmo uma página de cada vez. Subir o piso punha a build
+vermelha sem haver nada partido. Ou o teste passa a medir o piso de outra
+maneira nas fontes paginadas, ou o piso fica onde está e a guarda vem de outro
+sítio. As duas dão trabalho e nenhuma é urgente; o que não se deve é esquecer.
+

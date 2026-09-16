@@ -36,6 +36,24 @@ import type { Paginacao } from "../sources/tipos.ts";
 
 export type { Paginacao };
 
+/**
+ * Quantas vezes se pede a mesma página antes de desistir do varrimento.
+ *
+ * Duas, e o número vem de uma medição: o primeiro varrimento a sério deste
+ * endpoint morreu na página **44 de 46** com um `timeout`, depois de sete
+ * minutos de páginas boas.
+ *
+ * Isso importa aqui mais do que numa entrada normal. Uma página que falha não
+ * rende registo nenhum, e o ciclo pára — não por o conjunto ter acabado, mas por
+ * a rede ter tossido. O varrimento fica truncado a 96%, com a cauda do catálogo
+ * por actualizar, e a corrida seguinte volta a ter a mesma probabilidade de
+ * morrer algures nas 46.
+ *
+ * Duas e não mais: se a segunda também falha, o problema não é passageiro, e
+ * insistir só carrega um servidor que já está a dizer que não consegue.
+ */
+export const TENTATIVAS_POR_PAGINA = 2;
+
 /** O sufixo que identifica a página no livro de snapshots. */
 const PARAMETRO_CHAVE = "_pagina";
 

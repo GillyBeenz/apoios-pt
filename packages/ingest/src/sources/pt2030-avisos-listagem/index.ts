@@ -2,7 +2,7 @@ import type { ApoioNovo } from "@apoios/core";
 import type { ContextoDataset, Fonte } from "../tipos.ts";
 import { lerAvisos } from "./resposta.ts";
 import { avisoAbertoParaApoio } from "./paraApoio.ts";
-import { corpoDoPedido, TIPO_CONTEUDO, URL_QUERY } from "./pedido.ts";
+import { corpoDoVarrimento, TIPO_CONTEUDO, URL_QUERY } from "./pedido.ts";
 
 /** A página humana. É para aqui que um leitor deve ser mandado. */
 const LISTAGEM = "https://portugal2030.pt/avisos/";
@@ -23,7 +23,7 @@ export const pt2030AvisosListagem: Fonte = {
     {
       url: URL_QUERY,
       metodo: "POST",
-      corpo: corpoDoPedido(),
+      corpo: corpoDoVarrimento(),
       tipoConteudo: TIPO_CONTEUDO,
 
       // Sem isto a fonte lia 5 de 228. O endpoint devolve cinco avisos por
