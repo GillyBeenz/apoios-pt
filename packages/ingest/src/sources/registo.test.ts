@@ -40,24 +40,13 @@ describe("registo de fontes", () => {
 
       let melhor = 0;
 
-      // Numa fonte paginada, a captura é de **uma página** e o piso é de **uma
-      // corrida**. São grandezas diferentes, e compará-las prendia o piso ao que
-      // cabe numa página: o PT2030 traz 229 avisos em 46 páginas, e exigir os 229
-      // de uma captura de cinco punha a build vermelha sem haver nada partido.
-      //
-      // O que esta captura consegue provar é que o leitor funciona sobre bytes
-      // reais, e é isso que se lhe pede: pelo menos um apoio de uma página que
-      // trouxe avisos. O piso da corrida fica livre para ser o número certo, e
-      // quem o guarda é o pipeline, que vê a corrida inteira.
-      //
-      // Isto enfraquece o exame, e enfraquece-o de propósito: a alternativa era
-      // manter uma exigência que a captura não consegue sustentar, e o preço dessa
-      // era um piso de saúde a um — incapaz de distinguir um varrimento truncado
-      // na primeira página de uma corrida sã.
       const paginada = (f.pedidosEntrada ?? []).some(
         (pedido) => pedido.paginacao !== undefined,
       );
 
+      // Qual dos dois leitores se põe à prova. O `extrair` de uma fonte cujo
+      // input já é o conjunto de dados devolve lista vazia por construção, e
+      // usá-lo aqui era dar-lhe um exame que passa sem saber a matéria.
       if (f.entradaEDataset === true) {
         for (const pedido of f.pedidosEntrada ?? []) {
           const entrada = entradas.find((e) => e.url === pedido.url);
@@ -70,14 +59,6 @@ describe("registo de fontes", () => {
             }).length ?? 0;
           melhor = Math.max(melhor, n);
         }
-
-        if (paginada) {
-          expect(
-            melhor,
-            `${f.id}: o leitor devolve ${melhor} da captura de uma página`,
-          ).toBeGreaterThanOrEqual(1);
-          continue;
-        }
       } else {
         for (const url of f.urlsEntrada) {
           const entrada = entradas.find((e) => e.url === url);
@@ -89,10 +70,44 @@ describe("registo de fontes", () => {
         }
       }
 
+      // E agora qual é a fasquia — que **não** depende de qual leitor correu
+      // acima, mas do que a captura é.
+      //
+      // Numa fonte paginada, a captura é de **uma página** e o piso é de **uma
+      // corrida**. São grandezas diferentes, e compará-las prendia o piso ao que
+      // cabe numa página: o PT2030 traz mais de duzentos avisos em dezenas de
+      // páginas, e exigir esse total de uma captura de cinco punha a build
+      // vermelha sem haver nada partido. (O número exacto anda — 228 a 16/09 —
+      // e não é para ficar gravado aqui, onde envelhece sem ninguém dar por
+      // isso; o sítio dele é o instantâneo datado do `como-funciona.html`.)
+      //
+      // O que esta captura consegue provar é que o leitor funciona sobre bytes
+      // reais, e é isso que se lhe pede. O piso da corrida fica livre para ser o
+      // número certo, e quem o guarda é o pipeline, que vê a corrida inteira.
+      //
+      // Isto enfraquece o exame, e enfraquece-o de propósito: a alternativa era
+      // manter uma exigência que a captura não consegue sustentar, e o preço dessa
+      // era um piso de saúde a um — incapaz de distinguir um varrimento truncado
+      // na primeira página de uma corrida sã.
+      //
+      // A fasquia vive aqui fora, e não dentro do ramo do `lerDataset` onde nasceu,
+      // porque paginar e ser-conjunto-de-dados são coisas independentes. Hoje a
+      // única fonte paginada é as duas, e escrever a excepção lá dentro não custou
+      // nada — mas a primeira listagem de HTML com páginas cairia exactamente na
+      // armadilha que isto existe para desarmar, e cairia em silêncio, com a build
+      // vermelha e nada partido.
+      //
+      // O que não faz é descer a zero. Uma fonte paginada continua a ter de provar
+      // que o seu leitor corre sobre bytes reais; uma que não consiga render um
+      // único apoio da sua própria captura falha, e deve falhar.
+      const fasquia = paginada ? 1 : f.candidatosMin;
+
       expect(
         melhor,
-        `${f.id}: devolve ${melhor} da sua própria captura`,
-      ).toBeGreaterThanOrEqual(f.candidatosMin);
+        paginada
+          ? `${f.id}: o leitor devolve ${melhor} da captura de uma página`
+          : `${f.id}: devolve ${melhor} da sua própria captura`,
+      ).toBeGreaterThanOrEqual(fasquia);
     }
   });
 
