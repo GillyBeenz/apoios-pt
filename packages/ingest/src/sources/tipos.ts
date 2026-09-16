@@ -33,6 +33,11 @@ export interface Fonte {
    * One request per URL. The snapshot ledger is keyed by URL, so two entries
    * sharing one would overwrite each other's change gate and each look
    * permanently changed to the other.
+   *
+   * A paginated endpoint does not get an exception from that rule; it gets
+   * `varredura`, which keeps it true. The pages are walked behind one entry and
+   * joined into one document, so the ledger still sees a single URL with a single
+   * body and a single hash.
    */
   readonly pedidosEntrada?: readonly PedidoDeEntrada[];
   readonly tipo: "listagem" | "noticias" | "legal" | "dataset";
@@ -111,6 +116,26 @@ export interface Fonte {
   lerDataset?(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[];
 
   /**
+   * Does this page of a sweep still carry items?
+   *
+   * Pure, and the sweep's only stopping rule. The PT2030 endpoint ends a walk with
+   * HTTP 200 and a body saying `{code: 404, info: "No data found"}` — a status code
+   * in the envelope, not in the response — so «the end» is something only the
+   * source can recognise. Required by any source that declares `varredura`.
+   */
+  paginaTemItens?(corpo: string): boolean;
+
+  /**
+   * Join a sweep's pages into the one document `lerDataset` will read.
+   *
+   * Pure. The result is what gets hashed and stored, so it must not carry a
+   * timestamp or anything else that changes when the data does not — the change
+   * gate is the hash, and a clock inside the document would make every run look
+   * like a change.
+   */
+  juntarPaginas?(corpos: readonly string[]): string;
+
+  /**
    * The entry response **is** the dataset. No listing, no second fetch.
    *
    * The spreadsheet path gets here in two hops: a listing page is parsed, it
@@ -134,6 +159,38 @@ export interface PedidoDeEntrada {
   readonly metodo: "POST";
   readonly corpo: string;
   readonly tipoConteudo: string;
+  /** Present when this entry is a paginated sweep rather than a single request. */
+  readonly varredura?: Varredura;
+}
+
+/**
+ * How to walk a paginated entry to its end.
+ *
+ * Declarative, for the same reason `pedidosEntrada` is: the capture script prints
+ * it. The page body is the entry's `corpo` with `parametro=<n>` appended, which is
+ * what the PT2030 endpoint was observed to accept.
+ *
+ * **The indexing is written down, not assumed.** `page` on the PT2030 endpoint is
+ * 0-indexed — `page=0` returns byte for byte what the request without `page`
+ * returns — and reading it as 1-indexed silently skips the second page of the set.
+ * That already happened once here, and it cost a session: the sweep came back with
+ * four notices missing and looked complete. A number nobody has to infer is the
+ * cheapest guard there is.
+ */
+export interface Varredura {
+  /** The query parameter that selects the page. */
+  readonly parametro: string;
+  /** The first page's number. `0` and `1` are both real conventions. */
+  readonly primeiraPagina: number;
+  /**
+   * Refuse to walk past this many pages.
+   *
+   * Not a limit on how much is read — it is a circuit breaker. An endpoint that
+   * stops signalling the end would otherwise be walked forever, one polite request
+   * at a time. Hitting it is an error and fails the source, deliberately: a sweep
+   * that stopped early must never be mistaken for a complete one.
+   */
+  readonly maxPaginas: number;
 }
 
 export interface ContextoDataset {

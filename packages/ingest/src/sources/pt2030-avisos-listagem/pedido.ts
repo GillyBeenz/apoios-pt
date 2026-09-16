@@ -62,3 +62,31 @@ export function corpoDoPedido(): string {
   for (const [chave, valor] of paresDoPedido()) p.append(chave, valor);
   return p.toString();
 }
+
+/**
+ * O mesmo corpo, mas a pedir a lista do fim para o princípio.
+ *
+ * É o corpo do varrimento, e a única diferença é `order_by_direction=asc`. A razão
+ * não é estética: paginar por deslocamento uma lista ordenada por publicação
+ * **desc** é instável, porque cada aviso publicado entre dois pedidos empurra todas
+ * as fronteiras uma posição para baixo. Um aviso que estava no fim da página 3
+ * escorrega para a 4 depois de a 3 já ter sido lida, e desaparece do varrimento sem
+ * deixar rasto — que é exactamente a perda silenciosa que este varrimento existe
+ * para acabar.
+ *
+ * Em `asc` os avisos novos caem no **fim**: as páginas já lidas ficam onde estavam
+ * e só a última cresce. Um aviso publicado a meio do varrimento pode entrar ou não
+ * entrar nesta corrida — e entra na seguinte —, mas nenhum dos que já lá estavam se
+ * perde.
+ *
+ * `order_by_direction` é, além disso, o único parâmetro que se sabe que este
+ * endpoint lê: foi o controlo positivo da sonda, e está gravado em
+ * `comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json`.
+ */
+export function corpoDoVarrimento(): string {
+  const p = new URLSearchParams();
+  for (const [chave, valor] of paresDoPedido()) {
+    p.append(chave, chave === "order_by_direction" ? "asc" : valor);
+  }
+  return p.toString();
+}

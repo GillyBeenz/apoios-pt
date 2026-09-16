@@ -13,7 +13,9 @@ import {
   verificarProvas,
   type ExtractorLike,
 } from "@apoios/extraction";
-import type { Buscador, PedidoCondicional } from "../http/tipos.ts";
+import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
+import type { PedidoDeEntrada } from "../sources/tipos.ts";
+import { varrerPaginas } from "./varrer.ts";
 import {
   decodificarEntidades,
   hashBytes,
@@ -179,7 +181,7 @@ export async function executarFonte(
   const apoiosDaEntrada: ApoioNovo[] = [];
 
   // `urlsEntrada` são GETs simples; `pedidosEntrada` são os que não são.
-  const entradas: PedidoCondicional[] = [
+  const entradas: (PedidoCondicional | PedidoDeEntrada)[] = [
     ...fonte.urlsEntrada.map((url) => ({ url })),
     ...(fonte.pedidosEntrada ?? []),
   ];
@@ -187,11 +189,35 @@ export async function executarFonte(
   for (const entrada of entradas) {
     const url = entrada.url;
     const anterior = await armazem.snapshotAnterior(url);
-    const resposta = await buscador.buscar({
-      ...entrada,
-      etag: anterior?.etag ?? null,
-      lastModified: anterior?.lastModified ?? null,
-    });
+
+    // Uma entrada paginada é lida até ao fim e devolvida como uma resposta só.
+    // O livro de snapshots é indexado por URL, e é isso que mantém a invariante
+    // «um pedido por URL» verdadeira em vez de contornada — ver `varrer.ts`.
+    let resposta: RespostaHttp;
+    if ("varredura" in entrada && entrada.varredura !== undefined) {
+      const { paginaTemItens, juntarPaginas } = fonte;
+      // Uma fonte que declara `varredura` sem estes dois não tem como saber onde o
+      // varrimento acaba nem que forma tem o resultado. Pára aqui, a dizer o que
+      // falta, em vez de percorrer o endpoint inteiro para juntar nada.
+      if (paginaTemItens === undefined || juntarPaginas === undefined) {
+        throw new Error(
+          `${fonte.id}: declara varredura mas falta-lhe paginaTemItens ou juntarPaginas`,
+        );
+      }
+      resposta = await varrerPaginas(
+        buscador,
+        entrada,
+        entrada.varredura,
+        (corpo) => paginaTemItens.call(fonte, corpo),
+        (corpos) => juntarPaginas.call(fonte, corpos),
+      );
+    } else {
+      resposta = await buscador.buscar({
+        ...entrada,
+        etag: anterior?.etag ?? null,
+        lastModified: anterior?.lastModified ?? null,
+      });
+    }
 
     statusFinal = resposta.status;
 

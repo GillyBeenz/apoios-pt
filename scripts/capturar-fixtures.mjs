@@ -26,6 +26,7 @@ import {
 } from "../packages/ingest/src/http/cadeia-tls.ts";
 import { FONTES, obterFonte } from "../packages/ingest/src/sources/registo.ts";
 import { USER_AGENT } from "../packages/ingest/src/http/tipos.ts";
+import { varrerPaginas } from "../packages/ingest/src/pipeline/varrer.ts";
 
 const ATRASO_MS = 2000;
 const MAX_DETALHES = 10;
@@ -356,6 +357,66 @@ async function renderizar(url) {
   }
 }
 
+/**
+ * `varrerPaginas` com o `buscar` deste script por baixo, e a resposta convertida
+ * para a forma que o resto da captura espera.
+ *
+ * O atraso entre pedidos fica aqui: o `varrerPaginas` não conhece delicadezas de
+ * rede, e o `BuscadorHttp` do pipeline — que tem a pausa por host lá dentro — não
+ * é o que este script usa, porque precisa do reparo de cadeia TLS que só existe
+ * aqui.
+ */
+async function varrido(pedido, fonte) {
+  const buscador = {
+    async buscar(p) {
+      await dormir(ATRASO_MS);
+      try {
+        const r = await buscar(p.url, undefined, {
+          metodo: p.metodo,
+          corpo: p.corpo,
+          tipoConteudo: p.tipoConteudo,
+        });
+        return {
+          url: r.url,
+          status: r.status,
+          naoModificado: false,
+          corpo: r.status === 200 ? new TextDecoder("utf-8").decode(r.bytes) : null,
+          bytes: r.bytes,
+          contentType: r.contentType,
+          etag: r.etag,
+          lastModified: r.lastModified,
+          erro: r.status === 200 ? null : `HTTP ${r.status}`,
+        };
+      } catch (erro) {
+        return {
+          url: p.url, status: 0, naoModificado: false, corpo: null, bytes: null,
+          contentType: null, etag: null, lastModified: null,
+          erro: erro instanceof Error ? erro.message : String(erro),
+        };
+      }
+    },
+  };
+
+  const r = await varrerPaginas(
+    buscador,
+    pedido,
+    pedido.varredura,
+    (corpo) => fonte.paginaTemItens(corpo),
+    (corpos) => fonte.juntarPaginas(corpos),
+  );
+
+  // Um varrimento interrompido não escreve fixture nenhuma, e o `status: 0` é o
+  // que faz o ramo de cima tratá-lo como o que é: uma captura que não aconteceu.
+  return {
+    url: r.url,
+    status: r.erro === null ? 200 : (r.status === 200 ? 0 : r.status),
+    contentType: r.contentType,
+    etag: null,
+    lastModified: null,
+    bytes: r.bytes ?? new Uint8Array(),
+  };
+}
+
 async function capturarFonte(fonte, dirRaiz) {
   // Write into a fresh staging directory and swap it in only once the capture has
   // actually produced something.
@@ -381,11 +442,23 @@ async function capturarFonte(fonte, dirRaiz) {
     for (const pedido of fonte.pedidosEntrada ?? []) {
       await dormir(ATRASO_MS);
 
-      const r = await buscar(pedido.url, undefined, {
-        metodo: pedido.metodo,
-        corpo: pedido.corpo,
-        tipoConteudo: pedido.tipoConteudo,
-      });
+      // Uma entrada paginada captura-se varrida, e não pela primeira página.
+      //
+      // Esta fixture é o que os testes usam para dizer o que a fonte lê. Gravar
+      // uma página quando o pipeline lê 46 fazia a fixture mentir sobre a fonte —
+      // e é uma mentira que se lê como «a fonte está bem», que é a pior espécie.
+      //
+      // O varrimento é o mesmo `varrerPaginas` do pipeline, com o `buscar` deste
+      // script por baixo. Duas implementações do mesmo percurso divergiam, e a que
+      // produz as fixtures tem de ser a que corre a sério.
+      const r =
+        pedido.varredura === undefined
+          ? await buscar(pedido.url, undefined, {
+              metodo: pedido.metodo,
+              corpo: pedido.corpo,
+              tipoConteudo: pedido.tipoConteudo,
+            })
+          : await varrido(pedido, fonte);
 
       // O mesmo cuidado do ramo do GET: uma resposta que não é 200 nunca escreve
       // por cima de uma fixture boa.

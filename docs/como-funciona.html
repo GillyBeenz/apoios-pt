@@ -485,11 +485,11 @@
 
         <rect x="14" y="336" width="242" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <text class="svg-mono" x="135" y="356" font-size="11" text-anchor="middle" fill="currentColor">POST /wp-json/avisos/query</text>
-        <text class="svg-mono" x="135" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">corpo form-encoded</text>
+        <text class="svg-mono" x="135" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">varrido: page=0..46, asc</text>
 
         <rect x="290" y="336" width="104" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <text class="svg-corp" x="342" y="356" font-size="12" text-anchor="middle" fill="currentColor">JSON</text>
-        <text class="svg-mono" x="342" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">27 KB</text>
+        <text class="svg-mono" x="342" y="372" font-size="9.5" text-anchor="middle" fill="currentColor" opacity="0.6">46 páginas, juntas</text>
 
         <rect x="428" y="336" width="256" height="46" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <text class="svg-corp" x="556" y="356" font-size="12" text-anchor="middle" fill="currentColor">lerDataset() — a entrada já são os dados</text>
@@ -531,7 +531,7 @@
         <span class="num">01</span>
         <span>
           <span class="fase-t">Buscar a entrada</span>
-          <span class="fase-d">Um <code>GET</code> com <code>if-none-match</code>, ou um <code>POST</code> com corpo declarado pela fonte. Num POST não vão validadores condicionais — a resposta depende do corpo enviado, não de uma versão guardada.</span>
+          <span class="fase-d">Um <code>GET</code> com <code>if-none-match</code>, ou um <code>POST</code> com corpo declarado pela fonte. Num POST não vão validadores condicionais — a resposta depende do corpo enviado, não de uma versão guardada. Uma entrada que declare <code>varredura</code> é paginada até ao fim e junta numa resposta só, porque o livro de snapshots é indexado por URL: são 46 pedidos, mas um URL, um corpo e um hash. Se qualquer página falhar, não sai documento nenhum — meio conjunto lido como se fosse o conjunto todo era 200 avisos a desaparecerem de um dia para o outro.</span>
         </span>
       </li>
       <li>
@@ -691,7 +691,7 @@
             <td class="id">pt2030-avisos-listagem</td>
             <td>API</td>
             <td><span class="pastilha p-activa">activa</span></td>
-            <td>Os avisos <em>abertos</em> — mas lê cinco dos 228 que existem. A nota abaixo explica porquê.</td>
+            <td>Os avisos <em>abertos</em>, os 229 deles: um pedido declarado, 46 páginas varridas por trás.</td>
           </tr>
           <tr>
             <td class="id">prr-candidaturas</td>
@@ -706,9 +706,10 @@
     <div class="nota">
       <span class="nota-t">o buraco que falta tapar</span>
       <p>A esmagadora maioria do catálogo são avisos <em>previstos</em> e avisos <em>encerrados</em>. O produto sabe bem o que <em>vai</em> abrir e o que <em>já</em> fechou, e pouco sobre o que está aberto agora — que é a pergunta que um proprietário faz.</p>
-      <p><strong>A maior parte desse buraco é nossa, e não do calendário do Estado.</strong> O endpoint dos avisos abertos responde cinco avisos, sempre — e tem <strong>228</strong>. O pedido leva <code>order_by_field=publicacao</code> com <code>direction=desc</code>, por isso os cinco que chegam são os cinco publicados mais recentemente, e cada aviso novo empurra um antigo para fora da resposta. A 15/09 saíram assim dois avisos do Norte que estavam no catálogo, um deles com prazo até 31/12/2026.</p>
+      <p><strong>A maior parte desse buraco era nossa, e não do calendário do Estado.</strong> O endpoint dos avisos abertos respondia cinco avisos, sempre — e tem <strong>229</strong>. O pedido levava <code>order_by_field=publicacao</code> com <code>direction=desc</code>, por isso os cinco que chegavam eram os cinco publicados mais recentemente, e cada aviso novo empurrava um antigo para fora da resposta. A 15/09 saíram assim dois avisos do Norte que estavam no catálogo, um deles com prazo até 31/12/2026.</p>
       <p>Uma sonda perguntou ao servidor que parâmetros ele reconhece, em vez de os adivinhar. De vinte nomes experimentados só um passou: <code>page</code>, e é <strong>0-indexado</strong> — <code>page=0</code> devolve exactamente o mesmo que não mandar <code>page</code> nenhum, e a segunda página é <code>page=1</code>. São 46 páginas, e o fim não é um erro HTTP: <code>page=46</code> devolve <code>200</code> com <code>{code: 404, info: "No data found"}</code> no corpo. O envelope não traz total, por isso quem varre tem de andar até ao sentinela. A prova está em <code>fixtures-permanentes/pt2030-avisos-query-paginacao.json</code>.</p>
-      <p>A paginação <em>ainda não está implementada</em>, e a razão está escrita ao lado do sítio onde vai doer: varrer 46 páginas são 46 <code>POST</code> ao mesmo URL, e o livro de snapshots que decide o portão da mudança é indexado por URL. Enquanto isso não for resolvido, a fonte continua a ler cinco.</p>
+      <p>A fonte passou a varrer, e lê os 229. O problema de o fazer era que 46 <code>POST</code> ao mesmo URL sobrescreviam o portão da mudança uns dos outros, já que o livro de snapshots é indexado por URL — resolvido por as páginas serem juntas num documento só antes de chegarem ao livro, que assim continua a ver um URL, um corpo e um hash. O hash passou a cobrir o conjunto inteiro em vez dos primeiros cinco, o que é um portão melhor do que o que havia.</p>
+      <p>Duas coisas que isto custa, e ficam ditas porque não são gratuitas: a corrida diária ganhou <strong>~4 minutos</strong> (46 pedidos com a pausa de 2 s entre pedidos ao mesmo host, mais o tempo do servidor), e cada dia em que alguma coisa muda grava um snapshot de <strong>~2 MB</strong>. O varrimento vai em <code>order_by_direction=asc</code> de propósito: em <code>desc</code> cada aviso publicado a meio empurra todas as fronteiras e um aviso pode escorregar de uma página já lida para a seguinte, desaparecendo sem deixar rasto; em <code>asc</code> os novos caem no fim e as páginas já lidas ficam onde estavam.</p>
     </div>
   </section>
 

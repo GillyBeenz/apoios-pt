@@ -105,66 +105,10 @@ respondem. Sobram duas arestas pequenas, verificadas no mesmo dia:
 
 ---
 
-## 5. A fonte dos avisos abertos lê cinco de 228
+## 5. Por saber sobre o endpoint dos avisos do PT2030
 
-**Isto já não é uma dúvida de contrato: é perda activa, e está medida.**
-
-A 14/09 o endpoint devolveu cinco avisos; a 15/09 devolveu cinco outros. Os dois
-que desapareceram — `NORTE2030-2026-22` e `NORTE2030-2026-23` — são exactamente
-os dois mais antigos por data de publicação, e entraram pelo topo dois publicados
-a 15/09. O `NORTE2030-2026-22` tem prazo até **31/12/2026**: não saiu por ter
-encerrado.
-
-O pedido leva `order_by_field=publicacao&order_by_direction=desc`. O que a fonte
-devolve não são «os avisos abertos», são os **cinco abertos publicados mais
-recentemente** — e cada aviso novo empurra um antigo para fora do catálogo sem
-deixar rasto. É a pergunta que o produto existe para responder, truncada em cinco.
-
-Isto também responde à outra metade do mistério da sessão anterior: o
-`NORTE2030-2026-23` não voltou depois da limpeza das chaves porque deixou de vir
-na resposta, não porque a limpeza tenha falhado. A limpeza estava certa. O aviso
-está vivo e volta sozinho assim que a fonte pedir a segunda página.
-
-### O contrato, já observado
-
-A sonda (`scripts/sondar-paginacao-pt2030.mjs`) correu a 15/09 e o endpoint
-respondeu. Dos 20 nomes experimentados só **um** foi reconhecido:
-
-- **O parâmetro é `page`**, e é **0-indexado**. `page=0` devolve byte a byte o
-  mesmo que o pedido sem `page` nenhum; a segunda página é `page=1`. Isto não é
-  um detalhe: ler o `page` como 1-indexado salta a segunda página inteira, e foi
-  assim que se chegou a concluir, por engano, que dois avisos tinham desaparecido
-  do conjunto quando estavam na página que não foi pedida.
-- **46 páginas**, de `page=0` a `page=45`, cinco por página e três na última.
-- **228 avisos** no `estadoAvisoId=7`, todos distintos, zero duplicados. A fonte
-  tem estado a ingerir **cinco**.
-- **O fim da paginação não é um erro HTTP**: `page=46` devolve `200` com
-  `{code: 404, info: "No data found"}` no corpo. O envelope continua a ser
-  `{avisos, status}` e **não traz total** — quem varre tem de andar até ao
-  sentinela.
-- Ignorados: `paged`, `pagina`, `page_number`, `pageIndex`, `numeroPagina`,
-  `limit`, `per_page`, `perPage`, `posts_per_page`, `pageSize`, `page_size`,
-  `length`, `rows`, `take`, `numeroRegistos`, `offset`, `skip`, `start`, `inicio`.
-
-Os dois `NORTE2030-2026-22` e `-23` estão vivos em `page=1`, nas duas primeiras
-posições. Foram empurrados das posições 4 e 5 para as 6 e 7, tal como a teoria
-previa — não saíram do conjunto. Voltam ao catálogo no dia em que a fonte pedir
-a segunda página.
-
-### O que falta
-
-**Implementar a paginação**, e a decisão de desenho que estava por confirmar
-confirmou-se na pior das duas hipóteses: o parâmetro é de *página* e não de
-*limite*, por isso varrer quer dizer **46 POSTs ao mesmo URL**. O livro de
-snapshots é indexado por URL, e 46 pedidos a partilhar um sobrescrevem o portão
-da mudança uns dos outros e ficam todos a parecer permanentemente mudados. Está
-escrito no comentário de `pedidosEntrada`, em `tipos.ts`.
-
-Isto não se resolve com uma linha e é matéria para quem decide a arquitectura:
-o portão da mudança tem de passar a ter uma chave que distinga páginas do mesmo
-URL, ou a fonte tem de deixar de usar `pedidosEntrada` para isto.
-
-### O que continua por saber do mesmo endpoint
+A truncagem em cinco acabou: a fonte varre as 46 páginas e lê os 229. O que
+sobra deste endpoint são duas coisas que nunca foram perguntadas.
 
 - **`estadoAvisoId`**: o `7` é o que a página usa na vista inicial. O que valem os
   outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda
@@ -174,3 +118,26 @@ URL, ou a fonte tem de deixar de usar `pedidosEntrada` para isto.
   O endereço de descarga não é derivável desses dois campos, por isso
   `documentos` fica vazio — ligar a um ficheiro que não se consegue endereçar é
   pior do que não o listar.
+
+---
+
+## 6. O piso de saúde do `pt2030-avisos-listagem` está baixo de mais
+
+`candidatosMin: 1`, e devia andar à volta de **50**.
+
+A fonte passou a varrer as 46 páginas e a resposta real tem 229 avisos, por isso
+«zero» deixou de ser o modo de falha que interessa. O varrimento falha fechado em
+quase tudo — uma página que não responde não produz documento nenhum — mas há uma
+falha que ele não apanha: o `paginaTemItens` passar a dizer «acabou» cedo de mais.
+Aí sai um documento bem formado, com os cinco avisos da primeira página, e nada a
+jusante acha estranho. É a truncagem silenciosa que este repositório já pagou
+duas vezes.
+
+**Porque não subiu já:** o `registo.test.ts` mede este piso contra a captura
+committada da fonte, e essa captura é de uma página. Subir o piso agora punha a
+build vermelha por causa de uma fixture velha, e commitar à mão uma fixture
+varrida era saltar o `capturar-fixtures.yml` — que é por onde as fixtures deste
+repositório entram, com PR e revisão.
+
+O script de captura já varre. **O piso sobe no PR que trouxer a captura varrida**,
+e esse PR é uma corrida do `capturar-fixtures.yml` mais duas linhas.
