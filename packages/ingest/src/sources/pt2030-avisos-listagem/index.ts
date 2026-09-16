@@ -25,6 +25,22 @@ export const pt2030AvisosListagem: Fonte = {
       metodo: "POST",
       corpo: corpoDoPedido(),
       tipoConteudo: TIPO_CONTEUDO,
+
+      // Sem isto a fonte lia 5 de 228. O endpoint devolve cinco avisos por
+      // página, ordenados por `publicacao desc`, e cada aviso novo empurrava um
+      // antigo para fora da única página que se pedia — em silêncio, porque uma
+      // resposta com cinco avisos é indistinguível de uma fonte saudável.
+      //
+      // `page` foi o único de vinte nomes que o servidor reconheceu, e **conta
+      // a partir do zero**: `page=0` devolve byte a byte o mesmo que não mandar
+      // `page` nenhum. Ler isto como 1-indexado salta a segunda página inteira
+      // sem dar erro. A prova está em
+      // `comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json`.
+      //
+      // 200 é tecto, não expectativa: a 16/09 havia 46 páginas. É folga para a
+      // fonte crescer sem que uma corrida ande até ao timeout no dia em que o
+      // sentinela de fim mudar. Atingi-lo é um aviso em voz alta.
+      paginacao: { parametro: "page", primeiraPagina: 0, maxPaginas: 200 },
     },
   ],
 

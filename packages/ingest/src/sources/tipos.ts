@@ -134,6 +134,49 @@ export interface PedidoDeEntrada {
   readonly metodo: "POST";
   readonly corpo: string;
   readonly tipoConteudo: string;
+  /**
+   * Como esta entrada pagina, se paginar.
+   *
+   * A nota em `pedidosEntrada` diz que um pedido por URL é o limite, porque o
+   * livro de snapshots é indexado por URL. Isto é a saída dessa limitação e não
+   * uma excepção a ela: o pedido continua a ir ao mesmo endereço, e o que muda é
+   * a chave com que cada página fica arrumada. A mecânica está em
+   * `pipeline/paginacao.ts`.
+   *
+   * Ausente quer dizer uma página só, que é como todas as fontes eram até o
+   * endpoint do PT2030 se revelar ter 46.
+   */
+  readonly paginacao?: Paginacao;
+}
+
+/**
+ * Como uma fonte pagina. Observado contra o servidor, nunca adivinhado.
+ *
+ * O ficheiro de prova que sustenta cada um destes campos vive em
+ * `comum/fixtures-permanentes/`, e é lá que se confirma antes de mudar aqui.
+ */
+export interface Paginacao {
+  /** O nome do parâmetro no corpo do pedido. `page`, no PT2030. */
+  readonly parametro: string;
+  /**
+   * Por onde começa a contagem.
+   *
+   * **Não é decoração, e não tem valor por omissão de propósito.** Um parâmetro
+   * 0-indexado lido como 1-indexado salta a segunda página do conjunto sem dar
+   * erro nenhum: o varrimento devolve menos e parece completo. Custou uma
+   * investigação inteira neste repositório — dois avisos dados como desaparecidos
+   * quando o que se tinha passado era que a página onde estavam nunca foi pedida.
+   * Quem acrescentar uma fonte paginada tem de ir ver, e escrever o que viu.
+   */
+  readonly primeiraPagina: number;
+  /**
+   * Tecto de páginas por corrida.
+   *
+   * Existe contra o caso em que o servidor deixa de devolver a página vazia que
+   * sinaliza o fim — sem isto, a corrida andava até ao timeout. Ser atingido é
+   * um erro a dizer em voz alta, não um limite a respeitar em silêncio.
+   */
+  readonly maxPaginas: number;
 }
 
 export interface ContextoDataset {
