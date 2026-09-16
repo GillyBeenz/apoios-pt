@@ -73,10 +73,16 @@ export function avisoAbertoParaApoio(
     // Uma fusão que não acontece é uma linha a mais no catálogo; uma chave que
     // colide é uma linha a menos, em silêncio. Entre as duas, esta.
     //
-    // A correcção de fundo é ensinar `canonicalizarReferenciaLegal` a guardar o
-    // prefixo. Não é feita aqui de propósito: essa função decide a identidade dos
-    // 450 apoios já gravados, e mudá-la sem uma passagem de reparação é como este
-    // repositório já perdeu apoios antes. Fica em `docs/estado-actual.md`.
+    // A correcção de fundo — ensinar `canonicalizarReferenciaLegal` a guardar o
+    // prefixo — **está feita**. A função já distingue `CENTRO2030-2026-23` de
+    // `NORTE2030-2026-23`, e já não há nada nela que mutile este código.
+    //
+    // Continua `null` na mesma, e isso agora é uma decisão por tomar e não um
+    // impedimento: voltar a pôr o código aqui muda a identidade de apoios que já
+    // estão gravados, de uma chave de força 70 para uma de 100. É uma mudança com
+    // as suas próprias consequências — e a lição deste sítio é que essas se
+    // medem antes, com as chaves contadas, e não se apanham à boleia de outra
+    // coisa. Fica em `docs/estado-actual.md`.
     referenciaLegal: null,
 
     // `aberto`, and this is the point of the whole source.

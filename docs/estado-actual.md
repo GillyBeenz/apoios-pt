@@ -13,47 +13,44 @@ descobrem a ler o código.
 
 ---
 
-## 1. `canonicalizarReferenciaLegal` mutila os códigos do PT2030
+## 1. Os códigos do PT2030 que chegam já mutilados, e uma chave por decidir
 
-**A perda está estancada; a causa de fundo não.**
+**A função está corrigida.** `canonicalizarReferenciaLegal` guarda o prefixo
+regional: `CENTRO2030-2026-23` e `NORTE2030-2026-23` deixaram de colapsar em
+`2026-23`. Eram **duas** avarias, não uma — além da regex do corpo, que exigia
+que ele começasse por dígito, o removedor do «n.º» tinha um `[.ºO°]*` que comia
+o `NO` de **NORTE**, e o código chegava ao resto da função como `RTE2030-…`.
+Medido antes e depois sobre os 57 valores em bruto da base: **uma** chave muda, e
+é de um apoio que não tinha chave nenhuma. Não houve nada a reparar.
 
-A função (em `packages/core/src/normalizar/texto.ts`) exige que o corpo da
-referência comece por um dígito:
+Sobram duas coisas, e nenhuma é a que estava aqui escrita.
 
-```js
-const corpoMatch = t.match(/\b\d[\dA-Z]*(?:[/-][\dA-Z.]+)+\b/);
-```
+### 1a. O `pt2030-avisos` perde o prefixo antes de a função lhe tocar
 
-Certo para `AVISO N.º 03/2026`, onde o prefixo é ruído. Errado para os códigos do
-Portugal 2030, onde **o prefixo é a parte que distingue**: `CENTRO2030-2026-23` e
-`NORTE2030-2026-23` dão os dois `2026-23`, com força 100.
+A outra fonte do PT2030 — a dos artigos, com extracção por modelo — grava
+códigos **já sem a região**, e por isso a correcção da função não lhe serve de
+nada. Na base, hoje:
 
-Custou um apoio: a 15/09/2026 o `CENTRO2030-2026-23` substituiu o
-`NORTE2030-2026-23` — saúde, cuidados de saúde primários — que saiu do catálogo
-sem deixar rasto.
+| fundo | `referencia_legal` | o título diz |
+|---|---|---|
+| `a7312041` | `2024-47` | «(avisos **Centro2030**-2024-47 a 52)» |
+| `1f614a8b` | `AVISO 2026-24` | «**Norte 2030** apoia…» |
+| `1d675c1a` | `2024-11` | «…nos **Açores**» |
 
-### O que já foi feito (15/09/2026)
+São chaves de força 100 ambíguas entre regiões, vivas neste momento. Não
+colidiram ainda porque as chaves levam o `sourceId` à frente e porque calhou não
+haver duas regiões com o mesmo número nesta fonte — não porque alguma coisa o
+impeça. O prefixo perde-se no extractor, a ler o texto do artigo; é aí que tem
+de ser apanhado, e o modelo tem a região à frente dele no título.
 
-- `pt2030-avisos-listagem` deixou de usar o código como `referenciaLegal`. A
-  identidade assenta no `url_canonica`, que é único porque o URL leva
-  `?aviso=<codigo>`. Um teste guarda a regra, e outro verifica que dois códigos
-  que canonicalizam para o mesmo continuam a dar dois apoios.
-- As seis chaves `referencia_legal` mutiladas foram apagadas de
-  `fund_identities`.
-- As chaves do aviso do Norte que tinham ficado gravadas no apoio do Centro
-  também. Sem isso a fusão repetia-se sozinha assim que o Norte voltasse —
-  exactamente como este repositório já perdeu apoios antes.
-- O `NORTE2030-2026-23` volta a entrar como apoio próprio na primeira corrida em
-  que o endpoint o devolva. Não há nada a restaurar à mão.
+### 1b. A listagem podia voltar a usar o código, e é uma decisão por tomar
 
-### O que falta
-
-A função continua errada para qualquer código com prefixo alfanumérico, e mais
-nenhuma fonte lhe dá um hoje — mas a próxima que der volta a perder apoios.
-Corrigi-la é o trabalho a sério, e tem de ser com cuidado: essa função decide a
-identidade dos 450 apoios já gravados, e mudá-la muda chaves em
-`fund_identities`. Tem de levar uma passagem de reparação e as chaves contadas
-antes e depois.
+O `pt2030-avisos-listagem` passa `referenciaLegal: null` desde o #76, para parar
+a perda. Agora que a função guarda o prefixo, o impedimento desapareceu — mas
+voltar a pôr o código lá muda a identidade de apoios já gravados, de uma chave de
+força 70 (`url_canonica`) para uma de 100. Isso tem as suas próprias
+consequências e merece as chaves contadas antes e depois, como esta teve. Não se
+apanha à boleia de outra coisa.
 
 ## 2. A hora de fecho é truncada
 
