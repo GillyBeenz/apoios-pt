@@ -630,6 +630,60 @@ describe("varrimento paginado", () => {
     expect(buscador.pedidas).toEqual([0, 1, 2, 3]);
   });
 
+  it("repete uma página que falhou, em vez de dar o varrimento por acabado", async () => {
+    // Medido, não suposto: o primeiro varrimento a sério deste endpoint morreu
+    // na página 44 de 46 com um `timeout`. Uma página que falha não rende
+    // registo nenhum e o ciclo pára — não porque o conjunto acabou, mas porque
+    // a rede tossiu. Sem repetição, o varrimento fica truncado a 96% e a
+    // corrida seguinte tem a mesma probabilidade de morrer algures.
+    class FalhaUmaVez extends BuscadorPaginado {
+      falhou = false;
+      override async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
+        const pagina = Number(new URLSearchParams(pedido.corpo ?? "").get("page"));
+        if (pagina === 1 && !this.falhou) {
+          this.falhou = true;
+          this.pedidas.push(pagina);
+          return {
+            url: pedido.url, status: 0, naoModificado: false, corpo: null,
+            bytes: null, contentType: null, etag: null, lastModified: null,
+            erro: "The operation was aborted due to timeout",
+          };
+        }
+        return super.buscar(pedido);
+      }
+    }
+
+    const buscador = new FalhaUmaVez(2);
+    const r = await executarFonte(contextoPt2030(buscador, new ArmazemMemoria()));
+
+    // A página 1 é pedida duas vezes, e o varrimento chega ao fim na mesma.
+    expect(buscador.pedidas).toEqual([0, 1, 1, 2, 3]);
+    expect(r.apoiosNovos).toHaveLength(3);
+  });
+
+  it("desiste depois da repetição, sem insistir num servidor que diz que não", async () => {
+    class FalhaSempre extends BuscadorPaginado {
+      override async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
+        const pagina = Number(new URLSearchParams(pedido.corpo ?? "").get("page"));
+        if (pagina === 1) {
+          this.pedidas.push(pagina);
+          return {
+            url: pedido.url, status: 503, naoModificado: false, corpo: null,
+            bytes: null, contentType: null, etag: null, lastModified: null,
+            erro: "HTTP 503",
+          };
+        }
+        return super.buscar(pedido);
+      }
+    }
+
+    const buscador = new FalhaSempre(2);
+    await executarFonte(contextoPt2030(buscador, new ArmazemMemoria()));
+
+    // Duas tentativas à página 1, e pára. Não há terceira.
+    expect(buscador.pedidas).toEqual([0, 1, 1]);
+  });
+
   it("lê os apoios de todas as páginas, não só da primeira", async () => {
     const armazem = new ArmazemMemoria();
     const r = await executarFonte(contextoPt2030(new BuscadorPaginado(2), armazem));

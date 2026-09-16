@@ -62,3 +62,37 @@ export function corpoDoPedido(): string {
   for (const [chave, valor] of paresDoPedido()) p.append(chave, valor);
   return p.toString();
 }
+
+/**
+ * O corpo do varrimento: o mesmo, mas do fim para o princípio.
+ *
+ * A única diferença é `order_by_direction=asc`, e são duas razões, nenhuma
+ * estética.
+ *
+ * **A que faz o portão da mudança valer alguma coisa.** Cada página tem a sua
+ * chave no livro, e o portão pergunta se o conteúdo daquela chave mudou. Em
+ * `desc`, um único aviso publicado empurra tudo uma posição: a página 0 perde o
+ * último para a 1, a 1 perde o seu para a 2, e assim até ao fim. As 46 páginas
+ * mudam de conteúdo ao mesmo tempo, e o portão — a melhor parte deste desenho —
+ * passa a deixar passar tudo, todos os dias. Em `asc` os avisos novos caem no
+ * **fim**: só a última página muda, e as outras 45 acertam no hash.
+ *
+ * **A que evita perder um aviso dentro de uma corrida.** Paginar por
+ * deslocamento uma lista que se desloca é instável: um aviso publicado a meio do
+ * varrimento empurra as fronteiras, e um aviso que estava no fim da página 3
+ * escorrega para a 4 depois de a 3 já ter sido lida — não entra nessa corrida.
+ * Em `asc` as páginas já lidas ficam onde estavam, e o pior caso é um aviso
+ * entrar só na corrida seguinte.
+ *
+ * `order_by_direction` é, além disso, o único parâmetro que se **sabe** que este
+ * endpoint lê: foi o controlo positivo da sonda, gravado em
+ * `comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json`. Tudo o resto
+ * do corpo continua a ser, byte a byte, o que a página envia.
+ */
+export function corpoDoVarrimento(): string {
+  const p = new URLSearchParams();
+  for (const [chave, valor] of paresDoPedido()) {
+    p.append(chave, chave === "order_by_direction" ? "asc" : valor);
+  }
+  return p.toString();
+}
