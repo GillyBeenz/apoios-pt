@@ -137,6 +137,47 @@ describe("canonicalizarReferenciaLegal", () => {
     expect(canonicalizarReferenciaLegal("Apoio a edifícios mais sustentáveis")).toBeNull();
     expect(canonicalizarReferenciaLegal(null)).toBeNull();
   });
+
+  // O prefixo alfanumérico dos códigos do Portugal 2030 **é** a parte que
+  // distingue: nomeia a região. Guardá-lo não é um detalhe de formatação — é a
+  // diferença entre dois avisos e um só.
+  //
+  // Este caso custou um apoio. A 15/09/2026 o `CENTRO2030-2026-23` e o
+  // `NORTE2030-2026-23` canonicalizavam os dois para `2026-23`, com força 100, e
+  // o do Centro substituiu o do Norte — saúde, cuidados de saúde primários — que
+  // saiu do catálogo sem deixar rasto.
+  it("guarda o prefixo regional, que é o que distingue dois códigos do PT2030", () => {
+    expect(canonicalizarReferenciaLegal("CENTRO2030-2026-23")).toBe("CENTRO2030-2026-23");
+    expect(canonicalizarReferenciaLegal("NORTE2030-2026-23")).toBe("NORTE2030-2026-23");
+  });
+
+  it("não funde dois avisos de regiões diferentes com o mesmo número", () => {
+    expect(canonicalizarReferenciaLegal("CENTRO2030-2026-23")).not.toBe(
+      canonicalizarReferenciaLegal("NORTE2030-2026-23"),
+    );
+  });
+
+  // A armadilha que fez isto falhar de duas maneiras independentes, e que uma
+  // correcção só à regex do corpo não teria apanhado: o removedor do «n.º» tem um
+  // `[.ºO°]*` para o `O` de «N.o 3», e sem exigir um dígito a seguir ele comia o
+  // `NO` de **NORTE**. O código chegava ao resto da função já sem a região.
+  it("não confunde o «N.º» com o primeiro N de uma palavra", () => {
+    expect(canonicalizarReferenciaLegal("NORTE2030-2026-22")).toBe("NORTE2030-2026-22");
+    // E o marcador a sério continua a cair.
+    expect(canonicalizarReferenciaLegal("Aviso N.º 03/2026")).toBe("AVISO 03/2026");
+  });
+
+  // Letras separadas por um hífen são um corpo válido para a forma nova, por isso
+  // `AVISO-CONVITE` casa — e devolveria o tipo de documento no lugar da
+  // referência se o primeiro candidato fosse aceite sem mais nada.
+  it("não toma o tipo de documento por referência", () => {
+    expect(canonicalizarReferenciaLegal("AVISO-CONVITE 02/C08-I05.02/2022")).toBe(
+      "AVISO-CONVITE 02/C08-I05.02/2022",
+    );
+    expect(canonicalizarReferenciaLegal("Aviso-Convite n.º 01/FAZ/2026")).toBe(
+      "AVISO-CONVITE 01/FAZ/2026",
+    );
+  });
 });
 
 describe("normalizarTitulo", () => {

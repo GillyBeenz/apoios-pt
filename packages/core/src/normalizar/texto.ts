@@ -63,7 +63,13 @@ export function canonicalizarReferenciaLegal(bruto: string | null | undefined): 
 
   // Normalise every spelling of "n.º" to a single marker, then drop it entirely:
   // the prefix carries no information and is the most variable part.
-  t = t.replace(/\bN\s*[.ºO°]*\s*/g, " ");
+  //
+  // O `(?=\d)` não é decoração. Sem ele, o `[.ºO°]*` — que existe para apanhar o
+  // `O` de «N.o 3» — come o `O` de **NORTE**: `NORTE2030-2026-23` chegava ao
+  // resto da função como ` RTE2030-2026-23`, com a região já destruída. Um
+  // marcador de número só é marcador se um número se lhe seguir, e exigi-lo aqui
+  // é o que separa o «N.º» do primeiro `N` de uma palavra qualquer.
+  t = t.replace(/\bN\s*[.ºO°]*\s*(?=\d)/g, " ");
   t = t.replace(/\bNUMERO\b/g, " ");
   t = normalizarEspacos(t);
 
@@ -75,10 +81,25 @@ export function canonicalizarReferenciaLegal(bruto: string | null | undefined): 
   const tipo = tipoMatch ? tipoMatch[1]!.replace(/[- ]/g, "-") : null;
 
   // The reference body: digits and letters separated by / and -, e.g. 03/C13-I01/2024
-  const corpoMatch = t.match(/\b\d[\dA-Z]*(?:[/-][\dA-Z.]+)+\b/);
-  if (!corpoMatch) return null;
+  //
+  // O corpo **pode começar por letras**, e isso é o que distingue os códigos do
+  // Portugal 2030. Neles o prefixo não é ruído: é a região, e é a única coisa que
+  // separa `CENTRO2030-2026-23` de `NORTE2030-2026-23`. A versão anterior exigia
+  // que o corpo começasse por dígito, e os dois colapsavam em `2026-23` com força
+  // 100 — o que a 15/09/2026 fez o `CENTRO2030-2026-23` substituir o
+  // `NORTE2030-2026-23`, que saiu do catálogo sem deixar rasto.
+  //
+  // A exigência que substitui «começa por dígito» é «contém um dígito», aplicada
+  // à lista de candidatos em vez de ao primeiro. Sem isso, `AVISO-CONVITE
+  // 02/C08-I05.02/2022` casaria em `AVISO-CONVITE` — letras separadas por um
+  // hífen são um corpo válido para esta forma — e devolveria um tipo de documento
+  // no lugar da referência. Com isso, o primeiro candidato que traz um dígito é o
+  // corpo, e as palavras que só descrevem o documento ficam de fora.
+  const candidatos = t.match(/\b[\dA-Z][\dA-Z.]*(?:[/-][\dA-Z.]+)+\b/g) ?? [];
+  const corpoBruto = candidatos.find((c) => /\d/.test(c));
+  if (corpoBruto === undefined) return null;
 
-  const corpo = corpoMatch[0]
+  const corpo = corpoBruto
     .replace(/\.+$/, "")
     // Zero-pad the leading sequence number so "3/2026" and "03/2026" agree.
     .replace(/^(\d+)/, (d) => d.padStart(2, "0"));
