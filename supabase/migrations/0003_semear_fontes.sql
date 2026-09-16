@@ -17,7 +17,7 @@ values
   ('fundo-ambiental-noticias', 'Fundo Ambiental — Notícias', 'https://www.fundoambiental.pt', 'Fundo Ambiental', true, 12, 2),
   ('prr-candidaturas', 'PRR — Candidaturas', 'https://recuperarportugal.gov.pt', 'Estrutura de Missão Recuperar Portugal', false, 24, 0),
   ('pt2030-avisos', 'Portugal 2030 — Avisos', 'https://portugal2030.pt', 'Agência para o Desenvolvimento e Coesão', true, 24, 3),
-  ('pt2030-avisos-listagem', 'Portugal 2030 — Avisos abertos', 'https://portugal2030.pt', 'Agência para o Desenvolvimento e Coesão', true, 24, 1),
+  ('pt2030-avisos-listagem', 'Portugal 2030 — Avisos abertos', 'https://portugal2030.pt', 'Agência para o Desenvolvimento e Coesão', true, 24, 50),
   ('pt2030-plano-anual-avisos', 'Portugal 2030 — Plano Anual de Avisos', 'https://portugal2030.pt', 'Agência para o Desenvolvimento e Coesão', true, 168, 1)
 on conflict (id) do update set
   nome           = excluded.nome,
