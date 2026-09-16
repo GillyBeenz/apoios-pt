@@ -715,3 +715,91 @@ describe("varrimento paginado", () => {
     expect(segunda.apoiosNovos).toHaveLength(0);
   });
 });
+
+/**
+ * A guarda que impede uma referência truncada de decidir identidade.
+ *
+ * O caso é real e está na base: o `pt2030-avisos` extrai por modelo sobre o texto
+ * de artigos, e gravou `2024-47` para um aviso que o artigo escreve
+ * `Centro2030-2024-47`. O prefixo é a região, e sem ele dois avisos de regiões
+ * diferentes com o mesmo número dão a mesma chave de força 100 — o mais forte que
+ * existe — e um come o outro sem deixar rasto.
+ */
+describe("uma referência truncada não entra na identidade", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/category/avisos/`;
+  const U_NORTE = `${B}/2026/08/10/norte-rotas/`;
+  const U_CENTRO = `${B}/2026/08/11/centro-rotas/`;
+
+  /** As duas páginas escrevem o código inteiro; é o modelo que o encurta. */
+  const artigo = (regiao: string) =>
+    `<html><body><main><p>O Aviso ${regiao}2030-2026-24 visa apoiar operações
+     de gestão e inventário de bens culturais na região.</p></main></body></html>`;
+
+  const fonteRegioes: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      [U_NORTE, U_CENTRO].map((u) => ({
+        titulo: `Rotas ${u}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  /** O modelo devolve a cauda, e só a cauda — como devolveu na realidade. */
+  const extractorQueTrunca: ExtractorLike = {
+    async extrair(doc: DocumentoEntrada): Promise<ResultadoExtraccao> {
+      return {
+        ...(await extractorFixo().extrair(doc)),
+        extraccao: extraccaoSolar({
+          identificacao: {
+            // Títulos distintos: sem isso era o `titulo_norm` a fundi-los, e o
+            // teste passava a medir outra coisa.
+            titulo: `Rotas do património — ${doc.urlFonte}`,
+            referencia_legal: {
+              valor: "2026-24",
+              confianca: "alta",
+              evidencia: "",
+            },
+            programa_pai: "Portugal 2030",
+            entidade_gestora: "Agência para o Desenvolvimento e Coesão",
+            resumo_pt: "Apoio a rotas de património cultural.",
+          },
+        }),
+      };
+    },
+  };
+
+  it("dois avisos de regiões diferentes continuam dois apoios", async () => {
+    const buscador = new BuscadorMemoria()
+      .definir(L, { corpo: "<html><body>listagem</body></html>" })
+      .definir(U_NORTE, { corpo: artigo("NORTE") })
+      .definir(U_CENTRO, { corpo: artigo("CENTRO") });
+    const armazem = new ArmazemMemoria();
+
+    await executarFonte({
+      fonte: fonteRegioes,
+      buscador,
+      armazem,
+      extractor: extractorQueTrunca,
+      agora: AGORA,
+    });
+
+    expect(armazem.apoios.size).toBe(2);
+
+    // E a chave ambígua não chegou a existir. Se existisse, o segundo aviso teria
+    // sido reconhecido como o primeiro e um deles desaparecia.
+    expect([...armazem.identidades.keys()]).not.toContain("pt2030-avisos:2026-24");
+  });
+});

@@ -27,21 +27,50 @@ Sobram duas coisas, e nenhuma é a que estava aqui escrita.
 
 ### 1a. O `pt2030-avisos` perde o prefixo antes de a função lhe tocar
 
-A outra fonte do PT2030 — a dos artigos, com extracção por modelo — grava
-códigos **já sem a região**, e por isso a correcção da função não lhe serve de
-nada. Na base, hoje:
+A outra fonte do PT2030 — a dos artigos, com extracção por modelo — grava códigos
+**já sem a região**, e por isso a correcção da função não lhe serve de nada. São
+**os cinco** apoios desta fonte que têm referência; nenhum escapou:
 
-| fundo | `referencia_legal` | o título diz |
+| fundo | o que ficou gravado | o que o artigo escreve |
 |---|---|---|
-| `a7312041` | `2024-47` | «(avisos **Centro2030**-2024-47 a 52)» |
-| `1f614a8b` | `AVISO 2026-24` | «**Norte 2030** apoia…» |
-| `1d675c1a` | `2024-11` | «…nos **Açores**» |
+| `a7312041` | `2024-47` | `Centro2030-2024-47` |
+| `1f614a8b` | `AVISO 2026-24` | `NORTE2030-2026-24` |
+| `1d675c1a` | `2024-11` | `ACORES2030-2024-11` |
+| `e0d9de1b` | `AVISO 2024-26` | `NORTE2030-2024-26` |
+| `1b5ca76a` | `AVISO 2024-45` | `MAR2030-2024-45` |
 
-São chaves de força 100 ambíguas entre regiões, vivas neste momento. Não
-colidiram ainda porque as chaves levam o `sourceId` à frente e porque calhou não
-haver duas regiões com o mesmo número nesta fonte — não porque alguma coisa o
-impeça. O prefixo perde-se no extractor, a ler o texto do artigo; é aí que tem
-de ser apanhado, e o modelo tem a região à frente dele no título.
+**A perda de identidade está estancada.** Uma referência que seja a cauda de um
+código mais longo escrito no próprio documento deixou de entrar na identidade: cai
+para o `url_canonica` (70), como o #76 já tinha feito na listagem. A guarda é
+determinista, corre sem rede e sem modelo, e há um teste que mostra os dois avisos
+a colapsarem num só quando ela se desliga.
+
+**Falta o resto, e são duas coisas.**
+
+- **A causa.** O modelo continua a encurtar. A única instrução que tem para este
+  campo é `Ex.: "Aviso n.º 03/C13-i01/2024"` — um exemplo só, começado por dígito,
+  com a forma do Fundo Ambiental, que ensina exactamente a forma que perde o
+  prefixo. Corrigir é reescrever esse `.describe()` e subir o `VERSAO_PROMPT`.
+  **Não é validável offline:** não há cassetes nenhumas no repositório
+  (`packages/extraction/fixtures/` nem existe), nenhum teste exercita uma extracção
+  a sério, e o `chaveCassete` inclui o hash do prompt. Precisa de
+  `ANTHROPIC_MODE=record` com chave, ou de uma corrida real.
+- **As cinco linhas.** As chaves ambíguas continuam gravadas em `fund_identities`.
+  Enquanto lá estiverem, um aviso novo que canonicalize para o mesmo número ainda
+  se cola ao fundo errado — a guarda impede que se criem mais, não apaga as que
+  existem. Apagá-las é uma passagem de reparação com as chaves contadas antes e
+  depois, como a do #85.
+
+### 1c. Um artigo pode anunciar seis avisos, e entra como um
+
+Separado do prefixo, e maior. O `pagina-cedd5dbe91` anuncia `Centro2030-2024-47`
+**a `-52`**; o `pagina-3229f24976` anuncia `ACORES2030-2024-11`, `-12` e `-13`. Um
+artigo é um candidato, é uma extracção, é **um** `referencia_legal` — portanto seis
+avisos entram como um e cinco não existem no catálogo.
+
+Isto não é identidade, é sub-contagem, e não se resolve no mesmo sítio: ou a fonte
+passa a render um candidato por aviso, ou o esquema passa a admitir vários. As duas
+são mudanças de forma, não de regex.
 
 ### 1b. A listagem podia voltar a usar o código, e é uma decisão por tomar
 

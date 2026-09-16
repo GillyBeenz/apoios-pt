@@ -1,6 +1,7 @@
 import {
   construirChaves,
   diferenciar,
+  prefixoPerdidoNaReferencia,
   resolverIdentidade,
   type Apoio,
   type ApoioNovo,
@@ -570,8 +571,39 @@ export async function executarFonte(
     });
 
     // --- 9. Identity resolution ---------------------------------------------
+    //
+    // A referência só entra na identidade se o documento não a desmentir.
+    //
+    // A chave `referencia_legal` é a mais forte que existe (100), e uma que nomeie
+    // um número sem a região funde dois avisos de regiões diferentes num só — o
+    // apoio que desaparece não deixa rasto. Na `pt2030-avisos` isso não é
+    // hipotético: a extracção é por modelo sobre texto de artigos, e o que ela
+    // grava é `2024-47` para um aviso que o artigo escreve `Centro2030-2024-47`.
+    //
+    // O prefixo perde-se antes de a canonicalização lhe tocar, por isso não há
+    // correcção àquela função que o recupere. O que se pode fazer aqui, sem rede e
+    // sem modelo, é perguntar ao próprio documento: escreves um código mais longo
+    // cuja cauda é esta? Se escreves, o que o modelo devolveu está truncado.
+    //
+    // E aí a referência não entra. Cai-se para o `url_canonica` (70), que é a
+    // mesma troca que o #76 fez na listagem: uma fusão que não acontece é uma
+    // linha a mais no catálogo; uma chave que colide é uma linha a menos, em
+    // silêncio. Reparar com o código completo era tentador e é outra decisão —
+    // esta falha fechada, como todas as outras deste portão.
+    const refDeclarada = novo.referenciaLegal ?? candidato.referenciaLegalBruta;
+    const codigoCompleto = prefixoPerdidoNaReferencia(refDeclarada, texto);
+    if (codigoCompleto !== null) {
+      // Alto, porque isto é uma extracção a perder informação que o documento
+      // tem — e o sítio onde se corrige é o prompt, não aqui.
+      console.warn(
+        `[${fonte.id}] referência truncada em ${candidato.urlDetalhe}: ` +
+          `o modelo devolveu ${JSON.stringify(refDeclarada)} e o documento ` +
+          `escreve ${JSON.stringify(codigoCompleto)}. Não entra na identidade.`,
+      );
+    }
+
     const resolucao = await resolverEPersistir(armazem, fonte, novo, {
-      referenciaLegal: novo.referenciaLegal ?? candidato.referenciaLegalBruta,
+      referenciaLegal: codigoCompleto === null ? refDeclarada : null,
       url: candidato.urlDetalhe,
     });
 

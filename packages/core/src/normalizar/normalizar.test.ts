@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { analisarDataPt, civilLisboaParaUtc, diasAte } from "./data.ts";
 import { analisarMontanteEur, analisarPercentagem } from "./montante.ts";
-import { canonicalizarReferenciaLegal, normalizarTitulo, removerAcentos } from "./texto.ts";
+import {
+  canonicalizarReferenciaLegal,
+  normalizarTitulo,
+  prefixoPerdidoNaReferencia,
+  removerAcentos,
+} from "./texto.ts";
 
 /**
  * Every real date string in this table was harvested from the way Portuguese
@@ -177,6 +182,59 @@ describe("canonicalizarReferenciaLegal", () => {
     expect(canonicalizarReferenciaLegal("Aviso-Convite n.º 01/FAZ/2026")).toBe(
       "AVISO-CONVITE 01/FAZ/2026",
     );
+  });
+});
+
+describe("prefixoPerdidoNaReferencia", () => {
+  // O texto tal como os artigos do PT2030 o escrevem mesmo. Copiado das fixtures
+  // de `pt2030-avisos`, não inventado: é sobre estes bytes que a guarda corre.
+  const ARTIGO_NORTE =
+    "Rotas do Norte. O Aviso NORTE2030-2026-24 visa apoiar operações de gestão.";
+  const ARTIGO_CENTRO =
+    "abrangem toda a região: Centro2030-2024-47 - ITI CIM da Região da Beira";
+
+  it("apanha a cauda que o modelo devolveu em vez do código inteiro", () => {
+    expect(prefixoPerdidoNaReferencia("AVISO 2026-24", ARTIGO_NORTE)).toBe(
+      "NORTE2030-2026-24",
+    );
+    expect(prefixoPerdidoNaReferencia("2024-47", ARTIGO_CENTRO)).toBe(
+      "Centro2030-2024-47",
+    );
+  });
+
+  // O ponto todo: sem o prefixo, dois avisos de regiões diferentes com o mesmo
+  // número dão a mesma chave de força 100, e um come o outro em silêncio.
+  it("o que ela evita é a colisão entre regiões", () => {
+    expect(canonicalizarReferenciaLegal("2026-24")).toBe(
+      canonicalizarReferenciaLegal("2026-24"),
+    );
+    expect(canonicalizarReferenciaLegal("NORTE2030-2026-24")).not.toBe(
+      canonicalizarReferenciaLegal("CENTRO2030-2026-24"),
+    );
+  });
+
+  it("cala-se quando a referência está inteira", () => {
+    const texto = "Aviso n.º 03/C13-I01/2024 e ainda o Despacho 6119/2025.";
+    expect(prefixoPerdidoNaReferencia("AVISO 03/C13-I01/2024", texto)).toBeNull();
+    expect(prefixoPerdidoNaReferencia("DESPACHO 6119/2025", texto)).toBeNull();
+  });
+
+  // Um prefixo tem de misturar letras e dígitos para ser código de programa.
+  // Sem isso, qualquer palavra agarrada por um hífen — num URL, tipicamente —
+  // fazia a guarda disparar e tirava a referência a quem a tinha certa.
+  it("não confunde prosa agarrada por um hífen com um código de programa", () => {
+    expect(
+      prefixoPerdidoNaReferencia("2024-11", "ver pagina-2024-11 do relatório"),
+    ).toBeNull();
+    expect(
+      prefixoPerdidoNaReferencia("2024-11", "o Aviso ACORES2030-2024-11 abre"),
+    ).toBe("ACORES2030-2024-11");
+  });
+
+  it("não inventa nada quando não há texto, referência, ou código no meio", () => {
+    expect(prefixoPerdidoNaReferencia(null, ARTIGO_NORTE)).toBeNull();
+    expect(prefixoPerdidoNaReferencia("AVISO 2026-24", "")).toBeNull();
+    expect(prefixoPerdidoNaReferencia("sem referência", ARTIGO_NORTE)).toBeNull();
   });
 });
 

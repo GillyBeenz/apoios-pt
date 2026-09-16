@@ -106,3 +106,70 @@ export function canonicalizarReferenciaLegal(bruto: string | null | undefined): 
 
   return tipo ? `${tipo === "AAC" ? "AVISO" : tipo} ${corpo}` : corpo;
 }
+
+/**
+ * O código completo que o documento escreve, quando a referência extraída é só a
+ * cauda dele.
+ *
+ * ## Porque isto existe
+ *
+ * A `canonicalizarReferenciaLegal` já guarda o prefixo regional dos códigos do
+ * PT2030 — mas só o guarda se ele lá chegar. Na fonte `pt2030-avisos` não chega:
+ * a extracção é feita por modelo sobre o texto de artigos de notícias, e o que
+ * ficou gravado foi `2024-47` para um aviso que o próprio artigo escreve como
+ * `Centro2030-2024-47`.
+ *
+ * O prefixo perde-se **antes** da canonicalização, e por isso nenhuma correcção
+ * àquela função o recupera. O que sobra na base são chaves de identidade de força
+ * 100 que nomeiam um número sem região — e duas regiões com o mesmo número fundem
+ * dois avisos num só, que é como este repositório já perdeu um apoio a 15/09/2026.
+ *
+ * ## O que isto faz, e o que deliberadamente não faz
+ *
+ * Responde a uma pergunta estreita e verificável: **o documento escreve um código
+ * mais longo cuja cauda é exactamente isto?** Se sim, devolve-o; se não, devolve
+ * `null`.
+ *
+ * Não repara nada. Quem chama decide, e a decisão certa — a que o #76 já tomou
+ * para a listagem — é não construir chave de referência nenhuma: uma fusão que
+ * não acontece é uma linha a mais no catálogo, e uma chave que colide é uma linha
+ * a menos, em silêncio. Entre as duas, esta.
+ *
+ * ## Porque o prefixo tem de misturar letras e dígitos
+ *
+ * `NORTE2030`, `CENTRO2030`, `ACORES2030` são códigos de programa. Uma palavra
+ * qualquer agarrada por um hífen — `pagina-2024-11` num URL — não é, e exigir
+ * dígitos no prefixo é o que separa as duas sem ter de conhecer a lista de
+ * programas do Estado. Nunca se inventa aqui um prefixo que o documento não
+ * escreva: ele é lido do texto, literalmente, tal como a prova das citações.
+ */
+export function prefixoPerdidoNaReferencia(
+  referencia: string | null | undefined,
+  textoFonte: string,
+): string | null {
+  if (!referencia || textoFonte.length === 0) return null;
+
+  // A cauda tal como se procura no documento: dígitos e separadores, sem a
+  // palavra do tipo de documento. Tirada do valor **em bruto** e não do
+  // canonicalizado, porque é o texto do documento que se vai procurar e o
+  // canonicalizado já lhe mexeu (o zero à esquerda, por exemplo).
+  const cauda = referencia.match(/\d[\dA-Za-z]*(?:[/-][\dA-Za-z.]+)+/);
+  if (cauda === null) return null;
+
+  const agulha = cauda[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const comPrefixo = new RegExp(
+    `\\b([A-Za-z]{2,}\\d{2,}-)${agulha}\\b`,
+    "i",
+  ).exec(textoFonte);
+  if (comPrefixo === null) return null;
+
+  const completo = `${comPrefixo[1]}${cauda[0]}`;
+
+  // Só conta se mudar mesmo a identidade. Um prefixo que a canonicalização
+  // deitasse fora de qualquer maneira não é uma perda — é ruído, e tratá-lo como
+  // perda punha esta guarda a disparar sem nada estar errado.
+  return canonicalizarReferenciaLegal(completo) ===
+    canonicalizarReferenciaLegal(referencia)
+    ? null
+    : completo;
+}
