@@ -13,7 +13,7 @@ descobrem a ler o código.
 
 ---
 
-## 1. Os códigos do PT2030 que chegam já mutilados, e uma chave por decidir
+## 1. Os códigos do PT2030 que chegam já mutilados
 
 **A função está corrigida.** `canonicalizarReferenciaLegal` guarda o prefixo
 regional: `CENTRO2030-2026-23` e `NORTE2030-2026-23` deixaram de colapsar em
@@ -71,15 +71,6 @@ avisos entram como um e cinco não existem no catálogo.
 Isto não é identidade, é sub-contagem, e não se resolve no mesmo sítio: ou a fonte
 passa a render um candidato por aviso, ou o esquema passa a admitir vários. As duas
 são mudanças de forma, não de regex.
-
-### 1b. A listagem podia voltar a usar o código, e é uma decisão por tomar
-
-O `pt2030-avisos-listagem` passa `referenciaLegal: null` desde o #76, para parar
-a perda. Agora que a função guarda o prefixo, o impedimento desapareceu — mas
-voltar a pôr o código lá muda a identidade de apoios já gravados, de uma chave de
-força 70 (`url_canonica`) para uma de 100. Isso tem as suas próprias
-consequências e merece as chaves contadas antes e depois, como esta teve. Não se
-apanha à boleia de outra coisa.
 
 ## 2. A hora de fecho é truncada
 
