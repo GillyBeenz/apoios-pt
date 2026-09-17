@@ -191,3 +191,49 @@ export function prefixoPerdidoNaReferencia(
     ? null
     : completo;
 }
+
+/**
+ * Os códigos de aviso que um documento escreve, sem repetições.
+ *
+ * ## Para que serve
+ *
+ * Um artigo do Portugal 2030 pode anunciar **vários** avisos de uma vez. O
+ * `pagina-cedd5dbe91` das fixtures anuncia `Centro2030-2024-47` a `-52`; o
+ * `pagina-3229f24976` anuncia `ACORES2030-2024-11`, `-12` e `-13`.
+ *
+ * O pipeline não sabe disso. Um artigo é um candidato, é uma extracção, é **um**
+ * apoio — por isso seis avisos entram como um e cinco não existem no catálogo.
+ * Medido a 17/09/2026: nenhum dos nove códigos desses dois artigos está no
+ * endpoint de avisos abertos, ou seja, não entram por outra via.
+ *
+ * ## O que isto faz, e o que não faz
+ *
+ * Conta. Não repara, não inventa um apoio que ninguém extraiu, e não muda o que
+ * já entrou. Devolve os códigos que o documento escreve para que quem chama possa
+ * dizer, em vez de calar, que aquele documento tinha mais do que um.
+ *
+ * Resolver a sub-contagem a sério é mudar a forma — ou a fonte rende um candidato
+ * por aviso, ou o esquema passa a admitir vários — e nenhuma das duas cabe aqui.
+ *
+ * ## A forma dos códigos
+ *
+ * `<LETRAS>[<DÍGITOS>]-<ANO>-<Nº>`, e a maiúscula é o que os separa de prosa
+ * agarrada por um hífen, pela mesma razão que em `prefixoPerdidoNaReferencia`.
+ * As catorze famílias que o endpoint devolve — de `ACORES2030-2025-18` a
+ * `PESSOAS-2024-2`, passando por `M2030-2026-21` e `MPr-2026-1` — casam todas.
+ */
+export function codigosDeAvisoNoTexto(textoFonte: string): string[] {
+  const achados = textoFonte.match(/\b[A-Za-z][A-Za-z0-9]*-\d{4}-\d{1,4}\b/g);
+  if (achados === null) return [];
+
+  const vistos = new Map<string, string>();
+  for (const c of achados) {
+    const prefixo = c.slice(0, c.indexOf("-"));
+    if (!/[A-Z]/.test(prefixo)) continue;
+    // Guardado uma vez por forma canónica: o mesmo aviso aparece várias vezes no
+    // texto e às vezes com maiúsculas diferentes (`Centro2030` e `CENTRO2030`).
+    const chave = c.toUpperCase();
+    if (!vistos.has(chave)) vistos.set(chave, c);
+  }
+  return [...vistos.values()];
+}

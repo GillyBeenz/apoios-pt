@@ -803,3 +803,87 @@ describe("uma referência truncada não entra na identidade", () => {
     expect([...armazem.identidades.keys()]).not.toContain("pt2030-avisos:2026-24");
   });
 });
+
+/**
+ * Um documento que anuncia vários avisos rende um apoio só, e isso passa a
+ * dizer-se em vez de se calar.
+ *
+ * O artigo do Centro 2030 anuncia `Centro2030-2024-47` a `-52`; o dos Açores
+ * anuncia três. Medido a 17/09/2026: nenhum desses nove códigos está no endpoint
+ * de avisos abertos, por isso os que ficam por capturar não entram por outra via.
+ */
+describe("um documento que anuncia varios avisos", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/category/avisos/`;
+  const U = `${B}/2024/09/09/centro-2030-apoia-diversificacao/`;
+
+  const fonteMulti: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () => [
+      {
+        titulo: "Centro 2030 apoia diversificação da base produtiva regional",
+        urlDetalhe: U,
+        urlCanonica: U,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      },
+    ],
+  };
+
+  it("marca o apoio para revisão e diz quantos ficam por capturar", async () => {
+    const buscador = new BuscadorMemoria()
+      .definir(L, { corpo: "<html><body>listagem</body></html>" })
+      .definir(U, {
+        corpo: `<html><body><main><p>Os avisos abrangem toda a região:
+          Centro2030-2024-47, Centro2030-2024-48, Centro2030-2024-49,
+          Centro2030-2024-50, Centro2030-2024-51 e Centro2030-2024-52.</p>
+        </main></body></html>`,
+      });
+    const armazem = new ArmazemMemoria();
+
+    const r = await executarFonte({
+      fonte: fonteMulti,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(r.apoiosNovos).toHaveLength(1);
+    const apoio = r.apoiosNovos[0]!;
+    expect(apoio.needsReview).toBe(true);
+    // Seis anunciados, um capturado: cinco por capturar.
+    expect(apoio.motivoRevisao).toContain("avisos_por_capturar:5");
+  });
+
+  it("não marca nada quando o documento anuncia um aviso só", async () => {
+    const buscador = new BuscadorMemoria()
+      .definir(L, { corpo: "<html><body>listagem</body></html>" })
+      .definir(U, {
+        corpo: `<html><body><main><p>O Aviso Centro2030-2024-47 abre
+          candidaturas.</p></main></body></html>`,
+      });
+    const armazem = new ArmazemMemoria();
+
+    const r = await executarFonte({
+      fonte: fonteMulti,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(
+      r.apoiosNovos[0]?.motivoRevisao.some((m) => m.startsWith("avisos_por_capturar")),
+    ).toBe(false);
+  });
+});

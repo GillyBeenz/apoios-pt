@@ -4,6 +4,7 @@ import { analisarMontanteEur, analisarPercentagem } from "./montante.ts";
 import {
   canonicalizarReferenciaLegal,
   normalizarTitulo,
+  codigosDeAvisoNoTexto,
   prefixoPerdidoNaReferencia,
   removerAcentos,
 } from "./texto.ts";
@@ -263,6 +264,43 @@ describe("prefixoPerdidoNaReferencia", () => {
     expect(prefixoPerdidoNaReferencia(null, ARTIGO_NORTE)).toBeNull();
     expect(prefixoPerdidoNaReferencia("AVISO 2026-24", "")).toBeNull();
     expect(prefixoPerdidoNaReferencia("sem referência", ARTIGO_NORTE)).toBeNull();
+  });
+});
+
+describe("codigosDeAvisoNoTexto", () => {
+  // O texto do artigo do Centro 2030, tal como a fixture o tem. Este documento
+  // anuncia seis avisos e o pipeline rende dele um apoio.
+  const ARTIGO_CENTRO =
+    "abrangem toda a região: Centro2030-2024-47 - ITI CIM da Região da Beira " +
+    "Centro2030-2024-48 - ITI CIM Beiras e Serra da Estrela " +
+    "Centro2030-2024-49 Centro2030-2024-50 Centro2030-2024-51 Centro2030-2024-52";
+
+  it("conta os avisos que o documento anuncia", () => {
+    expect(codigosDeAvisoNoTexto(ARTIGO_CENTRO)).toHaveLength(6);
+  });
+
+  it("não repete o mesmo aviso citado várias vezes, nem por causa de maiúsculas", () => {
+    const t = "O Aviso NORTE2030-2026-24 abre. Ver NORTE2030-2026-24 e norte2030-2026-24.";
+    expect(codigosDeAvisoNoTexto(t)).toEqual(["NORTE2030-2026-24"]);
+  });
+
+  // As catorze famílias reais têm de contar, incluindo as que não levam dígitos
+  // no prefixo — é a mesma lição que o `prefixoPerdidoNaReferencia` já aprendeu.
+  it("conhece as catorze famílias que o endpoint devolve", () => {
+    const t =
+      "ACORES2030-2025-18 ALGARVE-2024-26 ALT2030-2024-27 CENTRO2030-2024-11 " +
+      "COMPETE2030-2026-7 FAMI2030-2025-29 LISBOA2030-2023-13 M2030-2026-21 " +
+      "MAR2030-2023-4 MPr-2026-1 NORTE2030-2024-5 PACS-2025-14 PAT2030-2024-15 " +
+      "PESSOAS-2024-2";
+    expect(codigosDeAvisoNoTexto(t)).toHaveLength(14);
+  });
+
+  it("não conta prosa minúscula agarrada por um hífen", () => {
+    expect(codigosDeAvisoNoTexto("ver pagina-2024-11 e anexo-2026-3")).toEqual([]);
+  });
+
+  it("devolve lista vazia quando o documento não nomeia aviso nenhum", () => {
+    expect(codigosDeAvisoNoTexto("Candidaturas abertas às Summer Schools.")).toEqual([]);
   });
 });
 
