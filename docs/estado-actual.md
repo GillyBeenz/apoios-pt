@@ -13,7 +13,7 @@ descobrem a ler o código.
 
 ---
 
-## 1. Os códigos do PT2030 que chegam já mutilados, e uma chave por decidir
+## 1. Os códigos do PT2030 que chegam já mutilados
 
 **A função está corrigida.** `canonicalizarReferenciaLegal` guarda o prefixo
 regional: `CENTRO2030-2026-23` e `NORTE2030-2026-23` deixaram de colapsar em
