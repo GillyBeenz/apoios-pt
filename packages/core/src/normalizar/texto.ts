@@ -135,13 +135,29 @@ export function canonicalizarReferenciaLegal(bruto: string | null | undefined): 
  * não acontece é uma linha a mais no catálogo, e uma chave que colide é uma linha
  * a menos, em silêncio. Entre as duas, esta.
  *
- * ## Porque o prefixo tem de misturar letras e dígitos
+ * ## Como se distingue um prefixo de programa de uma palavra qualquer
  *
- * `NORTE2030`, `CENTRO2030`, `ACORES2030` são códigos de programa. Uma palavra
- * qualquer agarrada por um hífen — `pagina-2024-11` num URL — não é, e exigir
- * dígitos no prefixo é o que separa as duas sem ter de conhecer a lista de
- * programas do Estado. Nunca se inventa aqui um prefixo que o documento não
- * escreva: ele é lido do texto, literalmente, tal como a prova das citações.
+ * **Pela maiúscula, e não pelos dígitos.** A primeira versão disto exigia que o
+ * prefixo misturasse letras e dígitos — `NORTE2030`, `CENTRO2030`, `MAR2030` —
+ * porque foram esses os três exemplos que se tinham à frente. Os códigos reais
+ * do PT2030 são catorze famílias, e cinco não têm dígitos nenhuns no prefixo:
+ *
+ *     ALGARVE-2024-26   M2030-2026-21   MPr-2026-1   PACS-2025-14   PESSOAS-2024-2
+ *
+ * Com a regra antiga, essas cinco escapavam à guarda e a referência truncada
+ * entrava na identidade na mesma — exactamente o que isto existe para impedir.
+ *
+ * A maiúscula separa-os de prose agarrada por um hífen (`pagina-2024-11` num
+ * URL), que é o falso positivo que interessa evitar, e não precisa de conhecer a
+ * lista de programas do Estado.
+ *
+ * E se falhar, falha para o lado seguro: um falso positivo tira uma referência à
+ * identidade e cai no `url_canonica`, que é uma chave mais fraca; um falso
+ * negativo deixa passar uma chave ambígua de força 100, e essa apaga um apoio em
+ * silêncio. Entre os dois erros, este código prefere o primeiro.
+ *
+ * Nunca se inventa aqui um prefixo que o documento não escreva: ele é lido do
+ * texto, literalmente, tal como a prova das citações.
  */
 export function prefixoPerdidoNaReferencia(
   referencia: string | null | undefined,
@@ -158,10 +174,12 @@ export function prefixoPerdidoNaReferencia(
 
   const agulha = cauda[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const comPrefixo = new RegExp(
-    `\\b([A-Za-z]{2,}\\d{2,}-)${agulha}\\b`,
-    "i",
+    `\\b([A-Za-z][A-Za-z0-9]*-)${agulha}\\b`,
   ).exec(textoFonte);
   if (comPrefixo === null) return null;
+
+  // A maiúscula é o que separa `ALGARVE-` de `pagina-`.
+  if (!/[A-Z]/.test(comPrefixo[1]!)) return null;
 
   const completo = `${comPrefixo[1]}${cauda[0]}`;
 

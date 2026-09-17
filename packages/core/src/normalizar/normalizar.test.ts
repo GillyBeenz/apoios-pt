@@ -219,9 +219,37 @@ describe("prefixoPerdidoNaReferencia", () => {
     expect(prefixoPerdidoNaReferencia("DESPACHO 6119/2025", texto)).toBeNull();
   });
 
-  // Um prefixo tem de misturar letras e dígitos para ser código de programa.
-  // Sem isso, qualquer palavra agarrada por um hífen — num URL, tipicamente —
-  // fazia a guarda disparar e tirava a referência a quem a tinha certa.
+  // As catorze famílias de código que o endpoint do PT2030 devolve mesmo, cada
+  // uma na forma em que o modelo a truncaria. Cinco não têm dígito nenhum no
+  // prefixo, e a primeira versão desta guarda — que exigia `[A-Za-z]{2,}\d{2,}`
+  // — deixava-as passar inteiras. Foram generalizadas de três exemplos em vez de
+  // medidas, e são estes os cinco que escapavam:
+  //
+  //     ALGARVE-2024-26   M2030-2026-21   MPr-2026-1   PACS-2025-14   PESSOAS-2024-2
+  it.each([
+    ["ACORES2030-2025-18", "2025-18"],
+    ["ALGARVE-2024-26", "2024-26"],
+    ["ALT2030-2024-27", "2024-27"],
+    ["CENTRO2030-2024-11", "2024-11"],
+    ["COMPETE2030-2026-7", "2026-7"],
+    ["FAMI2030-2025-29", "2025-29"],
+    ["LISBOA2030-2023-13", "2023-13"],
+    ["M2030-2026-21", "2026-21"],
+    ["MAR2030-2023-4", "2023-4"],
+    ["MPr-2026-1", "2026-1"],
+    ["NORTE2030-2024-5", "2024-5"],
+    ["PACS-2025-14", "2025-14"],
+    ["PAT2030-2024-15", "2024-15"],
+    ["PESSOAS-2024-2", "2024-2"],
+  ])("apanha a truncagem de %s", (completo, truncado) => {
+    expect(
+      prefixoPerdidoNaReferencia(truncado, `O Aviso ${completo} abre candidaturas.`),
+    ).toBe(completo);
+  });
+
+  // O que separa um prefixo de programa de uma palavra qualquer é a maiúscula,
+  // não o dígito. Prosa agarrada por um hífen — num URL, tipicamente — não pode
+  // fazer a guarda disparar e tirar a referência a quem a tinha certa.
   it("não confunde prosa agarrada por um hífen com um código de programa", () => {
     expect(
       prefixoPerdidoNaReferencia("2024-11", "ver pagina-2024-11 do relatório"),
