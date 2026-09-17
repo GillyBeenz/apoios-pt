@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { lerAvisos } from "./resposta.ts";
 import { avisoAbertoParaApoio, urlDoAviso } from "./paraApoio.ts";
+import { canonicalizarReferenciaLegal } from "@apoios/core";
 
 /**
  * A resposta real do endpoint, de 14/09/2026, tal como a página a recebeu.
@@ -147,24 +148,23 @@ describe("avisoAbertoParaApoio", () => {
     expect(apoios.every((a) => !a.urlOficial.includes("wp-json"))).toBe(true);
   });
 
-  /**
-   * Não usa o código como referência legal, e este é o teste que guarda um apoio
-   * apagado a 15/09/2026.
-   *
-   * `canonicalizarReferenciaLegal` exige que o corpo comece por um dígito, o que
-   * está certo para `AVISO N.º 03/2026` e errado para estes códigos, onde o
-   * prefixo é a parte que distingue: `CENTRO2030-2026-23` e `NORTE2030-2026-23`
-   * dão os dois `2026-23`, com força 100. O segundo a chegar substituiu o
-   * primeiro, e o aviso de cuidados de saúde primários do Norte 2030 saiu do
-   * catálogo sem deixar rasto.
-   */
-  it("não usa o código do aviso como referência legal", () => {
-    expect(apoios.every((a) => a.referenciaLegal === null)).toBe(true);
+  it("usa o código do aviso como referência legal", () => {
+    expect(apoios.every((a) => a.referenciaLegal !== null)).toBe(true);
   });
 
   /**
-   * O que substitui a referência tem de ser realmente único — senão a correcção
-   * troca uma colisão por outra.
+   * O teste que guarda um apoio apagado a 15/09/2026.
+   *
+   * `canonicalizarReferenciaLegal` exigia que o corpo começasse por um dígito, o
+   * que está certo para `AVISO N.º 03/2026` e errado para estes códigos, onde o
+   * prefixo é a parte que distingue: `CENTRO2030-2026-23` e `NORTE2030-2026-23`
+   * davam os dois `2026-23`, com força 100. O segundo a chegar substituiu o
+   * primeiro, e o aviso de cuidados de saúde primários do Norte 2030 saiu do
+   * catálogo sem deixar rasto.
+   *
+   * O #85 corrigiu a função e o #86 travou o caso em que o prefixo se perde antes
+   * dela. Este teste fica: é a prova de que o código voltou a poder ser
+   * identidade **porque** os dois deixaram de colidir, e não por esquecimento.
    */
   it("distingue avisos cujo código canonicaliza para a mesma coisa", () => {
     const corpo = JSON.stringify({
@@ -187,8 +187,14 @@ describe("avisoAbertoParaApoio", () => {
     );
 
     expect(dois).toHaveLength(2);
-    // Os dois URLs têm de ser diferentes: é a única chave que lhes resta.
     expect(new Set(dois.map((a) => a.urlOficial)).size).toBe(2);
+
+    // E a chave forte — a que os fundiu — tem de os separar outra vez. Comparada
+    // depois de canonicalizada, que é a forma com que entra no `fund_identities`:
+    // guardar os códigos em bruto provaria só que são strings diferentes.
+    const canonicas = dois.map((a) => canonicalizarReferenciaLegal(a.referenciaLegal));
+    expect(canonicas).toEqual(["CENTRO2030-2026-23", "NORTE2030-2026-23"]);
+    expect(new Set(canonicas).size).toBe(2);
   });
 
   it("não lista documentos que não consegue endereçar", () => {

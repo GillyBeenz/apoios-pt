@@ -47,43 +47,46 @@ export function avisoAbertoParaApoio(
     programaPai: a.programa,
     entidadeGestora: opcoes.entidade,
 
-    // Nulo, e o código fica só no `urlOficial`. Isto é uma correcção, e a razão
-    // interessa mais do que a linha.
+    // O código do aviso, outra vez — e agora sem o que o tornava perigoso.
     //
-    // O comentário que aqui estava dizia que `codigoAviso` é uma referência a
-    // sério, que `canonicalizarReferenciaLegal` a aceita, e que é a chave de
-    // identidade mais forte que existe. As três coisas são verdade, e juntas
-    // apagaram um apoio do catálogo.
-    //
-    // Essa função exige que o corpo da referência comece por um dígito — o que
-    // está certo para `AVISO N.º 03/2026`, onde o prefixo é ruído, e errado aqui,
-    // onde o prefixo é a parte que distingue:
+    // Esteve `null` entre o #76 e agora, e a razão era boa: a
+    // `canonicalizarReferenciaLegal` exigia que o corpo começasse por um dígito,
+    // o que está certo para `AVISO N.º 03/2026`, onde o prefixo é ruído, e errado
+    // aqui, onde o prefixo é a região:
     //
     //     CENTRO2030-2026-23  →  2026-23
     //     NORTE2030-2026-23   →  2026-23
     //
-    // O `2030` de `CENTRO2030` não está numa fronteira de palavra, por isso a
-    // captura só começa em `2026`. Os dois códigos dão a mesma chave, com força
-    // 100, e a 15/09/2026 o segundo a chegar substituiu o primeiro: o aviso de
-    // cuidados de saúde primários do Norte 2030 desapareceu.
+    // Dois avisos, uma chave, força 100. A 15/09/2026 o segundo a chegar
+    // substituiu o primeiro e o aviso de cuidados de saúde primários do Norte
+    // saiu do catálogo sem deixar rasto. O #85 corrigiu a função — eram duas
+    // avarias, não uma — e os dois códigos voltaram a dar chaves diferentes.
     //
-    // A identidade passa a assentar no `url_canonica`, que é único porque o URL
-    // leva `?aviso=<codigo>`. É uma chave mais fraca (70), e o custo real é esse:
-    // o mesmo aviso visto por outra fonte deixa de se reconhecer por referência.
-    // Uma fusão que não acontece é uma linha a mais no catálogo; uma chave que
-    // colide é uma linha a menos, em silêncio. Entre as duas, esta.
+    // **Medido antes de voltar:** os 228 códigos que o endpoint devolve hoje dão
+    // 228 chaves canónicas distintas, zero colisões, e nenhum canonicaliza para
+    // `null`. Os prefixos reais são catorze, de `ACORES` a `PESSOAS`, e incluem
+    // formas curtas como `M` e `MPr` que a versão antiga teria mutilado na mesma.
     //
-    // A correcção de fundo — ensinar `canonicalizarReferenciaLegal` a guardar o
-    // prefixo — **está feita**. A função já distingue `CENTRO2030-2026-23` de
-    // `NORTE2030-2026-23`, e já não há nada nela que mutile este código.
+    // ## Porque não ficar pelo `url_canonica`
     //
-    // Continua `null` na mesma, e isso agora é uma decisão por tomar e não um
-    // impedimento: voltar a pôr o código aqui muda a identidade de apoios que já
-    // estão gravados, de uma chave de força 70 para uma de 100. É uma mudança com
-    // as suas próprias consequências — e a lição deste sítio é que essas se
-    // medem antes, com as chaves contadas, e não se apanham à boleia de outra
-    // coisa. Fica em `docs/estado-actual.md`.
-    referenciaLegal: null,
+    // Porque essa chave não é do Estado, é nossa: o `urlDoAviso` constrói-a a
+    // partir da constante `LISTAGEM` deste ficheiro. No dia em que essa linha
+    // mudar — e é uma linha fácil de mudar sem pensar — as 228 chaves mudam com
+    // ela, todos os avisos entram como apoios novos, e o catálogo inteiro desta
+    // fonte rebenta em eventos de `programa_novo`. O código do aviso é a única
+    // identidade aqui que não depende de nós.
+    //
+    // ## O que o #76 disse e não era verdade
+    //
+    // O comentário que aqui estava justificava o `null` dizendo que o custo era
+    // «o mesmo aviso visto por outra fonte deixa de se reconhecer por
+    // referência». Isso não era o custo, porque nunca foi possível: o
+    // `construirChaves` prefixa **todas** as chaves com o `sourceId`, de
+    // propósito, para que um `AVISO 01/2026` do Fundo Ambiental não colida com um
+    // do PRR. Uma referência desta fonte nunca poderia casar com a de outra, com
+    // ou sem esta linha. A troca real era outra, e era só entre esta chave e o
+    // URL que nós próprios fabricamos.
+    referenciaLegal: a.codigo,
 
     // `aberto`, and this is the point of the whole source.
     //
