@@ -163,7 +163,68 @@ coisas por saber do mesmo endpoint.
   outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda
   não lhes toca de propósito — uma investigação de cada vez, senão não se sabe qual
   das duas mudanças produziu a diferença.
-- **Documentos**: cada aviso traz PDFs com `path` e `container`, mas **sem URL**.
-  O endereço de descarga não é derivável desses dois campos, por isso
-  `documentos` fica vazio — ligar a um ficheiro que não se consegue endereçar é
-  pior do que não o listar.
+- **`documentoData` não ordena versões, e por isso não se sabe qual é o aviso em
+  vigor.** Ver o ponto 6.
+
+---
+
+## 6. Os PDFs dos avisos são endereçáveis — e não se sabe qual deles vale
+
+**A afirmação anterior era falsa e esteve aqui escrita.** Dizia que cada aviso
+traz PDFs com `path` e `container` «mas sem URL», e que o endereço de descarga
+não era derivável desses dois campos. É derivável, e o `wp-json` sempre o disse:
+a rota está no índice do namespace, ao lado do `query` que já usamos.
+
+```
+GET https://portugal2030.pt/wp-json/avisos/download?path=<path>&container=<container>
+```
+
+Os dois valores vêm da própria resposta. Verificado a 17/09/2026 contra o
+`MAR2030-2023-4`: devolve **835 918 bytes**, assinatura `%PDF-1.6`.
+
+A rota é um proxy para o Azure Blob (`hubdocsprdsa.blob.core.windows.net`), e o
+`container` é `siag-prod-container` — um só, em todos os avisos. A nota antiga
+provavelmente nasceu de uma leitura truncada do campo, que começa por `siag`.
+
+**Cobertura, medida sobre os 228 avisos abertos:** todos têm documentos, e
+**todos têm pelo menos um do tipo `Aviso`**. São 666 documentos desse tipo, mais
+906 anexos, 148 complementares e 8 de perguntas frequentes.
+
+### O que isto desbloqueia
+
+O endpoint não tem campo de beneficiários nenhum, e é por isso que os avisos
+desta fonte entram sem `medidas` e sem `beneficiarios` — e um apoio sem medidas
+não casa com subscritor nenhum, porque as subscrições são **por medida**. É o que
+mantém o caminho de alerta em zero.
+
+As medidas e a elegibilidade estão nos PDFs. Uma fase de detalhe que os leia põe
+esta fonte no mesmo pé do `fundo-ambiental-aac`, que é hoje a única com medidas —
+e não por acaso, porque é a única que lê o documento.
+
+### O que falta saber, e é o que trava
+
+**Qual dos documentos «Aviso» é o que está em vigor.** Numa amostra de 40 avisos
+abertos, a distribuição vai de 1 a **13** documentos desse tipo por aviso, e só 6
+dos 40 têm exactamente um.
+
+Os metadados não ordenam:
+
+- **`documentoData` é igual em todos os documentos do mesmo aviso** — 34 em 34
+  medidos, zero excepções. É a data do aviso, não a do ficheiro. Só 5 dos 34
+  coincidem com o `aviso.dataUltimaAlteracao`.
+- O único sinal é o **nome do ficheiro**, e o vocabulário é inconsistente:
+  `alteração` (38) e `republicação` (36) na mesma amostra, com grafias que variam
+  (`1ª`, `1a`, `2 `, com e sem acento) e sem forma de ordenar uma contra a outra.
+
+Ler a versão errada é anunciar condições revogadas a quem se está a candidatar.
+Por isso isto não é «acrescentar uma fase» — precisa primeiro de uma resposta a
+esta pergunta.
+
+**Uma atenuante medida:** o prazo, que é o campo mais volátil entre
+republicações, **já vem do endpoint** em `calendario.dataFimAtual` e não depende
+do PDF. O que se vai lá buscar são factos que mudam mais devagar.
+
+**O caminho seguro para começar** é a fatia sem ambiguidade — os avisos com
+exactamente um documento «Aviso», cerca de 15% da amostra. Prova o caminho todo
+de ponta a ponta, sem heurística de versão nenhuma, e mede quantos apoios
+alertáveis rende antes de se decidir o resto.
