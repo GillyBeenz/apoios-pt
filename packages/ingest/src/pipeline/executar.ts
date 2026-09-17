@@ -1,4 +1,5 @@
 import {
+  codigosDeAvisoNoTexto,
   construirChaves,
   diferenciar,
   prefixoPerdidoNaReferencia,
@@ -555,12 +556,50 @@ export async function executarFonte(
     const verificacao = verificarProvas(resultado.extraccao, texto);
     if (verificacao.provaFalhou.length > 0) provasFalhadas++;
 
-    const decisao = decidir(
+    const decidida = decidir(
       resultado.extraccao,
       verificacao,
       resultado.stopReason,
       agora.toISOString().slice(0, 10),
     );
+
+    // Um documento pode anunciar vários avisos, e daqui só sai um apoio.
+    //
+    // Um artigo é um candidato, é uma extracção, é **um** `ApoioNovo`. Quando o
+    // artigo anuncia seis — o do Centro 2030 anuncia `Centro2030-2024-47` a `-52`,
+    // e o dos Açores anuncia três — cinco não existem em lado nenhum. Medido a
+    // 17/09/2026: nenhum dos nove códigos desses dois artigos está no endpoint de
+    // avisos abertos, por isso não entram por outra via.
+    //
+    // Isto não repara a sub-contagem: repará-la é mudar a forma, ou a fonte a
+    // render um candidato por aviso, ou o esquema a admitir vários. O que faz é
+    // pará-la de ser silenciosa. Um apoio que representa seis avisos passa a
+    // chegar a um humano marcado como tal, em vez de se confundir com um que
+    // representa um só.
+    //
+    // Não mexe no `publicado` nem no `alertavel`, de propósito: o aviso que **foi**
+    // capturado está tão certo como estava, e escondê-lo perdia mais do que ganha.
+    const codigos = codigosDeAvisoNoTexto(texto);
+    const decisao =
+      codigos.length <= 1
+        ? decidida
+        : {
+            ...decidida,
+            needsReview: true,
+            motivoRevisao: [
+              ...decidida.motivoRevisao,
+              `avisos_por_capturar:${codigos.length - 1}`,
+            ],
+          };
+
+    if (codigos.length > 1) {
+      console.warn(
+        `[${fonte.id}] ${candidato.urlDetalhe} anuncia ${codigos.length} avisos ` +
+          `(${codigos.join(", ")}) e rende um apoio. ` +
+          `${codigos.length - 1} ficam por capturar.`,
+      );
+    }
+
     if (decisao.needsReview) extraccoesRevisao++;
     else extraccoesOk++;
 

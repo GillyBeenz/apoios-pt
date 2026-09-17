@@ -63,23 +63,34 @@ a colapsarem num só quando ela se desliga.
 
 ### 1c. Um artigo pode anunciar seis avisos, e entra como um
 
-Separado do prefixo, e maior. O `pagina-cedd5dbe91` anuncia `Centro2030-2024-47`
-**a `-52`**; o `pagina-3229f24976` anuncia `ACORES2030-2024-11`, `-12` e `-13`. Um
-artigo é um candidato, é uma extracção, é **um** `referencia_legal` — portanto seis
-avisos entram como um e cinco não existem no catálogo.
+**Deixou de ser silencioso; continua por resolver.**
 
-Isto não é identidade, é sub-contagem, e não se resolve no mesmo sítio: ou a fonte
-passa a render um candidato por aviso, ou o esquema passa a admitir vários. As duas
-são mudanças de forma, não de regex.
+Um artigo é um candidato, é uma extracção, é **um** apoio. O
+`pagina-cedd5dbe91` anuncia `Centro2030-2024-47` a `-52`; o `pagina-3229f24976`
+anuncia `ACORES2030-2024-11`, `-12` e `-13`. Nas seis páginas de detalhe
+capturadas, quatro nomeiam um aviso só, uma não nomeia nenhum, e **duas anunciam
+vários**.
 
-### 1b. A listagem podia voltar a usar o código, e é uma decisão por tomar
+Medido a 17/09/2026: **nenhum** dos nove códigos desses dois artigos está no
+endpoint de avisos abertos — e não é por serem de 2024, porque 65 dos 228 abertos
+são desse ano. Os que ficam por capturar não entram por outra via.
 
-O `pt2030-avisos-listagem` passa `referenciaLegal: null` desde o #76, para parar
-a perda. Agora que a função guarda o prefixo, o impedimento desapareceu — mas
-voltar a pôr o código lá muda a identidade de apoios já gravados, de uma chave de
-força 70 (`url_canonica`) para uma de 100. Isso tem as suas próprias
-consequências e merece as chaves contadas antes e depois, como esta teve. Não se
-apanha à boleia de outra coisa.
+O que existe agora é a contagem: um documento que nomeia mais do que um aviso
+marca o apoio `needs_review` com `avisos_por_capturar:<n>`, e a corrida escreve
+quais. Não repara nada, e de propósito — não inventa um apoio que ninguém
+extraiu.
+
+**A decisão que falta é de forma, e são duas hipóteses:**
+
+- **A fonte rende um candidato por aviso.** Os códigos estão no corpo do artigo,
+  e o `extrair` corre sobre a página de arquivo, que não os tem. Implica um
+  pipeline em que um candidato se expande depois de o detalhe ser buscado — uma
+  fase nova.
+- **O esquema admite vários.** O `Extraccao` passa a devolver uma lista, e isso
+  atravessa o `verificar`, o `decidir`, o `paraApoio`, a identidade, o diffing e
+  o rasto de auditoria.
+
+Nenhuma é pequena, e escolher entre elas não é trabalho de regex.
 
 ## 2. A hora de fecho é truncada
 
