@@ -201,30 +201,60 @@ As medidas e a elegibilidade estão nos PDFs. Uma fase de detalhe que os leia p�
 esta fonte no mesmo pé do `fundo-ambiental-aac`, que é hoje a única com medidas —
 e não por acaso, porque é a única que lê o documento.
 
-### O que falta saber, e é o que trava
+### Qual dos documentos está em vigor: medido, e não há regra
 
-**Qual dos documentos «Aviso» é o que está em vigor.** Numa amostra de 40 avisos
-abertos, a distribuição vai de 1 a **13** documentos desse tipo por aviso, e só 6
-dos 40 têm exactamente um.
+**Varrido a 17/09/2026 sobre os 229 avisos abertos** — não sobre uma amostra, e a
+distinção importa porque a estimativa por amostra errou por três vezes o valor.
 
-Os metadados não ordenam:
+| | |
+|---|---|
+| Avisos abertos | **229** |
+| Documentos do tipo `Aviso` | **667** |
+| Avisos com **exactamente um** | **106 — 46,3%** |
+| Avisos com mais do que um | 123 (até **14** num só) |
 
-- **`documentoData` é igual em todos os documentos do mesmo aviso** — 34 em 34
-  medidos, zero excepções. É a data do aviso, não a do ficheiro. Só 5 dos 34
-  coincidem com o `aviso.dataUltimaAlteracao`.
-- O único sinal é o **nome do ficheiro**, e o vocabulário é inconsistente:
-  `alteração` (38) e `republicação` (36) na mesma amostra, com grafias que variam
-  (`1ª`, `1a`, `2 `, com e sem acento) e sem forma de ordenar uma contra a outra.
+**Os metadados não ordenam as versões.** O `documentoData` é **igual em todos os
+documentos do mesmo aviso** — 34 em 34 medidos, zero excepções — porque é a data
+do aviso e não a do ficheiro. Só 5 dos 34 coincidem com o `dataUltimaAlteracao`.
+
+**E o nome do ficheiro também não serve.** São **303 formas distintas** em 667
+documentos, com pelo menos quatro esquemas a conviver:
+
+| forma (dígitos → `#`) | n |
+|---|---|
+| `#.ª alt` | 74 |
+| *(sem sufixo)* | 70 |
+| `aviso #a. republicacao` | 61 |
+| `#.# - #ª alteracao` | 13 |
+| `alteracao_ aviso__…(it)_#-#-#` | 12 |
+| `prorrogacao prazo conclusao…_signed` | 6 |
+| `republicacao_#.#.#` | 4 |
+
+Repare-se no quinto: o número é uma **data** (`15-05-2026`), não uma versão. E o
+sexto não é sequer uma versão do aviso — é uma prorrogação de prazo. Uma regex
+que apanhe as cinco formas do topo cobre cerca de 60% e **escolhe mal em silêncio
+no resto**.
 
 Ler a versão errada é anunciar condições revogadas a quem se está a candidatar.
-Por isso isto não é «acrescentar uma fase» — precisa primeiro de uma resposta a
-esta pergunta.
+Não há aqui uma heurística honesta à espera de ser escrita: há uma cauda longa
+sem esquema.
+
+### O caminho que a medição abre
+
+**A fatia sem ambiguidade são 106 avisos — quase metade.** Para esses a pergunta
+não se põe: há um documento e é esse. É por aí que a fase de detalhe deve
+começar, sem heurística de versão nenhuma, e é ela que mede quantos apoios
+alertáveis isto rende de facto antes de se decidir o resto.
 
 **Uma atenuante medida:** o prazo, que é o campo mais volátil entre
 republicações, **já vem do endpoint** em `calendario.dataFimAtual` e não depende
 do PDF. O que se vai lá buscar são factos que mudam mais devagar.
 
-**O caminho seguro para começar** é a fatia sem ambiguidade — os avisos com
-exactamente um documento «Aviso», cerca de 15% da amostra. Prova o caminho todo
-de ponta a ponta, sem heurística de versão nenhuma, e mede quantos apoios
-alertáveis rende antes de se decidir o resto.
+**O que falta decidir é o custo.** A primeira corrida paga uma chamada ao modelo
+por aviso; o portão da mudança limita as seguintes aos que mudarem. Isso é uma
+decisão de quem paga, não de quem escreve o código.
+
+**E para os outros 123 não há resposta ainda.** Ficam de fora até alguém
+responder a «qual é a versão em vigor» por uma via que não seja o nome do
+ficheiro — perguntar à AD&C, ou ler a data de assinatura de dentro do PDF, são
+as duas hipóteses que ninguém ainda tentou.
