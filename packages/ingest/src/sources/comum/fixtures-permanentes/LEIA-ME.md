@@ -93,3 +93,34 @@ Duas coisas a ler antes do resto:
 
 Um nome que não foi experimentado continua por experimentar. O ficheiro leva a lista
 completa dos que foram, precisamente para que a próxima pessoa não repita os mesmos.
+
+## `pt2030-aviso-lisboa2030-2023-12-alteracao.pdf`
+
+188 KB de PDF a sério, e o único ficheiro binário aqui. É a alteração de julho de
+2025 ao `LISBOA2030-2023-12`, descarregada a 21/09/2026 pela rota
+`/wp-json/avisos/download`. Foi escolhido por ser o mais pequeno dos avisos medidos,
+não por ser especial: qualquer um dos outros servia.
+
+Está aqui porque o leitor de PDFs não se consegue testar sem um. Um PDF fabricado à
+mão prova a gramática dos operadores — e o `pdf.test.ts` fabrica sete —, mas não
+prova a única coisa que interessava saber: que o leitor aguenta o que o Estado
+publica de facto. O leitor anterior passaria em todos os testes fabricados em que
+se pensasse, porque o que ele não sabia fazer era descomprimir, e um exemplo
+fabricado só tem streams comprimidos se quem o fabricou se lembrar disso.
+
+O que este ficheiro guarda, em concreto:
+
+- **Streams `FlateDecode`.** Todo o texto do documento está comprimido, que é o
+  caso normal e era o caso que o leitor anterior não via.
+- **O dicionário `Info` dentro de um object stream.** A data de produção
+  (`ModDate`) não está em texto claro em lado nenhum do ficheiro. Uma primeira
+  medição deste repositório procurou-a só nos bytes crus e concluiu que 67
+  documentos não tinham data nenhuma. Tinham todos.
+- **Texto partido por célula de tabela.** O código do aviso sai
+  `LISBOA2030 - 2023 - 1 2`, porque o produtor posicionou cada pedaço com o seu
+  próprio `Tm`. O leitor não junta isso, e não deve fingir que junta: uma citação
+  do modelo que contenha o código não é verificável contra este documento, e o
+  campo cai para `baixa`. É uma limitação medida, não um descuido.
+
+Não é apagado pelo `capturar-fixtures.yml` pela mesma razão que os outros: o sítio
+serve o que serve hoje, e este ficheiro é uma prova de como os avisos eram feitos.

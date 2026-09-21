@@ -25,6 +25,7 @@ import {
 import type { Fonte, Paginacao } from "../sources/tipos.ts";
 import type { Armazem } from "./armazem.ts";
 import type { MetricasFonte } from "./saude.ts";
+import { textoDoPdf } from "./pdf.ts";
 import {
   atingiuOTecto,
   chaveDePagina,
@@ -503,7 +504,7 @@ export async function executarFonte(
     const texto = ehPdf
       ? // A PDF's text layer is only needed so evidence quotes can be verified;
         // the model still receives the original bytes.
-        extrairTextoPdfAproximado(resposta.bytes)
+        textoDoPdf(resposta.bytes)
       : textoVisivel(resposta.corpo ?? "");
 
     if (op.simulacao) {
@@ -736,27 +737,4 @@ export async function executarFonte(
     conflitos,
     saltouPorNaoModificado: saltou,
   };
-}
-
-/**
- * Crude text layer read straight out of the PDF's content streams.
- *
- * Only ever used to verify evidence quotes — the model receives the original PDF
- * bytes, never this. Deliberately not a full parser: a proper extraction of these
- * multi-column measure/cap tables is exactly what mangles them, and the model reads
- * the real document anyway. When this yields too little to verify against, the
- * extraction simply lands in the review queue, which is the correct outcome.
- */
-function extrairTextoPdfAproximado(bytes: Uint8Array | null): string {
-  if (!bytes) return "";
-  const bruto = new TextDecoder("latin1").decode(bytes);
-  const pedacos: string[] = [];
-  for (const m of bruto.matchAll(/\((?:\\.|[^\\()])*\)/g)) {
-    const s = m[0]
-      .slice(1, -1)
-      .replace(/\\([()\\])/g, "$1")
-      .replace(/\\n/g, " ");
-    if (s.trim().length > 0) pedacos.push(s);
-  }
-  return pedacos.join(" ").replace(/\s+/g, " ").trim();
 }
