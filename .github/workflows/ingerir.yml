@@ -66,8 +66,30 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # O tecto aqui e uma rede de seguranca, nao um orcamento.
+      #
+      # Esta corrida e incremental: o portao da mudanca de conteudo limita-a aos
+      # documentos que mudaram mesmo, e uma noite normal sao meia duzia de
+      # chamadas. O projecto inteiro gastou $11,50 em 99 chamadas desde que ha
+      # registo.
+      #
+      # Cinco dolares sao cerca de quarenta chamadas ao preco de lista: muito
+      # acima de qualquer noite normal, e muito abaixo do que custa uma fonte que
+      # de repente passa a render um universo inteiro. Foi exactamente isso que
+      # a fase de detalhe do PT2030 tornou possivel — 103 documentos novos de uma
+      # vez, numa corrida que ate aqui nunca tinha tido por onde gastar.
+      #
+      # Atingi-lo nao perde nada: os documentos recusados ficam com o snapshot por
+      # marcar processado e a noite seguinte tenta-os outra vez. O `avaliarSaude`
+      # assinala, para que um tecto atingido todas as noites nao passe
+      # despercebido — isso seria sinal de que o numero esta errado, nao de que a
+      # rede esta a funcionar.
+      #
+      # Sem `--lote`, de proposito: um lote pode demorar 24h e esta corrida tem de
+      # acabar esta noite. A primeira passagem sobre o arquivo de uma fonte faz-se
+      # a mao, pelo `ingerir-lote.yml`.
       - name: Executar pipeline
-        run: pnpm ingerir
+        run: pnpm ingerir --tecto-custo-usd 5.00
 
       # A failing job is the operator's first alarm: GitHub emails the repository
       # owner on workflow failure at no cost. The independent watchdog that catches
