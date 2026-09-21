@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { Extractor } from "@apoios/extraction";
+import { Extractor, ExtractorLote } from "@apoios/extraction";
 import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
@@ -22,6 +22,16 @@ apoios ingerir — executa o pipeline de recolha
                     pelas fontes por ordem de execução. Sem isto não há tecto,
                     que é o certo para a corrida nocturna: um portão que pára a
                     meio deixa o catálogo num estado que ninguém escolheu.
+  --lote            Extrai pela API de lotes: metade do preço, e a resposta
+                    pode demorar até 24h. Não serve a corrida nocturna, que tem
+                    de acabar esta noite; serve a primeira passagem sobre o
+                    arquivo de uma fonte, que ninguém está à espera.
+  --custo-esperado-usd <n>
+                    Quanto se espera que custe uma chamada. Só é lido com
+                    --lote, onde o tecto tem de cortar por contagem porque não
+                    há onde parar depois de submeter. Por omissão 0.06, que é a
+                    média medida ($0,1162) a metade do preço. Com --lote e
+                    --tecto-custo-usd, sem isto não se submete nada.
   --list            Lista as fontes conhecidas
   --redecidir       Volta a aplicar o portão de publicação às extracções já
                     guardadas. Não chama o modelo nem vai à rede. Use com
@@ -124,6 +134,8 @@ async function main(): Promise<number> {
       fixtures: { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "tecto-custo-usd": { type: "string" },
+      lote: { type: "boolean", default: false },
+      "custo-esperado-usd": { type: "string" },
       list: { type: "boolean", default: false },
       redecidir: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -216,10 +228,29 @@ async function main(): Promise<number> {
     }
   }
 
+  // Média medida sobre as 99 chamadas com custo em `fund_extractions` ($0,1162),
+  // a metade do preço. É uma estimativa e o nome do parâmetro di-lo; o que a
+  // corrida gastou de facto sai no resumo, e é contra esse número que se corrige.
+  const CUSTO_ESPERADO_LOTE_USD = 0.06;
+
+  const emLote = values.lote === true;
+  let custoEsperadoUsd: number | undefined = emLote
+    ? CUSTO_ESPERADO_LOTE_USD
+    : undefined;
+  if (values["custo-esperado-usd"] !== undefined) {
+    custoEsperadoUsd = Number(values["custo-esperado-usd"]);
+    if (!Number.isFinite(custoEsperadoUsd) || custoEsperadoUsd <= 0) {
+      console.error(
+        `--custo-esperado-usd inválido: ${JSON.stringify(values["custo-esperado-usd"])}`,
+      );
+      return 2;
+    }
+  }
+
   const buscador = values.fixtures
     ? new BuscadorReplay(values.fixtures)
     : new BuscadorHttp();
-  const extractor = new Extractor();
+  const extractor = emLote ? new ExtractorLote() : new Extractor();
   const agora = new Date();
 
   const armazenamento = escolherArmazem(simulacao);
@@ -241,6 +272,7 @@ async function main(): Promise<number> {
         agora,
         simulacao,
         tectoCustoUsd: restanteUsd,
+        custoEsperadoPorChamadaUsd: custoEsperadoUsd,
       });
 
       const m = r.metricas;

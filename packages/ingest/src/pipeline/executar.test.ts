@@ -7,7 +7,7 @@ import type {
 } from "@apoios/extraction";
 import { custoDaChamada } from "@apoios/extraction";
 import { extraccaoSolar } from "@apoios/extraction/teste";
-import { executarFonte } from "./executar.ts";
+import { executarFonte, quantosCabemNoTecto } from "./executar.ts";
 import { ArmazemMemoria } from "./armazem.ts";
 import { BuscadorMemoria } from "../http/replay.ts";
 import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
@@ -1268,5 +1268,211 @@ describe("fase de detalhe da listagem do PT2030", () => {
     // É este portão que faz a actualização diária custar cêntimos: os bytes do
     // PDF são estáveis (medidos byte a byte com quatro dias de intervalo).
     expect((await executarFonte(ctx())).metricas.chamadasModelo).toBe(0);
+  });
+});
+
+/**
+ * O ciclo parte-se em duas fases quando o extractor sabe fazer lotes.
+ *
+ * A API de lotes só existe no plural: os pedidos vão todos de uma vez e a
+ * resposta chega mais tarde, a metade do preço. É a única razão para o ciclo
+ * estar partido, e sem um extractor que saiba fazer lotes as duas metades correm
+ * de seguida como sempre correram.
+ */
+describe("extracção em lote", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3, 4, 5].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteCinco: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}: candidaturas abertas.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  /** Um extractor que responde em lote, como o `ExtractorLote` real. */
+  function extractorDeLote(): ExtractorLike & {
+    lotes: number;
+    preparados: string[];
+  } {
+    const estado = { lotes: 0, preparados: [] as string[] };
+    return {
+      lotes: 0,
+      preparados: estado.preparados,
+      async prepararLote(docs: readonly DocumentoEntrada[]) {
+        estado.lotes++;
+        this.lotes = estado.lotes;
+        for (const d of docs) estado.preparados.push(d.urlFonte);
+      },
+      async extrair(doc) {
+        if (!estado.preparados.includes(doc.urlFonte)) {
+          throw new Error(`não preparado: ${doc.urlFonte}`);
+        }
+        return extractorFixo().extrair(doc);
+      },
+    };
+  }
+
+  it("prepara tudo num lote só, antes de pedir a primeira resposta", async () => {
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+    });
+
+    expect(extractor.lotes).toBe(1);
+    expect(extractor.preparados).toHaveLength(5);
+    expect(r.metricas.chamadasModelo).toBe(5);
+  });
+
+  it("só entra no lote o que passou o portão da mudança", async () => {
+    const { buscador, armazem } = mundo();
+
+    await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: extractorDeLote(),
+      agora: AGORA,
+    });
+
+    // Segunda corrida: nada mudou, por isso o lote fica vazio e não se submete.
+    const segundo = extractorDeLote();
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: segundo,
+      agora: AGORA,
+    });
+
+    expect(segundo.lotes).toBe(0);
+    expect(r.metricas.chamadasModelo).toBe(0);
+  });
+
+  /**
+   * A diferença de semântica que o `custoEsperadoPorChamadaUsd` existe para
+   * tornar visível: num lote não há um «entre duas chamadas» onde parar, por isso
+   * o corte é por contagem e é feito antes de submeter.
+   */
+  it("o tecto corta antes de submeter, e por contagem", async () => {
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      tectoCustoUsd: 0.25,
+      custoEsperadoPorChamadaUsd: 0.1,
+    });
+
+    // floor(0,25 / 0,10) = 2.
+    expect(extractor.preparados).toHaveLength(2);
+    expect(r.metricas.chamadasModelo).toBe(2);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(3);
+  });
+
+  it("um tecto sem custo esperado não submete nada", async () => {
+    // Em dúvida, não passa. Um orçamento que não sabe converter dinheiro em
+    // documentos não foi respeitado por se adivinhar quantos cabem.
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      tectoCustoUsd: 10,
+    });
+
+    expect(extractor.lotes).toBe(0);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(5);
+  });
+
+  it("o que o tecto deixou de fora é tentado na corrida seguinte", async () => {
+    const { buscador, armazem } = mundo();
+
+    await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: extractorDeLote(),
+      agora: AGORA,
+      tectoCustoUsd: 0.25,
+      custoEsperadoPorChamadaUsd: 0.1,
+    });
+
+    const segundo = extractorDeLote();
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: segundo,
+      agora: AGORA,
+    });
+
+    expect(segundo.preparados).toHaveLength(3);
+    expect(r.metricas.chamadasModelo).toBe(3);
+  });
+});
+
+describe("quantosCabemNoTecto", () => {
+  it("sem tecto cabem todos", () => {
+    expect(quantosCabemNoTecto(103, undefined, 0.06)).toBe(103);
+    expect(quantosCabemNoTecto(103, undefined, undefined)).toBe(103);
+  });
+
+  it("divide o tecto pelo custo esperado, arredondando para baixo", () => {
+    expect(quantosCabemNoTecto(103, 10, 0.06)).toBe(103);
+    expect(quantosCabemNoTecto(103, 1, 0.06)).toBe(16);
+    expect(quantosCabemNoTecto(5, 10, 0.06)).toBe(5);
+  });
+
+  it("sem custo esperado, ou com um absurdo, não passa nada", () => {
+    expect(quantosCabemNoTecto(103, 10, undefined)).toBe(0);
+    expect(quantosCabemNoTecto(103, 10, 0)).toBe(0);
+    expect(quantosCabemNoTecto(103, 10, -1)).toBe(0);
+  });
+
+  it("um tecto que não chega para uma chamada não deixa passar meia", () => {
+    expect(quantosCabemNoTecto(103, 0.01, 0.06)).toBe(0);
   });
 });

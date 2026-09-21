@@ -14,6 +14,7 @@ import {
   extraccaoParaApoio,
   verificarProvas,
   type ExtractorLike,
+  type DocumentoEntrada,
 } from "@apoios/extraction";
 import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
 import {
@@ -96,6 +97,25 @@ export interface OpcoesExecucao {
    * gate that stops halfway leaves the catalogue in a state nobody chose.
    */
   readonly tectoCustoUsd?: number;
+  /**
+   * What one model call is expected to cost, for a ceiling that must cut before
+   * it can measure.
+   *
+   * Only read on the batched path, where the requests go out together and there
+   * is no moment between two calls at which to stop. There the ceiling becomes a
+   * count — `floor(tecto / esperado)` — and this is the divisor.
+   *
+   * It is an estimate, and naming it separately is how that stays visible. The
+   * measured average over the 99 priced calls in `fund_extractions` is $0.1162 at
+   * list price, so roughly $0.058 batched; a PDF costs more in input than the
+   * HTML those were, so the honest use of this field is to pass a figure with
+   * slack and correct it against `MetricasFonte.custoUsd` afterwards.
+   *
+   * Omitted while a ceiling is set means nothing is submitted, deliberately: a
+   * budget that cannot convert money into documents has not been respected by
+   * guessing.
+   */
+  readonly custoEsperadoPorChamadaUsd?: number;
   /** When true, nothing is written and no model call is made. */
   readonly simulacao?: boolean;
 }
@@ -107,6 +127,41 @@ export interface ResultadoExecucao {
   readonly eventos: readonly EventoApoio[];
   readonly conflitos: readonly string[];
   readonly saltouPorNaoModificado: boolean;
+}
+
+/** Um documento buscado, comparado e gravado, à espera do modelo. */
+interface Preparado {
+  readonly candidato: Candidato;
+  readonly hash: string;
+  readonly doc: DocumentoEntrada;
+}
+
+/**
+ * Quantos documentos cabem no tecto, contados antes de se saber o que custam.
+ *
+ * O tecto do caminho normal é conferido **depois** de cada chamada, contra o que
+ * já se gastou — uma medição. Num lote isso é impossível: os pedidos vão todos de
+ * uma vez e não há um «entre duas chamadas» onde parar. O corte passa a ser por
+ * contagem, e a contagem precisa de um custo esperado por chamada, que é uma
+ * estimativa.
+ *
+ * A diferença é real e não se deve esconder atrás do mesmo nome: com lote, o
+ * tecto é respeitado **se a estimativa estiver certa**. O que a corrida gastou de
+ * facto fica em `MetricasFonte.custoUsd`, medido, e é contra esse número que a
+ * estimativa se corrige da próxima vez.
+ *
+ * Sem tecto pedido, cabem todos.
+ */
+export function quantosCabemNoTecto(
+  disponiveis: number,
+  tectoUsd: number | undefined,
+  custoEsperadoUsd: number | undefined,
+): number {
+  if (tectoUsd === undefined) return disponiveis;
+  // Sem custo esperado não há como converter dinheiro em documentos. Em dúvida,
+  // não passa: zero, e o alarme do tecto diz quantos ficaram de fora.
+  if (custoEsperadoUsd === undefined || custoEsperadoUsd <= 0) return 0;
+  return Math.max(0, Math.min(disponiveis, Math.floor(tectoUsd / custoEsperadoUsd)));
 }
 
 /** `%PDF-`, os cinco bytes que a norma obriga a estar no início do ficheiro. */
@@ -431,6 +486,15 @@ export async function executarFonte(
   // Um modelo sem preço fixado em `PRECOS` fecha o tecto. Ver abaixo.
   let precoEmFalta = false;
 
+  /**
+   * O que foi buscado, comparado e gravado, e está à espera do modelo.
+   *
+   * Existe porque a API de lotes precisa de todos os pedidos de uma vez. Guarda
+   * os bytes do documento enquanto espera — cerca de 70 MB para os avisos do
+   * PT2030 —, que é o preço de os pedir juntos em vez de um a um.
+   */
+  let preparados: Preparado[] = [];
+
   const limite = op.maxDetalhes ?? 250;
   const ignorados = Math.max(0, candidatos.length - limite);
   if (ignorados > 0) {
@@ -600,15 +664,56 @@ export async function executarFonte(
       resposta.bytes ?? new TextEncoder().encode(texto),
     );
 
-    // --- 7. Model extraction, only on genuinely changed documents ------------
-    //
+    preparados.push({
+      candidato,
+      hash,
+      doc: {
+        urlFonte: candidato.urlDetalhe,
+        entidade: fonte.entidade,
+        dataRecolha: agora.toISOString().slice(0, 10),
+        texto,
+        pdf: ehPdf ? (resposta.bytes ?? undefined) : undefined,
+      },
+    });
+  }
+
+  // --- 6d. Preparar o lote, se o extractor souber -----------------------------
+  //
+  // É aqui que o ciclo se parte em dois, e é a única razão para ele estar
+  // partido. A API de lotes só existe no plural: os pedidos vão todos juntos e a
+  // resposta chega mais tarde, a metade do preço. Com um extractor que não sabe
+  // fazer lotes isto não faz nada e as duas metades correm de seguida, como
+  // sempre correram.
+  //
+  // O tecto corta **antes** de submeter, e por contagem, porque depois de
+  // submeter já não há onde parar. É a diferença de semântica que o
+  // `custoEsperadoPorChamadaUsd` existe para tornar visível.
+  if (extractor.prepararLote !== undefined) {
+    const cabem = quantosCabemNoTecto(
+      preparados.length,
+      op.tectoCustoUsd,
+      op.custoEsperadoPorChamadaUsd,
+    );
+    extraccoesAdiadasPorTecto += preparados.length - cabem;
+    preparados = preparados.slice(0, cabem);
+    if (preparados.length > 0) {
+      await extractor.prepararLote(preparados.map((p) => p.doc));
+    }
+  }
+
+  // --- 7. Model extraction, only on genuinely changed documents --------------
+  for (const { candidato, hash, doc } of preparados) {
+    const texto = doc.texto;
     // O tecto é conferido aqui, e não antes da descarga: só se sabe que um
     // documento precisa de uma chamada depois de ele ser buscado e comparado. O
     // que se perde por estar aqui é a descarga; o que se ganharia por estar antes
     // era gastar o orçamento no primeiro candidato da lista em vez de no primeiro
     // que mudou.
+    //
+    // Com lote isto nunca dispara: o corte já foi feito acima, por contagem.
     if (
       op.tectoCustoUsd !== undefined &&
+      extractor.prepararLote === undefined &&
       (precoEmFalta || custoUsd >= op.tectoCustoUsd)
     ) {
       extraccoesAdiadasPorTecto++;
@@ -616,13 +721,7 @@ export async function executarFonte(
     }
 
     chamadasModelo++;
-    const resultado = await extractor.extrair({
-      urlFonte: candidato.urlDetalhe,
-      entidade: fonte.entidade,
-      dataRecolha: agora.toISOString().slice(0, 10),
-      texto,
-      pdf: ehPdf ? (resposta.bytes ?? undefined) : undefined,
-    });
+    const resultado = await extractor.extrair(doc);
 
     tokensCacheLidos += resultado.tokensCacheLidos;
 

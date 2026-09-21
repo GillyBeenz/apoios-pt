@@ -77,6 +77,21 @@ export function chaveCassete(doc: DocumentoEntrada): string {
  */
 export interface ExtractorLike {
   extrair(doc: DocumentoEntrada): Promise<ResultadoExtraccao>;
+
+  /**
+   * Answer every document up front, before any of them is asked for.
+   *
+   * Optional, and its presence changes the pipeline's shape rather than its
+   * behaviour: with it, the candidate loop splits in two — fetch and gate
+   * everything first, prepare, then read the answers. `Extractor` does not have
+   * it, because a call at a time is exactly what it does; `ExtractorLote` does,
+   * because the Batches API only exists in the plural.
+   *
+   * An implementation must answer **every** document it was given, including with
+   * a failure. The loop that follows will ask for each one, and a missing answer
+   * would take the run down over a single document.
+   */
+  prepararLote?(docs: readonly DocumentoEntrada[]): Promise<void>;
 }
 
 export type ModoExtraccao = "replay" | "record" | "live";
@@ -103,6 +118,193 @@ export class ErroCasseteEmFalta extends Error {
     );
     this.name = "ErroCasseteEmFalta";
   }
+}
+
+export const BETA_FALLBACK = "server-side-fallback-2026-07-01" as const;
+
+/**
+ * The request body, identical on the single and the batched path.
+ *
+ * Shared on purpose rather than duplicated: the cached prefix has to stay
+ * byte-identical across both, and `chaveCassete` hashes the prompt. Two copies of
+ * this object would drift, and the drift would show up as a tenfold bill and a
+ * cassette that no longer matches, in that order.
+ */
+export function corpoDoPedido(
+  doc: DocumentoEntrada,
+): Anthropic.Beta.Messages.BatchCreateParams.Request.Params {
+  const conteudo: Anthropic.Beta.BetaContentBlockParam[] = [];
+
+  if (doc.pdf) {
+    // The PDF goes in raw. Parsing it locally first would mangle the multi-column
+    // measure/percentage/cap tables these notices use, and feeding the model that
+    // mangled text is strictly worse than feeding it the document.
+    conteudo.push({
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: Buffer.from(doc.pdf).toString("base64"),
+      },
+    });
+  } else {
+    conteudo.push({ type: "text", text: doc.texto });
+  }
+
+  // Volatile context goes last, after the cached prefix.
+  conteudo.push({
+    type: "text",
+    text: instrucaoVolatil({
+      urlFonte: doc.urlFonte,
+      entidade: doc.entidade,
+      dataRecolha: doc.dataRecolha,
+    }),
+  });
+
+  return {
+    model: MODELO,
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
+    // `format` is deliberately absent — see `contrato.ts`. `effort` stays:
+    // it governs how hard the model thinks, not how the output is decoded.
+    output_config: { effort: "high" },
+    fallbacks: "default",
+    system: [
+      {
+        type: "text",
+        // The contract goes inside the cached block: it is the same bytes on
+        // every call, so it is read from cache at ~0.1x rather than re-sent.
+        text: `${PROMPT_SISTEMA}\n\n${CONTRATO_JSON}`,
+        // The whole taxonomy and rubric sit before this breakpoint, so every
+        // document after the first reads them from cache at ~0.1x.
+        cache_control: { type: "ephemeral", ttl: "1h" },
+      },
+    ],
+    messages: [{ role: "user", content: conteudo }],
+  };
+}
+
+/** A call that threw, or a batch entry that errored: nothing was produced. */
+export function resultadoDeErro(erro: unknown): ResultadoExtraccao {
+  return {
+    extraccao: null,
+    stopReason: null,
+    modelo: MODELO,
+    versaoPrompt: VERSAO_PROMPT,
+    versaoEsquema: VERSAO_ESQUEMA,
+    tokensEntrada: 0,
+    tokensSaida: 0,
+    tokensCacheLidos: 0,
+    tokensCacheEscritos: 0,
+    // A call that threw before a response was billed nothing, and zero is the
+    // honest figure — unlike an unpriced model, where the cost exists and we
+    // simply cannot name it.
+    custoUsd: 0,
+    erro: erro instanceof Error ? erro.message : String(erro),
+  };
+}
+
+/**
+ * Turn one answered message into a result.
+ *
+ * `desconto` is the fraction of list price actually billed: 1 on the Messages
+ * API, 0.5 on the Batches API. It multiplies the priced cost rather than the
+ * token counts, because the tokens are what they are — only the bill is halved,
+ * and a token count quietly scaled to make the arithmetic come out would be a lie
+ * in the one table that exists to say what was asked and what came back.
+ */
+export function interpretarResposta(
+  resposta: Anthropic.Beta.BetaMessage,
+  desconto = 1,
+): ResultadoExtraccao {
+  const uso = resposta.usage;
+  const modelo = resposta.model ?? MODELO;
+  const tokens = {
+    tokensEntrada: uso?.input_tokens ?? 0,
+    tokensSaida: uso?.output_tokens ?? 0,
+    tokensCacheLidos: uso?.cache_read_input_tokens ?? 0,
+    tokensCacheEscritos: uso?.cache_creation_input_tokens ?? 0,
+  };
+  // Priced against the model the API says served the call, not the one we
+  // asked for. They differ on a fallback, and the bill follows the server.
+  const bruto = custoDaChamada(modelo, tokens);
+  const base = {
+    modelo,
+    versaoPrompt: VERSAO_PROMPT,
+    versaoEsquema: VERSAO_ESQUEMA,
+    ...tokens,
+    custoUsd: bruto === null ? null : Math.round(bruto * desconto * 1e6) / 1e6,
+  };
+
+  // Check the stop reason before touching content: on a refusal there is no
+  // usable output, and throwing here would take down the whole run for one
+  // awkward document.
+  if (resposta.stop_reason === "refusal") {
+    return {
+      ...base,
+      extraccao: null,
+      stopReason: "refusal",
+      erro: "modelo recusou",
+    };
+  }
+
+  // Validation moved from the decoder to here, and the schema doing it is the
+  // same one that used to constrain it — so a response that would have been
+  // rejected mid-decode is now rejected on arrival, by `EsquemaExtraccao`
+  // itself. What is lost is the guarantee that the model *cannot* produce
+  // something invalid; what is gained is a schema that the API will accept.
+  const texto = resposta.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  const json = extrairJson(texto);
+  if (json === null) {
+    return {
+      ...base,
+      extraccao: null,
+      stopReason: resposta.stop_reason ?? null,
+      erro:
+        resposta.stop_reason === "max_tokens"
+          ? "resposta truncada em max_tokens antes de fechar o JSON"
+          : "resposta sem JSON reconhecível",
+    };
+  }
+
+  let validado = EsquemaExtraccao.safeParse(json);
+
+  if (!validado.success) {
+    // One retry, in memory, for length alone. See `apararDemasiadoLongos`:
+    // a 620-character summary is not a reason to throw away an otherwise
+    // sound extraction of a document we have already paid to read.
+    const { json: aparado, aparados } = apararDemasiadoLongos(
+      json,
+      validado.error.issues,
+    );
+    if (aparados.length > 0) validado = EsquemaExtraccao.safeParse(aparado);
+  }
+
+  if (!validado.success) {
+    // The message names the offending paths, so a prompt or schema drift
+    // shows up as "beneficiarios.tipos: invalid enum" instead of silence.
+    const problemas = validado.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    return {
+      ...base,
+      extraccao: null,
+      stopReason: resposta.stop_reason ?? null,
+      erro: `JSON não valida contra o esquema — ${problemas}`,
+    };
+  }
+
+  return {
+    ...base,
+    extraccao: validado.data,
+    stopReason: resposta.stop_reason ?? null,
+    erro: null,
+  };
 }
 
 export class Extractor {
@@ -160,163 +362,18 @@ export class Extractor {
 
   async #chamarApi(doc: DocumentoEntrada): Promise<ResultadoExtraccao> {
     const cliente = this.#obterCliente();
-
-    const conteudo: Anthropic.Beta.BetaContentBlockParam[] = [];
-
-    if (doc.pdf) {
-      // The PDF goes in raw. Parsing it locally first would mangle the multi-column
-      // measure/percentage/cap tables these notices use, and feeding the model that
-      // mangled text is strictly worse than feeding it the document.
-      conteudo.push({
-        type: "document",
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data: Buffer.from(doc.pdf).toString("base64"),
-        },
-      });
-    } else {
-      conteudo.push({ type: "text", text: doc.texto });
-    }
-
-    // Volatile context goes last, after the cached prefix.
-    conteudo.push({
-      type: "text",
-      text: instrucaoVolatil({
-        urlFonte: doc.urlFonte,
-        entidade: doc.entidade,
-        dataRecolha: doc.dataRecolha,
-      }),
-    });
-
     try {
       const resposta = await cliente.beta.messages.create({
-        model: MODELO,
-        max_tokens: 16000,
-        thinking: { type: "adaptive" },
-        // `format` is deliberately absent — see `contrato.ts`. `effort` stays:
-        // it governs how hard the model thinks, not how the output is decoded.
-        output_config: { effort: "high" },
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-        system: [
-          {
-            type: "text",
-            // The contract goes inside the cached block: it is the same bytes on
-            // every call, so it is read from cache at ~0.1x rather than re-sent.
-            text: `${PROMPT_SISTEMA}\n\n${CONTRATO_JSON}`,
-            // The whole taxonomy and rubric sit before this breakpoint, so every
-            // document after the first reads them from cache at ~0.1x.
-            cache_control: { type: "ephemeral", ttl: "1h" },
-          },
-        ],
-        messages: [{ role: "user", content: conteudo }],
+        ...corpoDoPedido(doc),
+        // Explícito para o TypeScript escolher a sobrecarga não-streaming: o
+        // corpo partilhado declara `stream?: boolean` e isso sozinho deixa o
+        // tipo de retorno na união com `Stream`.
+        stream: false,
+        betas: [BETA_FALLBACK],
       });
-
-      const uso = resposta.usage;
-      const modelo = resposta.model ?? MODELO;
-      const tokens = {
-        tokensEntrada: uso?.input_tokens ?? 0,
-        tokensSaida: uso?.output_tokens ?? 0,
-        tokensCacheLidos: uso?.cache_read_input_tokens ?? 0,
-        tokensCacheEscritos: uso?.cache_creation_input_tokens ?? 0,
-      };
-      const base = {
-        modelo,
-        versaoPrompt: VERSAO_PROMPT,
-        versaoEsquema: VERSAO_ESQUEMA,
-        ...tokens,
-        // Priced against the model the API says served the call, not the one we
-        // asked for. They differ on a fallback, and the bill follows the server.
-        custoUsd: custoDaChamada(modelo, tokens),
-      };
-
-      // Check the stop reason before touching content: on a refusal there is no
-      // usable output, and throwing here would take down the whole run for one
-      // awkward document.
-      if (resposta.stop_reason === "refusal") {
-        return {
-          ...base,
-          extraccao: null,
-          stopReason: "refusal",
-          erro: "modelo recusou",
-        };
-      }
-
-      // Validation moved from the decoder to here, and the schema doing it is the
-      // same one that used to constrain it — so a response that would have been
-      // rejected mid-decode is now rejected on arrival, by `EsquemaExtraccao`
-      // itself. What is lost is the guarantee that the model *cannot* produce
-      // something invalid; what is gained is a schema that the API will accept.
-      const texto = resposta.content
-        .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("");
-
-      const json = extrairJson(texto);
-      if (json === null) {
-        return {
-          ...base,
-          extraccao: null,
-          stopReason: resposta.stop_reason ?? null,
-          erro:
-            resposta.stop_reason === "max_tokens"
-              ? "resposta truncada em max_tokens antes de fechar o JSON"
-              : "resposta sem JSON reconhecível",
-        };
-      }
-
-      let validado = EsquemaExtraccao.safeParse(json);
-
-      if (!validado.success) {
-        // One retry, in memory, for length alone. See `apararDemasiadoLongos`:
-        // a 620-character summary is not a reason to throw away an otherwise
-        // sound extraction of a document we have already paid to read.
-        const { json: aparado, aparados } = apararDemasiadoLongos(
-          json,
-          validado.error.issues,
-        );
-        if (aparados.length > 0) validado = EsquemaExtraccao.safeParse(aparado);
-      }
-
-      if (!validado.success) {
-        // The message names the offending paths, so a prompt or schema drift
-        // shows up as "beneficiarios.tipos: invalid enum" instead of silence.
-        const problemas = validado.error.issues
-          .slice(0, 5)
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
-          .join("; ");
-        return {
-          ...base,
-          extraccao: null,
-          stopReason: resposta.stop_reason ?? null,
-          erro: `JSON não valida contra o esquema — ${problemas}`,
-        };
-      }
-
-      return {
-        ...base,
-        extraccao: validado.data,
-        stopReason: resposta.stop_reason ?? null,
-        erro: null,
-      };
+      return interpretarResposta(resposta);
     } catch (erro) {
-      return {
-        extraccao: null,
-        stopReason: null,
-        modelo: MODELO,
-        versaoPrompt: VERSAO_PROMPT,
-        versaoEsquema: VERSAO_ESQUEMA,
-        tokensEntrada: 0,
-        tokensSaida: 0,
-        tokensCacheLidos: 0,
-        tokensCacheEscritos: 0,
-        // A call that threw before a response was billed nothing, and zero is the
-        // honest figure — unlike an unpriced model, where the cost exists and we
-        // simply cannot name it.
-        custoUsd: 0,
-        erro: erro instanceof Error ? erro.message : String(erro),
-      };
+      return resultadoDeErro(erro);
     }
   }
 }

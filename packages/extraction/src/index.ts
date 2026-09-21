@@ -4,4 +4,5 @@ export * from "./verificar.ts";
 export * from "./portao.ts";
 export * from "./precos.ts";
 export * from "./cliente.ts";
+export * from "./lote.ts";
 export * from "./paraApoio.ts";
