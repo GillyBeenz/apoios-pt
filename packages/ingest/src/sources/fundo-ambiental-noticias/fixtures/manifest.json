@@ -1,6 +1,6 @@
 {
   "sourceId": "fundo-ambiental-noticias",
-  "capturadoEm": "2026-09-07T09:33:21.098Z",
+  "capturadoEm": "2026-09-21T10:08:11.419Z",
   "erro": null,
   "entradas": [
     {
@@ -10,7 +10,25 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-07T09:33:09.030Z"
+      "capturadoEm": "2026-09-21T10:07:58.856Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/orientacao-tecnica-n-03c08-i01012022-operacoes-integradas-de-gestao-da-paisagem-5-republicacao.aspx",
+      "ficheiro": "orientacao-tecnica-n-03c08-i01012022-operacoes-i-2e7530a1d0.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-21T10:08:01.791Z"
+    },
+    {
+      "url": "https://www.fundoambiental.pt/listagem-noticias/agencia-para-o-clima-cumpre-100-das-metas-do-prr-sob-sua-gestao.aspx",
+      "ficheiro": "agencia-para-o-clima-cumpre-100-das-metas-do-prr-ca902865ad.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": null,
+      "lastModified": null,
+      "capturadoEm": "2026-09-21T10:08:04.946Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/aviso-de-abertura-de-concurso-n-032026-apoio-a-conversao-de-matos-em-novas-pastagens-abertura-do-periodo-de-candidaturas.aspx",
@@ -19,7 +37,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-07T09:33:12.329Z"
+      "capturadoEm": "2026-09-21T10:08:08.034Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/candidaturas-a-medida-de-auxilio-a-custos-indiretos-do-cele-2026.aspx",
@@ -28,25 +46,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-07T09:33:15.221Z"
-    },
-    {
-      "url": "https://www.fundoambiental.pt/listagem-noticias/fundo-azul-aviso-convite-n-01faz2026-campanhas-oceanograficas-de-suporte-ao-desenvolvimento-da-rede-nacional-de-areas-marinhas-protegidas--rececao-de-candidaturas.aspx",
-      "ficheiro": "fundo-azul-aviso-convite-n-01faz2026-campanhas-o-9f92f14f8c.html",
-      "status": 200,
-      "contentType": "text/html; charset=utf-8",
-      "etag": null,
-      "lastModified": null,
-      "capturadoEm": "2026-09-07T09:33:17.971Z"
-    },
-    {
-      "url": "https://www.fundoambiental.pt/listagem-noticias/aviso-convite-n-09c08-i01012026-criacao-de-novas-oigp-20-para-as-areas-florestais-atingidas-pela-tempestade-kristin-primeira-republicacao.aspx",
-      "ficheiro": "aviso-convite-n-09c08-i01012026-criacao-de-novas-c82f67df7c.html",
-      "status": 200,
-      "contentType": "text/html; charset=utf-8",
-      "etag": null,
-      "lastModified": null,
-      "capturadoEm": "2026-09-07T09:33:21.098Z"
+      "capturadoEm": "2026-09-21T10:08:11.419Z"
     }
   ]
 }

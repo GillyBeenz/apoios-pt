@@ -1,6 +1,6 @@
 {
   "sourceId": "pt2030-avisos-listagem",
-  "capturadoEm": "2026-09-14T17:04:16.353Z",
+  "capturadoEm": "2026-09-21T10:09:19.032Z",
   "erro": null,
   "entradas": [
     {
@@ -11,7 +11,7 @@
       "etag": null,
       "lastModified": null,
       "metodo": "POST",
-      "capturadoEm": "2026-09-14T17:04:16.353Z"
+      "capturadoEm": "2026-09-21T10:09:19.032Z"
     }
   ]
 }
