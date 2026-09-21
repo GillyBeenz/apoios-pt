@@ -154,107 +154,45 @@ respondem. Sobram duas arestas pequenas, verificadas no mesmo dia:
 
 ## 5. O que continua por saber do endpoint do PT2030
 
-A paginação foi resolvida — `page`, 0-indexado, 46 páginas, 228 avisos — e o que
-se aprendeu ficou no contrato da fonte e em
-`comum/fixtures-permanentes/pt2030-avisos-query-paginacao.json`. Sobram duas
-coisas por saber do mesmo endpoint.
-
-- **`estadoAvisoId`**: o `7` é o que a página usa na vista inicial. O que valem os
-  outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda
-  não lhes toca de propósito — uma investigação de cada vez, senão não se sabe qual
-  das duas mudanças produziu a diferença.
-- **`documentoData` não ordena versões, e por isso não se sabe qual é o aviso em
-  vigor.** Ver o ponto 6.
+**`estadoAvisoId`**: o `7` é o que a página usa na vista inicial. O que valem os
+outros valores não se sabe, e é aí que devem estar os avisos encerrados. A sonda
+não lhes toca de propósito — uma investigação de cada vez, senão não se sabe qual
+das duas mudanças produziu a diferença.
 
 ---
 
-## 6. Os PDFs dos avisos são endereçáveis — e não se sabe qual deles vale
+## 6. Os 127 avisos com mais do que uma versão esperam uma segunda passagem
 
-**A afirmação anterior era falsa e esteve aqui escrita.** Dizia que cada aviso
-traz PDFs com `path` e `container` «mas sem URL», e que o endereço de descarga
-não era derivável desses dois campos. É derivável, e o `wp-json` sempre o disse:
-a rota está no índice do namespace, ao lado do `query` que já usamos.
+A fase de detalhe já corre, e lê os avisos com **um único** documento «Aviso».
+Para os outros falta uma passagem própria — não falta a resposta.
 
-```
-GET https://portugal2030.pt/wp-json/avisos/download?path=<path>&container=<container>
-```
-
-Os dois valores vêm da própria resposta. Verificado a 17/09/2026 contra o
-`MAR2030-2023-4`: devolve **835 918 bytes**, assinatura `%PDF-1.6`.
-
-A rota é um proxy para o Azure Blob (`hubdocsprdsa.blob.core.windows.net`), e o
-`container` é `siag-prod-container` — um só, em todos os avisos. A nota antiga
-provavelmente nasceu de uma leitura truncada do campo, que começa por `siag`.
-
-**Cobertura, medida sobre os 228 avisos abertos:** todos têm documentos, e
-**todos têm pelo menos um do tipo `Aviso`**. São 666 documentos desse tipo, mais
-906 anexos, 148 complementares e 8 de perguntas frequentes.
-
-### O que isto desbloqueia
-
-O endpoint não tem campo de beneficiários nenhum, e é por isso que os avisos
-desta fonte entram sem `medidas` e sem `beneficiarios` — e um apoio sem medidas
-não casa com subscritor nenhum, porque as subscrições são **por medida**. É o que
-mantém o caminho de alerta em zero.
-
-As medidas e a elegibilidade estão nos PDFs. Uma fase de detalhe que os leia põe
-esta fonte no mesmo pé do `fundo-ambiental-aac`, que é hoje a única com medidas —
-e não por acaso, porque é a única que lê o documento.
-
-### Qual dos documentos está em vigor: medido, e não há regra
-
-**Varrido a 17/09/2026 sobre os 229 avisos abertos** — não sobre uma amostra, e a
-distinção importa porque a estimativa por amostra errou por três vezes o valor.
+**A resposta é o `ModDate` do próprio PDF**, e está medida sobre o universo, não
+sobre uma amostra. A 21/09/2026, os 127 avisos multi-documento da listagem:
 
 | | |
 |---|---|
-| Avisos abertos | **229** |
-| Documentos do tipo `Aviso` | **667** |
-| Avisos com **exactamente um** | **106 — 46,3%** |
-| Avisos com mais do que um | 123 (até **14** num só) |
+| Documentos do tipo «Aviso» | **570** |
+| Descarregados como PDF | 568 |
+| Desses, com data | **568 — 100%** |
+| Avisos que ordenam | **125** |
+| Empates | **0** |
+| Assinados digitalmente | 12 |
 
-**Os metadados não ordenam as versões.** O `documentoData` é **igual em todos os
-documentos do mesmo aviso** — 34 em 34 medidos, zero excepções — porque é a data
-do aviso e não a do ficheiro. Só 5 dos 34 coincidem com o `dataUltimaAlteracao`.
+Zero empates em 127 avisos, e a ordem coincide com a numeração do nome onde o
+nome tem número: os oito documentos do `CENTRO2030-2024-11` saem monotónicos de
+`1.ª Alt` a `7.ª Alt`. A assinatura digital não servia — só 12 dos 570 a têm.
 
-**E o nome do ficheiro também não serve.** São **303 formas distintas** em 667
-documentos, com pelo menos quatro esquemas a conviver:
+Os dois avisos que não ordenam não são empates nem faltas de data: são os dois
+ficheiros que não são PDFs, e estão descritos no `LEIA-ME.md` das fixtures.
 
-| forma (dígitos → `#`) | n |
-|---|---|
-| `#.ª alt` | 74 |
-| *(sem sufixo)* | 70 |
-| `aviso #a. republicacao` | 61 |
-| `#.# - #ª alteracao` | 13 |
-| `alteracao_ aviso__…(it)_#-#-#` | 12 |
-| `prorrogacao prazo conclusao…_signed` | 6 |
-| `republicacao_#.#.#` | 4 |
-
-Repare-se no quinto: o número é uma **data** (`15-05-2026`), não uma versão. E o
-sexto não é sequer uma versão do aviso — é uma prorrogação de prazo. Uma regex
-que apanhe as cinco formas do topo cobre cerca de 60% e **escolhe mal em silêncio
-no resto**.
-
-Ler a versão errada é anunciar condições revogadas a quem se está a candidatar.
-Não há aqui uma heurística honesta à espera de ser escrita: há uma cauda longa
-sem esquema.
-
-### O caminho que a medição abre
-
-**A fatia sem ambiguidade são 106 avisos — quase metade.** Para esses a pergunta
-não se põe: há um documento e é esse. É por aí que a fase de detalhe deve
-começar, sem heurística de versão nenhuma, e é ela que mede quantos apoios
-alertáveis isto rende de facto antes de se decidir o resto.
+**O que falta é a forma, e é uma passagem a mais.** Escolher pelo `ModDate` obriga
+a descarregar **todas** as versões de todos eles — 570 descargas para decidir 127
+—, e isso não cabe na passagem que existe, que busca um documento por candidato.
+A bandeira `incluirAmbiguos` existe em `candidatosDeAvisos` e está desligada,
+porque o que ela faz — ficar com o último da lista — é determinista e não é
+defensável.
 
 **Uma atenuante medida:** o prazo, que é o campo mais volátil entre
 republicações, **já vem do endpoint** em `calendario.dataFimAtual` e não depende
-do PDF. O que se vai lá buscar são factos que mudam mais devagar.
-
-**O que falta decidir é o custo.** A primeira corrida paga uma chamada ao modelo
-por aviso; o portão da mudança limita as seguintes aos que mudarem. Isso é uma
-decisão de quem paga, não de quem escreve o código.
-
-**E para os outros 123 não há resposta ainda.** Ficam de fora até alguém
-responder a «qual é a versão em vigor» por uma via que não seja o nome do
-ficheiro — perguntar à AD&C, ou ler a data de assinatura de dentro do PDF, são
-as duas hipóteses que ninguém ainda tentou.
+do PDF. Estes 127 avisos estão no catálogo hoje, com prazo certo; o que lhes
+falta são as medidas, e por isso não alertam.
