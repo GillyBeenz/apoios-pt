@@ -17,6 +17,11 @@ apoios ingerir — executa o pipeline de recolha
   --fixtures <dir>  Usa fixtures em vez da rede (obrigatório neste ambiente,
                     onde os domínios do Estado português estão bloqueados)
   --dry-run         Não escreve nada nem chama o modelo
+  --tecto-custo-usd <n>
+                    Orçamento em dólares para esta corrida inteira, repartido
+                    pelas fontes por ordem de execução. Sem isto não há tecto,
+                    que é o certo para a corrida nocturna: um portão que pára a
+                    meio deixa o catálogo num estado que ninguém escolheu.
   --list            Lista as fontes conhecidas
   --redecidir       Volta a aplicar o portão de publicação às extracções já
                     guardadas. Não chama o modelo nem vai à rede. Use com
@@ -118,6 +123,7 @@ async function main(): Promise<number> {
       source: { type: "string" },
       fixtures: { type: "string" },
       "dry-run": { type: "boolean", default: false },
+      "tecto-custo-usd": { type: "string" },
       list: { type: "boolean", default: false },
       redecidir: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -194,6 +200,22 @@ async function main(): Promise<number> {
   }
 
   const simulacao = values["dry-run"] === true;
+
+  // O tecto é da corrida, não de cada fonte. O ciclo abaixo passa a cada fonte o
+  // que sobra, e subtrai o que ela gastou: cinco fontes com o mesmo tecto seriam
+  // cinco orçamentos, que é cinco vezes o que se pediu.
+  const tectoDaCorrida = values["tecto-custo-usd"];
+  let restanteUsd: number | undefined;
+  if (tectoDaCorrida !== undefined) {
+    restanteUsd = Number(tectoDaCorrida);
+    if (!Number.isFinite(restanteUsd) || restanteUsd < 0) {
+      console.error(
+        `--tecto-custo-usd inválido: ${JSON.stringify(tectoDaCorrida)}`,
+      );
+      return 2;
+    }
+  }
+
   const buscador = values.fixtures
     ? new BuscadorReplay(values.fixtures)
     : new BuscadorHttp();
@@ -218,15 +240,27 @@ async function main(): Promise<number> {
         extractor,
         agora,
         simulacao,
+        tectoCustoUsd: restanteUsd,
       });
 
       const m = r.metricas;
+      if (restanteUsd !== undefined) {
+        restanteUsd = Math.max(0, restanteUsd - m.custoUsd);
+      }
       console.log(
         `candidatos=${m.candidatos} (com data: ${m.candidatosComData})  ` +
           `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao} ` +
           `falhadas=${m.extraccoesFalhadas}  ` +
-          `chamadas-modelo=${m.chamadasModelo}  cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
+          `chamadas-modelo=${m.chamadasModelo}  custo=$${m.custoUsd.toFixed(4)}  ` +
+          `cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
       );
+
+      if (m.extraccoesAdiadasPorTecto > 0) {
+        console.log(
+          `  tecto de custo atingido: ${m.extraccoesAdiadasPorTecto} documentos ` +
+            `ficaram por extrair. A corrida seguinte volta a tentá-los.`,
+        );
+      }
 
       // Printed even when the failure rate sits below the alarm threshold: one
       // call failing for a reason nobody reads is how thirty end up failing.

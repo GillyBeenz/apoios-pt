@@ -23,6 +23,17 @@ export interface MetricasFonte {
   readonly provasFalhadas: number;
   readonly tokensCacheLidos: number;
   readonly chamadasModelo: number;
+  /** US dollars spent on model calls in this run. */
+  readonly custoUsd: number;
+  /**
+   * Documents the cost ceiling refused to send to the model.
+   *
+   * Zero when there is no ceiling, and zero in a run that fitted inside one.
+   * Anything else means the run stopped short of the work it had to do — the
+   * documents are not lost (their snapshots stay unprocessed and the next run
+   * retries them), but the catalogue is a night behind on exactly that many.
+   */
+  readonly extraccoesAdiadasPorTecto: number;
   readonly erro: string | null;
 }
 
@@ -116,6 +127,24 @@ export function avaliarSaude(
       regra: "conteudo_congelado",
       gravidade: "aviso",
       mensagem: `${m.sourceId}: sem alteração de conteúdo há ${Math.round(historico.horasDesdeMudancaConteudo)}h.`,
+    });
+  }
+
+  // O tecto de custo travou a corrida.
+  //
+  // Nunca é silencioso, e é de propósito. Um tecto que se atinge todas as noites
+  // não está a proteger orçamento nenhum — está a esconder que a fonte cresceu
+  // acima do que se orçamentou, e o catálogo fica permanentemente atrasado em
+  // relação ao que existe. Aviso e não crítico: nenhum documento se perdeu, e a
+  // corrida seguinte volta a tentá-los.
+  if (m.extraccoesAdiadasPorTecto > 0) {
+    alarmes.push({
+      regra: "tecto_de_custo_atingido",
+      gravidade: "aviso",
+      mensagem:
+        `${m.sourceId}: tecto de custo atingido com $${m.custoUsd.toFixed(2)} ` +
+        `em ${m.chamadasModelo} chamadas. ${m.extraccoesAdiadasPorTecto} ` +
+        `documentos ficaram por extrair e serão tentados na corrida seguinte.`,
     });
   }
 

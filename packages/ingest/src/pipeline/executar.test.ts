@@ -887,3 +887,174 @@ describe("um documento que anuncia varios avisos", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * O tecto de custo, que é o orçamento que o `maxDetalhes` explicitamente não é.
+ *
+ * O comentário do `maxDetalhes` diz há muito que ele não é um controlo de custo e
+ * que o passo caro — a chamada ao modelo — «é gerido em separado». Era gerido
+ * apenas pelo portão da mudança de conteúdo, que responde à pergunta «vale a pena
+ * chamar?» e nunca à pergunta «quanto é que já se gastou esta noite?».
+ */
+describe("tecto de custo", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3, 4, 5].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteCinco: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}: candidaturas abertas.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  // $0,1775 por chamada no `extractorFixo`.
+  const POR_CHAMADA = 0.1775;
+
+  it("sem tecto, chama o modelo para todos", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({ ...contexto(buscador, armazem), fonte: fonteCinco });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+    expect(r.metricas.custoUsd).toBeCloseTo(POR_CHAMADA * 5, 6);
+  });
+
+  it("pára quando o gasto acumulado chega ao tecto", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      ...contexto(buscador, armazem),
+      fonte: fonteCinco,
+      // Espaço para duas chamadas; a terceira encontra o tecto já atingido.
+      tectoCustoUsd: POR_CHAMADA * 2,
+    });
+
+    expect(r.metricas.chamadasModelo).toBe(2);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(3);
+  });
+
+  /**
+   * A propriedade que torna o tecto seguro: recusar não é perder.
+   *
+   * O snapshot é gravado antes da chamada e só é marcado processado depois dela,
+   * e o `snapshotAnterior` só conta snapshots processados. Sem isso, um documento
+   * recusado pelo orçamento ficava indistinguível de um documento conferido e
+   * inalterado — e desaparecia para sempre por causa de uma noite cara.
+   */
+  it("o que o tecto recusou é tentado outra vez na corrida seguinte", async () => {
+    const { buscador, armazem } = mundo();
+    const vistos: string[] = [];
+    const queRegista: ExtractorLike = {
+      async extrair(doc) {
+        vistos.push(doc.urlFonte);
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const primeira = await executarFonte({
+      ...contexto(buscador, armazem, queRegista),
+      fonte: fonteCinco,
+      tectoCustoUsd: POR_CHAMADA * 2,
+    });
+    expect(primeira.metricas.chamadasModelo).toBe(2);
+    const naPrimeira = [...vistos];
+
+    const segunda = await executarFonte({
+      ...contexto(buscador, armazem, queRegista),
+      fonte: fonteCinco,
+    });
+
+    expect(segunda.metricas.chamadasModelo).toBe(3);
+    // Os três que ficaram de fora, e só esses: a segunda corrida não volta a
+    // pagar pelos dois que já tinham sido extraídos.
+    expect(vistos.slice(2)).toEqual(urls.filter((u) => !naPrimeira.includes(u)));
+    expect(new Set(vistos).size).toBe(5);
+  });
+
+  it("um tecto que não se atinge não muda nada", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      ...contexto(buscador, armazem),
+      fonte: fonteCinco,
+      tectoCustoUsd: 100,
+    });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+  });
+
+  /**
+   * Em dúvida, não passa — a mesma regra do portão, aplicada ao dinheiro.
+   *
+   * `custoDaChamada` devolve `null` para um modelo sem preço fixado, de propósito:
+   * um zero somaria em silêncio para um total que subestima a conta. Tratá-lo como
+   * zero aqui deixava o tecto por atingir para sempre, que é a avaria exacta que o
+   * `null` existe para evitar.
+   */
+  it("um modelo sem preço fecha o tecto em vez de gastar às cegas", async () => {
+    const { buscador, armazem } = mundo();
+    let chamadas = 0;
+    const semPreco: ExtractorLike = {
+      async extrair(doc) {
+        chamadas++;
+        return {
+          ...(await extractorFixo().extrair(doc)),
+          modelo: "claude-modelo-que-ninguem-fixou",
+          custoUsd: null,
+        };
+      },
+    };
+
+    const r = await executarFonte({
+      ...contexto(buscador, armazem, semPreco),
+      fonte: fonteCinco,
+      tectoCustoUsd: 100,
+    });
+
+    expect(chamadas).toBe(1);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(4);
+    expect(r.metricas.errosExtraccao.join(" ")).toContain("sem preço em PRECOS");
+  });
+
+  it("sem tecto, um modelo sem preço não trava a corrida", async () => {
+    // O tecto é opcional, e a corrida nocturna não o usa. Um preço em falta não
+    // pode parar quem não pediu orçamento nenhum.
+    const { buscador, armazem } = mundo();
+    const semPreco: ExtractorLike = {
+      async extrair(doc) {
+        return { ...(await extractorFixo().extrair(doc)), custoUsd: null };
+      },
+    };
+
+    const r = await executarFonte({ ...contexto(buscador, armazem, semPreco), fonte: fonteCinco });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+  });
+});

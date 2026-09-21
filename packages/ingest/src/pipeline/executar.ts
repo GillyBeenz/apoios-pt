@@ -74,6 +74,28 @@ export interface OpcoesExecucao {
    * a night, which is a different problem with a different right answer.
    */
   readonly maxDetalhes?: number;
+  /**
+   * Hard ceiling on what one run may spend on model calls, in US dollars.
+   *
+   * This is the budget that `maxDetalhes` is explicitly not. It is checked
+   * against the cost of the calls already made, immediately before each new one,
+   * and a run that reaches it stops calling the model and says so.
+   *
+   * Two properties worth knowing before trusting it:
+   *
+   * - **It can overshoot by one call.** The cost of a call is only known once the
+   *   API has answered, so the check is on what has been spent, not on what the
+   *   next call will cost. Measured average is $0.12 a call; set the ceiling with
+   *   that much slack.
+   * - **A refused document is not a lost one.** The snapshot is stored but never
+   *   marked processed, and `snapshotAnterior` only counts processed snapshots —
+   *   so the next run sees it as changed and tries again. Refusing is a delay,
+   *   not a drop.
+   *
+   * Omitted means no ceiling, which is the right default for the nightly run: a
+   * gate that stops halfway leaves the catalogue in a state nobody chose.
+   */
+  readonly tectoCustoUsd?: number;
   /** When true, nothing is written and no model call is made. */
   readonly simulacao?: boolean;
 }
@@ -378,6 +400,10 @@ export async function executarFonte(
   let provasFalhadas = 0;
   let tokensCacheLidos = 0;
   let chamadasModelo = 0;
+  let custoUsd = 0;
+  let extraccoesAdiadasPorTecto = 0;
+  // Um modelo sem preço fixado em `PRECOS` fecha o tecto. Ver abaixo.
+  let precoEmFalta = false;
 
   const limite = op.maxDetalhes ?? 250;
   const ignorados = Math.max(0, candidatos.length - limite);
@@ -525,6 +551,20 @@ export async function executarFonte(
     );
 
     // --- 7. Model extraction, only on genuinely changed documents ------------
+    //
+    // O tecto é conferido aqui, e não antes da descarga: só se sabe que um
+    // documento precisa de uma chamada depois de ele ser buscado e comparado. O
+    // que se perde por estar aqui é a descarga; o que se ganharia por estar antes
+    // era gastar o orçamento no primeiro candidato da lista em vez de no primeiro
+    // que mudou.
+    if (
+      op.tectoCustoUsd !== undefined &&
+      (precoEmFalta || custoUsd >= op.tectoCustoUsd)
+    ) {
+      extraccoesAdiadasPorTecto++;
+      continue;
+    }
+
     chamadasModelo++;
     const resultado = await extractor.extrair({
       urlFonte: candidato.urlDetalhe,
@@ -535,6 +575,21 @@ export async function executarFonte(
     });
 
     tokensCacheLidos += resultado.tokensCacheLidos;
+
+    if (op.tectoCustoUsd !== undefined && resultado.custoUsd === null) {
+      // Um modelo sem preço fixado em `PRECOS` não se consegue somar, e um
+      // orçamento que não sabe quanto já gastou não é um orçamento. Pára, em vez
+      // de continuar a gastar às cegas — é a mesma regra do portão: em dúvida,
+      // não passa. A alternativa, tratar o desconhecido como zero, deixava o
+      // tecto por atingir para sempre e era precisamente a avaria silenciosa.
+      precoEmFalta = true;
+      errosExtraccao.add(
+        `modelo ${resultado.modelo} sem preço em PRECOS: o tecto de custo não ` +
+          `se consegue respeitar, corrida interrompida`,
+      );
+    } else {
+      custoUsd += resultado.custoUsd ?? 0;
+    }
 
     if (resultado.extraccao === null) {
       // Not a review: the call produced nothing. `cliente.ts` already knows why —
@@ -729,6 +784,8 @@ export async function executarFonte(
       provasFalhadas,
       tokensCacheLidos,
       chamadasModelo,
+      custoUsd,
+      extraccoesAdiadasPorTecto,
       erro,
     },
     apoiosNovos,
