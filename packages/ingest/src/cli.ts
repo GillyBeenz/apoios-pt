@@ -283,6 +283,7 @@ async function main(): Promise<number> {
         `candidatos=${m.candidatos} (com data: ${m.candidatosComData})  ` +
           `extracções ok=${m.extraccoesOk} por-rever=${m.extraccoesRevisao} ` +
           `falhadas=${m.extraccoesFalhadas}  ` +
+          `documentos-mudados=${m.documentosMudados}  ` +
           `chamadas-modelo=${m.chamadasModelo}  custo=$${m.custoUsd.toFixed(4)}  ` +
           `cache-lida=${m.tokensCacheLidos}  ${m.duracaoMs}ms`,
       );

@@ -1476,3 +1476,116 @@ describe("quantosCabemNoTecto", () => {
     expect(quantosCabemNoTecto(103, 0.01, 0.06)).toBe(0);
   });
 });
+
+/**
+ * O `--dry-run` tem de responder à pergunta que se lhe faz.
+ *
+ * Exercita a busca e os dois portões, não escreve nada e não chama o modelo.
+ * Antes disto dizia «zero chamadas ao modelo», que é verdade e não responde a
+ * «quantos documentos é que a corrida a sério ia pagar» — que é a única razão
+ * para se correr a seco antes de gastar.
+ */
+describe("simulação", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteTres: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  it("conta os documentos que a corrida a sério pagaria, e não paga nenhum", async () => {
+    const { buscador, armazem } = mundo();
+    let chamadas = 0;
+    const extractor: ExtractorLike = {
+      async extrair(doc) {
+        chamadas++;
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      simulacao: true,
+    });
+
+    expect(r.metricas.documentosMudados).toBe(3);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    expect(chamadas).toBe(0);
+    expect(r.metricas.custoUsd).toBe(0);
+    // E não escreveu nada: a corrida a sério a seguir continua a ver três.
+    expect(armazem.apoios.size).toBe(0);
+  });
+
+  it("a seco, um extractor de lote não chega a submeter", async () => {
+    const { buscador, armazem } = mundo();
+    let lotes = 0;
+    const extractor: ExtractorLike = {
+      async prepararLote() {
+        lotes++;
+      },
+      async extrair(doc) {
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      simulacao: true,
+    });
+
+    expect(lotes).toBe(0);
+    expect(r.metricas.documentosMudados).toBe(3);
+  });
+
+  it("numa corrida a sério, os que mudaram são os que se pagam", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(r.metricas.documentosMudados).toBe(3);
+    expect(r.metricas.chamadasModelo).toBe(3);
+  });
+});

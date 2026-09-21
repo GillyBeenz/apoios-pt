@@ -204,6 +204,23 @@ describe("ExtractorLote", () => {
     );
   });
 
+  it("escreve o identificador do lote antes de esperar por ele", async () => {
+    // Um lote é pago quando é processado, não quando é lido. Se o processo
+    // morrer a meio da espera, o identificador no log é a única forma de ir
+    // buscar trabalho que já foi pago — os resultados ficam 29 dias.
+    const a = doc("aviso A");
+    const { cliente } = clienteFalso({
+      linhas: [{ custom_id: chaveCassete(a), result: { type: "succeeded", message: mensagem() } }],
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await new ExtractorLote({ cliente, ...semEspera }).prepararLote([a]);
+      expect(log.mock.calls.flat().join(" ")).toContain("batch_1");
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("um lote vazio não chega a bater na API", async () => {
     const { cliente, criar } = clienteFalso({ linhas: [] });
     await new ExtractorLote({ cliente, ...semEspera }).prepararLote([]);

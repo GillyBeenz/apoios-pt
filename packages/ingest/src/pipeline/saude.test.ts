@@ -27,6 +27,7 @@ function metricas(parcial: Partial<MetricasFonte> = {}): MetricasFonte {
     custoUsd: 0,
     extraccoesAdiadasPorTecto: 0,
     documentosQueNaoSaoPdf: 0,
+    documentosMudados: 0,
     erro: null,
     ...parcial,
   };

@@ -43,6 +43,14 @@ export interface MetricasFonte {
    * not the pipeline.
    */
   readonly documentosQueNaoSaoPdf: number;
+  /**
+   * Documents that passed both gates and therefore need a model call.
+   *
+   * Counted before the dry-run branch, so `--dry-run` answers the one question
+   * asked of it: how many documents would the real run pay for. In a real run it
+   * equals `chamadasModelo` plus whatever the cost ceiling deferred.
+   */
+  readonly documentosMudados: number;
   readonly erro: string | null;
 }
 

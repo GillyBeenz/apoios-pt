@@ -483,6 +483,7 @@ export async function executarFonte(
   let custoUsd = 0;
   let extraccoesAdiadasPorTecto = 0;
   let documentosQueNaoSaoPdf = 0;
+  let documentosMudados = 0;
   // Um modelo sem preço fixado em `PRECOS` fecha o tecto. Ver abaixo.
   let precoEmFalta = false;
 
@@ -646,6 +647,12 @@ export async function executarFonte(
         // the model still receives the original bytes.
         textoDoPdf(resposta.bytes)
       : textoVisivel(resposta.corpo ?? "");
+
+    // Contado antes do desvio da simulação, e é isso que torna o `--dry-run`
+    // útil: sem este número uma corrida a seco dizia «zero chamadas ao modelo»,
+    // que é verdade e não responde à única pergunta que se lhe faz — quantos
+    // documentos é que a corrida a sério ia pagar.
+    documentosMudados++;
 
     if (op.simulacao) {
       // Dry run stops here: the fetch and both gates are exercised, but nothing
@@ -936,6 +943,7 @@ export async function executarFonte(
       custoUsd,
       extraccoesAdiadasPorTecto,
       documentosQueNaoSaoPdf,
+      documentosMudados,
       erro,
     },
     apoiosNovos,

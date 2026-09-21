@@ -103,6 +103,20 @@ export class ExtractorLote implements ExtractorLike {
       })),
     });
 
+    // O identificador vai para o log antes de se esperar por ele, e isso é o
+    // que torna o tempo de espera recuperável em vez de caro.
+    //
+    // Um lote é pago quando é processado, não quando é lido, e os resultados
+    // ficam disponíveis 29 dias. Se o processo morrer a meio da espera — o job
+    // esgota o tempo, o runner cai — o trabalho está feito e pago; sem o
+    // identificador escrito em lado nenhum, não há como ir buscá-lo e a corrida
+    // seguinte paga tudo outra vez.
+    console.log(
+      `[lote] ${lote.id} submetido com ${porChave.size} pedidos. ` +
+        `Os resultados ficam disponíveis 29 dias: se esta corrida morrer a ` +
+        `meio, é por este identificador que se recuperam.`,
+    );
+
     const limite = this.#agora() + this.#tempoMaximoMs;
     let estado = lote;
     while (estado.processing_status !== "ended") {
