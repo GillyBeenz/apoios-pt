@@ -24,6 +24,10 @@ function metricas(parcial: Partial<MetricasFonte> = {}): MetricasFonte {
     provasFalhadas: 0,
     tokensCacheLidos: 5000,
     chamadasModelo: 0,
+    custoUsd: 0,
+    extraccoesAdiadasPorTecto: 0,
+    documentosQueNaoSaoPdf: 0,
+    documentosMudados: 0,
     erro: null,
     ...parcial,
   };
@@ -95,5 +99,37 @@ describe("chamadas ao modelo que não produzem nada", () => {
   it("cala-se quando todas as chamadas correm bem", () => {
     const m = metricas({ chamadasModelo: 5, extraccoesOk: 5 });
     expect(regras(m)).not.toContain("extraccoes_falhadas");
+  });
+});
+
+describe("tecto de custo", () => {
+  it("não diz nada quando a corrida coube no orçamento", () => {
+    const a = avaliarSaude(
+      metricas({ chamadasModelo: 12, custoUsd: 1.4 }),
+      SEM_HISTORICO,
+      1,
+      24,
+    );
+    expect(a.map((x) => x.regra)).not.toContain("tecto_de_custo_atingido");
+  });
+
+  it("assinala, com o gasto e o que ficou por fazer", () => {
+    const a = avaliarSaude(
+      metricas({
+        chamadasModelo: 57,
+        custoUsd: 10.02,
+        extraccoesAdiadasPorTecto: 46,
+      }),
+      SEM_HISTORICO,
+      1,
+      24,
+    );
+    const alarme = a.find((x) => x.regra === "tecto_de_custo_atingido");
+    // Aviso e não crítico: nenhum documento se perdeu. Mas tem de aparecer —
+    // um tecto atingido todas as noites não está a proteger orçamento nenhum,
+    // está a esconder que a fonte cresceu acima do que se orçamentou.
+    expect(alarme?.gravidade).toBe("aviso");
+    expect(alarme?.mensagem).toContain("$10.02");
+    expect(alarme?.mensagem).toContain("46");
   });
 });

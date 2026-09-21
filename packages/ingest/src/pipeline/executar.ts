@@ -14,6 +14,7 @@ import {
   extraccaoParaApoio,
   verificarProvas,
   type ExtractorLike,
+  type DocumentoEntrada,
 } from "@apoios/extraction";
 import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
 import {
@@ -25,6 +26,7 @@ import {
 import type { Fonte, Paginacao } from "../sources/tipos.ts";
 import type { Armazem } from "./armazem.ts";
 import type { MetricasFonte } from "./saude.ts";
+import { textoDoPdf } from "./pdf.ts";
 import {
   atingiuOTecto,
   chaveDePagina,
@@ -73,6 +75,47 @@ export interface OpcoesExecucao {
    * a night, which is a different problem with a different right answer.
    */
   readonly maxDetalhes?: number;
+  /**
+   * Hard ceiling on what one run may spend on model calls, in US dollars.
+   *
+   * This is the budget that `maxDetalhes` is explicitly not. It is checked
+   * against the cost of the calls already made, immediately before each new one,
+   * and a run that reaches it stops calling the model and says so.
+   *
+   * Two properties worth knowing before trusting it:
+   *
+   * - **It can overshoot by one call.** The cost of a call is only known once the
+   *   API has answered, so the check is on what has been spent, not on what the
+   *   next call will cost. Measured average is $0.12 a call; set the ceiling with
+   *   that much slack.
+   * - **A refused document is not a lost one.** The snapshot is stored but never
+   *   marked processed, and `snapshotAnterior` only counts processed snapshots —
+   *   so the next run sees it as changed and tries again. Refusing is a delay,
+   *   not a drop.
+   *
+   * Omitted means no ceiling, which is the right default for the nightly run: a
+   * gate that stops halfway leaves the catalogue in a state nobody chose.
+   */
+  readonly tectoCustoUsd?: number;
+  /**
+   * What one model call is expected to cost, for a ceiling that must cut before
+   * it can measure.
+   *
+   * Only read on the batched path, where the requests go out together and there
+   * is no moment between two calls at which to stop. There the ceiling becomes a
+   * count — `floor(tecto / esperado)` — and this is the divisor.
+   *
+   * It is an estimate, and naming it separately is how that stays visible. The
+   * measured average over the 99 priced calls in `fund_extractions` is $0.1162 at
+   * list price, so roughly $0.058 batched; a PDF costs more in input than the
+   * HTML those were, so the honest use of this field is to pass a figure with
+   * slack and correct it against `MetricasFonte.custoUsd` afterwards.
+   *
+   * Omitted while a ceiling is set means nothing is submitted, deliberately: a
+   * budget that cannot convert money into documents has not been respected by
+   * guessing.
+   */
+  readonly custoEsperadoPorChamadaUsd?: number;
   /** When true, nothing is written and no model call is made. */
   readonly simulacao?: boolean;
 }
@@ -84,6 +127,53 @@ export interface ResultadoExecucao {
   readonly eventos: readonly EventoApoio[];
   readonly conflitos: readonly string[];
   readonly saltouPorNaoModificado: boolean;
+}
+
+/** Um documento buscado, comparado e gravado, à espera do modelo. */
+interface Preparado {
+  readonly candidato: Candidato;
+  readonly hash: string;
+  readonly doc: DocumentoEntrada;
+}
+
+/**
+ * Quantos documentos cabem no tecto, contados antes de se saber o que custam.
+ *
+ * O tecto do caminho normal é conferido **depois** de cada chamada, contra o que
+ * já se gastou — uma medição. Num lote isso é impossível: os pedidos vão todos de
+ * uma vez e não há um «entre duas chamadas» onde parar. O corte passa a ser por
+ * contagem, e a contagem precisa de um custo esperado por chamada, que é uma
+ * estimativa.
+ *
+ * A diferença é real e não se deve esconder atrás do mesmo nome: com lote, o
+ * tecto é respeitado **se a estimativa estiver certa**. O que a corrida gastou de
+ * facto fica em `MetricasFonte.custoUsd`, medido, e é contra esse número que a
+ * estimativa se corrige da próxima vez.
+ *
+ * Sem tecto pedido, cabem todos.
+ */
+export function quantosCabemNoTecto(
+  disponiveis: number,
+  tectoUsd: number | undefined,
+  custoEsperadoUsd: number | undefined,
+): number {
+  if (tectoUsd === undefined) return disponiveis;
+  // Sem custo esperado não há como converter dinheiro em documentos. Em dúvida,
+  // não passa: zero, e o alarme do tecto diz quantos ficaram de fora.
+  if (custoEsperadoUsd === undefined || custoEsperadoUsd <= 0) return 0;
+  return Math.max(0, Math.min(disponiveis, Math.floor(tectoUsd / custoEsperadoUsd)));
+}
+
+/** `%PDF-`, os cinco bytes que a norma obriga a estar no início do ficheiro. */
+function comecaPorPdf(bytes: Uint8Array): boolean {
+  if (bytes.length < 5) return false;
+  return (
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  );
 }
 
 function textoVisivel(html: string): string {
@@ -330,6 +420,19 @@ export async function executarFonte(
         });
         rendeu = apoios.length;
         apoiosDaEntrada.push(...apoios);
+
+        // A mesma resposta responde a duas perguntas. O que ela já diz vira
+        // apoio aqui; o que ela só nomeia — os PDFs dos avisos, onde vivem as
+        // medidas e os beneficiários — vira candidato, e segue pelo caminho de
+        // detalhe normal, com o portão da mudança e o tecto de custo pelo meio.
+        if (fonte.candidatosDoDataset !== undefined) {
+          candidatos.push(
+            ...fonte.candidatosDoDataset(new TextEncoder().encode(html), {
+              urlOrigem: url,
+              entidade: fonte.entidade,
+            }),
+          );
+        }
       }
 
       const p = entrada.paginacao;
@@ -377,6 +480,21 @@ export async function executarFonte(
   let provasFalhadas = 0;
   let tokensCacheLidos = 0;
   let chamadasModelo = 0;
+  let custoUsd = 0;
+  let extraccoesAdiadasPorTecto = 0;
+  let documentosQueNaoSaoPdf = 0;
+  let documentosMudados = 0;
+  // Um modelo sem preço fixado em `PRECOS` fecha o tecto. Ver abaixo.
+  let precoEmFalta = false;
+
+  /**
+   * O que foi buscado, comparado e gravado, e está à espera do modelo.
+   *
+   * Existe porque a API de lotes precisa de todos os pedidos de uma vez. Guarda
+   * os bytes do documento enquanto espera — cerca de 70 MB para os avisos do
+   * PT2030 —, que é o preço de os pedir juntos em vez de um a um.
+   */
+  let preparados: Preparado[] = [];
 
   const limite = op.maxDetalhes ?? 250;
   const ignorados = Math.max(0, candidatos.length - limite);
@@ -492,6 +610,30 @@ export async function executarFonte(
     }
 
     const ehPdf = candidato.tipoDocumento === "pdf" || resposta.corpo === null;
+
+    // Um PDF que não começa por `%PDF-` não é um PDF, e nada a jusante o vai
+    // descobrir sozinho.
+    //
+    // O PT2030 anuncia documentos cujo blob já não existe, e o Azure responde
+    // **HTTP 200** com 215 bytes de XML `BlobNotFound` — medido no
+    // `NORTE2030-2024-80`, três tentativas, três vezes o mesmo. Nem o código de
+    // estado nem o hash denunciam, que é a mesma armadilha do `erro-aspx-200.html`.
+    // Sem esta guarda, 215 bytes de XML iam para a API dentro de um bloco
+    // `document` a dizer `application/pdf`.
+    //
+    // Sem `marcarProcessado`, de propósito: o ficheiro pode voltar, e a corrida
+    // seguinte volta a tentar. Uma descarga de 215 bytes por noite é mais barata
+    // do que decidir por ele que desapareceu para sempre.
+    if (ehPdf && resposta.bytes !== null && !comecaPorPdf(resposta.bytes)) {
+      documentosQueNaoSaoPdf++;
+      console.warn(
+        `[${fonte.id}] ${candidato.urlDetalhe} devolveu ${resposta.bytes.length} ` +
+          `bytes que não começam por %PDF- (HTTP ${resposta.status}). ` +
+          `Não vai ao modelo.`,
+      );
+      continue;
+    }
+
     const hash = ehPdf
       ? resposta.bytes
         ? hashBytes(resposta.bytes)
@@ -503,8 +645,14 @@ export async function executarFonte(
     const texto = ehPdf
       ? // A PDF's text layer is only needed so evidence quotes can be verified;
         // the model still receives the original bytes.
-        extrairTextoPdfAproximado(resposta.bytes)
+        textoDoPdf(resposta.bytes)
       : textoVisivel(resposta.corpo ?? "");
+
+    // Contado antes do desvio da simulação, e é isso que torna o `--dry-run`
+    // útil: sem este número uma corrida a seco dizia «zero chamadas ao modelo»,
+    // que é verdade e não responde à única pergunta que se lhe faz — quantos
+    // documentos é que a corrida a sério ia pagar.
+    documentosMudados++;
 
     if (op.simulacao) {
       // Dry run stops here: the fetch and both gates are exercised, but nothing
@@ -523,17 +671,81 @@ export async function executarFonte(
       resposta.bytes ?? new TextEncoder().encode(texto),
     );
 
-    // --- 7. Model extraction, only on genuinely changed documents ------------
-    chamadasModelo++;
-    const resultado = await extractor.extrair({
-      urlFonte: candidato.urlDetalhe,
-      entidade: fonte.entidade,
-      dataRecolha: agora.toISOString().slice(0, 10),
-      texto,
-      pdf: ehPdf ? (resposta.bytes ?? undefined) : undefined,
+    preparados.push({
+      candidato,
+      hash,
+      doc: {
+        urlFonte: candidato.urlDetalhe,
+        entidade: fonte.entidade,
+        dataRecolha: agora.toISOString().slice(0, 10),
+        texto,
+        pdf: ehPdf ? (resposta.bytes ?? undefined) : undefined,
+      },
     });
+  }
+
+  // --- 6d. Preparar o lote, se o extractor souber -----------------------------
+  //
+  // É aqui que o ciclo se parte em dois, e é a única razão para ele estar
+  // partido. A API de lotes só existe no plural: os pedidos vão todos juntos e a
+  // resposta chega mais tarde, a metade do preço. Com um extractor que não sabe
+  // fazer lotes isto não faz nada e as duas metades correm de seguida, como
+  // sempre correram.
+  //
+  // O tecto corta **antes** de submeter, e por contagem, porque depois de
+  // submeter já não há onde parar. É a diferença de semântica que o
+  // `custoEsperadoPorChamadaUsd` existe para tornar visível.
+  if (extractor.prepararLote !== undefined) {
+    const cabem = quantosCabemNoTecto(
+      preparados.length,
+      op.tectoCustoUsd,
+      op.custoEsperadoPorChamadaUsd,
+    );
+    extraccoesAdiadasPorTecto += preparados.length - cabem;
+    preparados = preparados.slice(0, cabem);
+    if (preparados.length > 0) {
+      await extractor.prepararLote(preparados.map((p) => p.doc));
+    }
+  }
+
+  // --- 7. Model extraction, only on genuinely changed documents --------------
+  for (const { candidato, hash, doc } of preparados) {
+    const texto = doc.texto;
+    // O tecto é conferido aqui, e não antes da descarga: só se sabe que um
+    // documento precisa de uma chamada depois de ele ser buscado e comparado. O
+    // que se perde por estar aqui é a descarga; o que se ganharia por estar antes
+    // era gastar o orçamento no primeiro candidato da lista em vez de no primeiro
+    // que mudou.
+    //
+    // Com lote isto nunca dispara: o corte já foi feito acima, por contagem.
+    if (
+      op.tectoCustoUsd !== undefined &&
+      extractor.prepararLote === undefined &&
+      (precoEmFalta || custoUsd >= op.tectoCustoUsd)
+    ) {
+      extraccoesAdiadasPorTecto++;
+      continue;
+    }
+
+    chamadasModelo++;
+    const resultado = await extractor.extrair(doc);
 
     tokensCacheLidos += resultado.tokensCacheLidos;
+
+    if (op.tectoCustoUsd !== undefined && resultado.custoUsd === null) {
+      // Um modelo sem preço fixado em `PRECOS` não se consegue somar, e um
+      // orçamento que não sabe quanto já gastou não é um orçamento. Pára, em vez
+      // de continuar a gastar às cegas — é a mesma regra do portão: em dúvida,
+      // não passa. A alternativa, tratar o desconhecido como zero, deixava o
+      // tecto por atingir para sempre e era precisamente a avaria silenciosa.
+      precoEmFalta = true;
+      errosExtraccao.add(
+        `modelo ${resultado.modelo} sem preço em PRECOS: o tecto de custo não ` +
+          `se consegue respeitar, corrida interrompida`,
+      );
+    } else {
+      custoUsd += resultado.custoUsd ?? 0;
+    }
 
     if (resultado.extraccao === null) {
       // Not a review: the call produced nothing. `cliente.ts` already knows why —
@@ -728,6 +940,10 @@ export async function executarFonte(
       provasFalhadas,
       tokensCacheLidos,
       chamadasModelo,
+      custoUsd,
+      extraccoesAdiadasPorTecto,
+      documentosQueNaoSaoPdf,
+      documentosMudados,
       erro,
     },
     apoiosNovos,
@@ -736,27 +952,4 @@ export async function executarFonte(
     conflitos,
     saltouPorNaoModificado: saltou,
   };
-}
-
-/**
- * Crude text layer read straight out of the PDF's content streams.
- *
- * Only ever used to verify evidence quotes — the model receives the original PDF
- * bytes, never this. Deliberately not a full parser: a proper extraction of these
- * multi-column measure/cap tables is exactly what mangles them, and the model reads
- * the real document anyway. When this yields too little to verify against, the
- * extraction simply lands in the review queue, which is the correct outcome.
- */
-function extrairTextoPdfAproximado(bytes: Uint8Array | null): string {
-  if (!bytes) return "";
-  const bruto = new TextDecoder("latin1").decode(bytes);
-  const pedacos: string[] = [];
-  for (const m of bruto.matchAll(/\((?:\\.|[^\\()])*\)/g)) {
-    const s = m[0]
-      .slice(1, -1)
-      .replace(/\\([()\\])/g, "$1")
-      .replace(/\\n/g, " ");
-    if (s.trim().length > 0) pedacos.push(s);
-  }
-  return pedacos.join(" ").replace(/\s+/g, " ").trim();
 }

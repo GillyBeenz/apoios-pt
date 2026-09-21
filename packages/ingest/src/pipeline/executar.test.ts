@@ -1,3 +1,4 @@
+import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type {
   DocumentoEntrada,
@@ -6,7 +7,7 @@ import type {
 } from "@apoios/extraction";
 import { custoDaChamada } from "@apoios/extraction";
 import { extraccaoSolar } from "@apoios/extraction/teste";
-import { executarFonte } from "./executar.ts";
+import { executarFonte, quantosCabemNoTecto } from "./executar.ts";
 import { ArmazemMemoria } from "./armazem.ts";
 import { BuscadorMemoria } from "../http/replay.ts";
 import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
@@ -885,5 +886,706 @@ describe("um documento que anuncia varios avisos", () => {
     expect(
       r.apoiosNovos[0]?.motivoRevisao.some((m) => m.startsWith("avisos_por_capturar")),
     ).toBe(false);
+  });
+});
+
+/**
+ * O tecto de custo, que é o orçamento que o `maxDetalhes` explicitamente não é.
+ *
+ * O comentário do `maxDetalhes` diz há muito que ele não é um controlo de custo e
+ * que o passo caro — a chamada ao modelo — «é gerido em separado». Era gerido
+ * apenas pelo portão da mudança de conteúdo, que responde à pergunta «vale a pena
+ * chamar?» e nunca à pergunta «quanto é que já se gastou esta noite?».
+ */
+describe("tecto de custo", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3, 4, 5].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteCinco: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}: candidaturas abertas.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  // $0,1775 por chamada no `extractorFixo`.
+  const POR_CHAMADA = 0.1775;
+
+  it("sem tecto, chama o modelo para todos", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({ ...contexto(buscador, armazem), fonte: fonteCinco });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+    expect(r.metricas.custoUsd).toBeCloseTo(POR_CHAMADA * 5, 6);
+  });
+
+  it("pára quando o gasto acumulado chega ao tecto", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      ...contexto(buscador, armazem),
+      fonte: fonteCinco,
+      // Espaço para duas chamadas; a terceira encontra o tecto já atingido.
+      tectoCustoUsd: POR_CHAMADA * 2,
+    });
+
+    expect(r.metricas.chamadasModelo).toBe(2);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(3);
+  });
+
+  /**
+   * A propriedade que torna o tecto seguro: recusar não é perder.
+   *
+   * O snapshot é gravado antes da chamada e só é marcado processado depois dela,
+   * e o `snapshotAnterior` só conta snapshots processados. Sem isso, um documento
+   * recusado pelo orçamento ficava indistinguível de um documento conferido e
+   * inalterado — e desaparecia para sempre por causa de uma noite cara.
+   */
+  it("o que o tecto recusou é tentado outra vez na corrida seguinte", async () => {
+    const { buscador, armazem } = mundo();
+    const vistos: string[] = [];
+    const queRegista: ExtractorLike = {
+      async extrair(doc) {
+        vistos.push(doc.urlFonte);
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const primeira = await executarFonte({
+      ...contexto(buscador, armazem, queRegista),
+      fonte: fonteCinco,
+      tectoCustoUsd: POR_CHAMADA * 2,
+    });
+    expect(primeira.metricas.chamadasModelo).toBe(2);
+    const naPrimeira = [...vistos];
+
+    const segunda = await executarFonte({
+      ...contexto(buscador, armazem, queRegista),
+      fonte: fonteCinco,
+    });
+
+    expect(segunda.metricas.chamadasModelo).toBe(3);
+    // Os três que ficaram de fora, e só esses: a segunda corrida não volta a
+    // pagar pelos dois que já tinham sido extraídos.
+    expect(vistos.slice(2)).toEqual(urls.filter((u) => !naPrimeira.includes(u)));
+    expect(new Set(vistos).size).toBe(5);
+  });
+
+  it("um tecto que não se atinge não muda nada", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      ...contexto(buscador, armazem),
+      fonte: fonteCinco,
+      tectoCustoUsd: 100,
+    });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+  });
+
+  /**
+   * Em dúvida, não passa — a mesma regra do portão, aplicada ao dinheiro.
+   *
+   * `custoDaChamada` devolve `null` para um modelo sem preço fixado, de propósito:
+   * um zero somaria em silêncio para um total que subestima a conta. Tratá-lo como
+   * zero aqui deixava o tecto por atingir para sempre, que é a avaria exacta que o
+   * `null` existe para evitar.
+   */
+  it("um modelo sem preço fecha o tecto em vez de gastar às cegas", async () => {
+    const { buscador, armazem } = mundo();
+    let chamadas = 0;
+    const semPreco: ExtractorLike = {
+      async extrair(doc) {
+        chamadas++;
+        return {
+          ...(await extractorFixo().extrair(doc)),
+          modelo: "claude-modelo-que-ninguem-fixou",
+          custoUsd: null,
+        };
+      },
+    };
+
+    const r = await executarFonte({
+      ...contexto(buscador, armazem, semPreco),
+      fonte: fonteCinco,
+      tectoCustoUsd: 100,
+    });
+
+    expect(chamadas).toBe(1);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(4);
+    expect(r.metricas.errosExtraccao.join(" ")).toContain("sem preço em PRECOS");
+  });
+
+  it("sem tecto, um modelo sem preço não trava a corrida", async () => {
+    // O tecto é opcional, e a corrida nocturna não o usa. Um preço em falta não
+    // pode parar quem não pediu orçamento nenhum.
+    const { buscador, armazem } = mundo();
+    const semPreco: ExtractorLike = {
+      async extrair(doc) {
+        return { ...(await extractorFixo().extrair(doc)), custoUsd: null };
+      },
+    };
+
+    const r = await executarFonte({ ...contexto(buscador, armazem, semPreco), fonte: fonteCinco });
+
+    expect(r.metricas.chamadasModelo).toBe(5);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+  });
+});
+
+/**
+ * Os PDFs dos avisos do PT2030 passam a ser buscados, e o que não for um PDF
+ * não chega ao modelo.
+ *
+ * O endpoint dá tudo o que um cartão precisa e não dá nem `medidas` nem
+ * `beneficiarios` — não tem campo para nenhum dos dois. Um apoio sem medidas não
+ * casa com subscritor nenhum, porque as subscrições são por medida, e é isso que
+ * mantém o caminho de alerta em zero. As duas coisas estão no PDF.
+ */
+describe("fase de detalhe da listagem do PT2030", () => {
+  const QUERY = "https://portugal2030.pt/wp-json/avisos/query";
+
+  function respostaDaQuery(avisos: unknown[]): string {
+    return JSON.stringify({ status: 201, avisos });
+  }
+
+  function avisoCom(codigo: string, documentos: unknown[]): unknown {
+    return {
+      aviso: { codigoAviso: codigo, designacaoPT: `Aviso ${codigo}` },
+      estrutura: [],
+      calendario: { dataInicio: "2026-09-01T00:00:00" },
+      documentos,
+    };
+  }
+
+  const docAviso = (nome: string, path: string): unknown => ({
+    documentoDesignacao: nome,
+    tipoDocumentoDesignacao: "Aviso",
+    path,
+    container: "siag-prod-container",
+  });
+
+  const urlDe = (path: string): string =>
+    "https://portugal2030.pt/wp-json/avisos/download" +
+    `?path=${encodeURIComponent(path)}&container=siag-prod-container`;
+
+  /** Um PDF mínimo, com um stream de texto comprimido como os reais. */
+  function pdfMinimo(texto: string): Uint8Array {
+    const conteudo = `BT /F1 12 Tf (${texto}) Tj ET`;
+    const comprimido = deflateSync(Buffer.from(conteudo, "latin1"));
+    return Buffer.concat([
+      Buffer.from(
+        `%PDF-1.7\n1 0 obj\n<< /Length ${comprimido.length} /Filter /FlateDecode >>\nstream\n`,
+        "latin1",
+      ),
+      comprimido,
+      Buffer.from("\nendstream\nendobj\n%%EOF\n", "latin1"),
+    ]);
+  }
+
+  class BuscadorDaQuery implements Buscador {
+    readonly buscados: string[] = [];
+    constructor(
+      private readonly avisos: unknown[],
+      private readonly ficheiros: Map<string, Uint8Array>,
+    ) {}
+
+    async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
+      const base = {
+        url: pedido.url,
+        status: 200,
+        naoModificado: false,
+        etag: null,
+        lastModified: null,
+        erro: null,
+      };
+
+      if (pedido.url.startsWith(QUERY)) {
+        const pagina = Number(
+          new URLSearchParams(pedido.corpo ?? "").get("page"),
+        );
+        return {
+          ...base,
+          corpo:
+            pagina === 0
+              ? respostaDaQuery(this.avisos)
+              : '{"code":404,"info":"No data found"}',
+          bytes: null,
+          contentType: "application/json",
+        };
+      }
+
+      this.buscados.push(pedido.url);
+      const bytes = this.ficheiros.get(pedido.url);
+      if (bytes === undefined) throw new Error(`sem fixture: ${pedido.url}`);
+      return {
+        ...base,
+        corpo: null,
+        bytes,
+        contentType: "application/octet-stream",
+      };
+    }
+  }
+
+  it("busca o PDF do aviso e manda-o ao modelo", async () => {
+    const buscador = new BuscadorDaQuery(
+      [avisoCom("ALT2030-2026-44", [docAviso("ALT2030-2026-44.pdf", "p/1")])],
+      new Map([[urlDe("p/1"), pdfMinimo("Candidaturas abertas")]]),
+    );
+    const armazem = new ArmazemMemoria();
+    let recebido: DocumentoEntrada | null = null;
+    const extractor: ExtractorLike = {
+      async extrair(doc) {
+        recebido = doc;
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+    });
+
+    expect(buscador.buscados).toEqual([urlDe("p/1")]);
+    expect(r.metricas.chamadasModelo).toBe(1);
+    // Os bytes originais vão no pedido, e o texto — que é contra o que as
+    // citações são conferidas — sai de dentro do stream comprimido.
+    expect(recebido!.pdf).toBeDefined();
+    expect(recebido!.texto).toContain("Candidaturas abertas");
+  });
+
+  /**
+   * A armadilha medida: o PT2030 anuncia documentos cujo blob já não existe, e o
+   * Azure responde **HTTP 200** com 215 bytes de XML. Nem o código de estado nem
+   * o hash denunciam. Sem a guarda, isso ia à API dentro de um bloco `document`
+   * a dizer `application/pdf`.
+   */
+  it("não manda ao modelo um BlobNotFound servido com 200", async () => {
+    const erro = new TextEncoder().encode(
+      '﻿<?xml version="1.0" encoding="utf-8"?><Error>' +
+        "<Code>BlobNotFound</Code><Message>The specified blob does not exist." +
+        "</Message></Error>",
+    );
+    const buscador = new BuscadorDaQuery(
+      [
+        avisoCom("NORTE2030-2024-80", [docAviso("desaparecido.pdf", "p/1")]),
+        avisoCom("ALT2030-2026-44", [docAviso("existe.pdf", "p/2")]),
+      ],
+      new Map([
+        [urlDe("p/1"), erro],
+        [urlDe("p/2"), pdfMinimo("Candidaturas abertas")],
+      ]),
+    );
+    const armazem = new ArmazemMemoria();
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(r.metricas.documentosQueNaoSaoPdf).toBe(1);
+    // O outro passa: um documento em falta não leva a corrida atrás.
+    expect(r.metricas.chamadasModelo).toBe(1);
+  });
+
+  it("um aviso com várias versões não é buscado", async () => {
+    const buscador = new BuscadorDaQuery(
+      [
+        avisoCom("CENTRO2030-2024-11", [
+          docAviso("CENTRO2030-2024-11.pdf", "p/1"),
+          docAviso("CENTRO2030-2024-11_1.ª Alt.pdf", "p/2"),
+        ]),
+      ],
+      new Map(),
+    );
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem: new ArmazemMemoria(),
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(buscador.buscados).toEqual([]);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    // E o apoio do caminho barato entrou na mesma: o catálogo não fica à espera
+    // da decisão de versão para mostrar o aviso.
+    expect(r.apoiosNovos).toHaveLength(1);
+  });
+
+  it("o PDF inalterado não volta ao modelo na corrida seguinte", async () => {
+    const ficheiros = new Map([
+      [urlDe("p/1"), pdfMinimo("Candidaturas abertas")],
+    ]);
+    const avisos = [
+      avisoCom("ALT2030-2026-44", [docAviso("ALT2030-2026-44.pdf", "p/1")]),
+    ];
+    const armazem = new ArmazemMemoria();
+
+    const ctx = () => ({
+      fonte: pt2030AvisosListagem,
+      buscador: new BuscadorDaQuery(avisos, ficheiros),
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect((await executarFonte(ctx())).metricas.chamadasModelo).toBe(1);
+    // É este portão que faz a actualização diária custar cêntimos: os bytes do
+    // PDF são estáveis (medidos byte a byte com quatro dias de intervalo).
+    expect((await executarFonte(ctx())).metricas.chamadasModelo).toBe(0);
+  });
+});
+
+/**
+ * O ciclo parte-se em duas fases quando o extractor sabe fazer lotes.
+ *
+ * A API de lotes só existe no plural: os pedidos vão todos de uma vez e a
+ * resposta chega mais tarde, a metade do preço. É a única razão para o ciclo
+ * estar partido, e sem um extractor que saiba fazer lotes as duas metades correm
+ * de seguida como sempre correram.
+ */
+describe("extracção em lote", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3, 4, 5].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteCinco: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}: candidaturas abertas.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  /** Um extractor que responde em lote, como o `ExtractorLote` real. */
+  function extractorDeLote(): ExtractorLike & {
+    lotes: number;
+    preparados: string[];
+  } {
+    const estado = { lotes: 0, preparados: [] as string[] };
+    return {
+      lotes: 0,
+      preparados: estado.preparados,
+      async prepararLote(docs: readonly DocumentoEntrada[]) {
+        estado.lotes++;
+        this.lotes = estado.lotes;
+        for (const d of docs) estado.preparados.push(d.urlFonte);
+      },
+      async extrair(doc) {
+        if (!estado.preparados.includes(doc.urlFonte)) {
+          throw new Error(`não preparado: ${doc.urlFonte}`);
+        }
+        return extractorFixo().extrair(doc);
+      },
+    };
+  }
+
+  it("prepara tudo num lote só, antes de pedir a primeira resposta", async () => {
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+    });
+
+    expect(extractor.lotes).toBe(1);
+    expect(extractor.preparados).toHaveLength(5);
+    expect(r.metricas.chamadasModelo).toBe(5);
+  });
+
+  it("só entra no lote o que passou o portão da mudança", async () => {
+    const { buscador, armazem } = mundo();
+
+    await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: extractorDeLote(),
+      agora: AGORA,
+    });
+
+    // Segunda corrida: nada mudou, por isso o lote fica vazio e não se submete.
+    const segundo = extractorDeLote();
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: segundo,
+      agora: AGORA,
+    });
+
+    expect(segundo.lotes).toBe(0);
+    expect(r.metricas.chamadasModelo).toBe(0);
+  });
+
+  /**
+   * A diferença de semântica que o `custoEsperadoPorChamadaUsd` existe para
+   * tornar visível: num lote não há um «entre duas chamadas» onde parar, por isso
+   * o corte é por contagem e é feito antes de submeter.
+   */
+  it("o tecto corta antes de submeter, e por contagem", async () => {
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      tectoCustoUsd: 0.25,
+      custoEsperadoPorChamadaUsd: 0.1,
+    });
+
+    // floor(0,25 / 0,10) = 2.
+    expect(extractor.preparados).toHaveLength(2);
+    expect(r.metricas.chamadasModelo).toBe(2);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(3);
+  });
+
+  it("um tecto sem custo esperado não submete nada", async () => {
+    // Em dúvida, não passa. Um orçamento que não sabe converter dinheiro em
+    // documentos não foi respeitado por se adivinhar quantos cabem.
+    const { buscador, armazem } = mundo();
+    const extractor = extractorDeLote();
+
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      tectoCustoUsd: 10,
+    });
+
+    expect(extractor.lotes).toBe(0);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    expect(r.metricas.extraccoesAdiadasPorTecto).toBe(5);
+  });
+
+  it("o que o tecto deixou de fora é tentado na corrida seguinte", async () => {
+    const { buscador, armazem } = mundo();
+
+    await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: extractorDeLote(),
+      agora: AGORA,
+      tectoCustoUsd: 0.25,
+      custoEsperadoPorChamadaUsd: 0.1,
+    });
+
+    const segundo = extractorDeLote();
+    const r = await executarFonte({
+      fonte: fonteCinco,
+      buscador,
+      armazem,
+      extractor: segundo,
+      agora: AGORA,
+    });
+
+    expect(segundo.preparados).toHaveLength(3);
+    expect(r.metricas.chamadasModelo).toBe(3);
+  });
+});
+
+describe("quantosCabemNoTecto", () => {
+  it("sem tecto cabem todos", () => {
+    expect(quantosCabemNoTecto(103, undefined, 0.06)).toBe(103);
+    expect(quantosCabemNoTecto(103, undefined, undefined)).toBe(103);
+  });
+
+  it("divide o tecto pelo custo esperado, arredondando para baixo", () => {
+    expect(quantosCabemNoTecto(103, 10, 0.06)).toBe(103);
+    expect(quantosCabemNoTecto(103, 1, 0.06)).toBe(16);
+    expect(quantosCabemNoTecto(5, 10, 0.06)).toBe(5);
+  });
+
+  it("sem custo esperado, ou com um absurdo, não passa nada", () => {
+    expect(quantosCabemNoTecto(103, 10, undefined)).toBe(0);
+    expect(quantosCabemNoTecto(103, 10, 0)).toBe(0);
+    expect(quantosCabemNoTecto(103, 10, -1)).toBe(0);
+  });
+
+  it("um tecto que não chega para uma chamada não deixa passar meia", () => {
+    expect(quantosCabemNoTecto(103, 0.01, 0.06)).toBe(0);
+  });
+});
+
+/**
+ * O `--dry-run` tem de responder à pergunta que se lhe faz.
+ *
+ * Exercita a busca e os dois portões, não escreve nada e não chama o modelo.
+ * Antes disto dizia «zero chamadas ao modelo», que é verdade e não responde a
+ * «quantos documentos é que a corrida a sério ia pagar» — que é a única razão
+ * para se correr a seco antes de gastar.
+ */
+describe("simulação", () => {
+  const B = "https://portugal2030.pt";
+  const L = `${B}/avisos/`;
+  const urls = [1, 2, 3].map((n) => `${B}/aviso-${n}/`);
+
+  const fonteTres: Fonte = {
+    id: "pt2030-avisos",
+    nome: "Portugal 2030 — Avisos",
+    entidade: "Agência para o Desenvolvimento e Coesão",
+    urlBase: B,
+    urlsEntrada: [L],
+    tipo: "listagem",
+    cadenciaHoras: 24,
+    estado: "activa",
+    candidatosMin: 1,
+    extrair: () =>
+      urls.map((u, i) => ({
+        titulo: `Aviso ${i + 1}`,
+        urlDetalhe: u,
+        urlCanonica: u,
+        referenciaLegalBruta: null,
+        dataBruta: null,
+        tipoDocumento: "html" as const,
+      })),
+  };
+
+  function mundo(): { buscador: BuscadorMemoria; armazem: ArmazemMemoria } {
+    let buscador = new BuscadorMemoria().definir(L, {
+      corpo: "<html><body>listagem</body></html>",
+    });
+    for (const [i, u] of urls.entries()) {
+      buscador = buscador.definir(u, {
+        corpo: `<html><body><main><p>Aviso ${i + 1}.</p></main></body></html>`,
+      });
+    }
+    return { buscador, armazem: new ArmazemMemoria() };
+  }
+
+  it("conta os documentos que a corrida a sério pagaria, e não paga nenhum", async () => {
+    const { buscador, armazem } = mundo();
+    let chamadas = 0;
+    const extractor: ExtractorLike = {
+      async extrair(doc) {
+        chamadas++;
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      simulacao: true,
+    });
+
+    expect(r.metricas.documentosMudados).toBe(3);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    expect(chamadas).toBe(0);
+    expect(r.metricas.custoUsd).toBe(0);
+    // E não escreveu nada: a corrida a sério a seguir continua a ver três.
+    expect(armazem.apoios.size).toBe(0);
+  });
+
+  it("a seco, um extractor de lote não chega a submeter", async () => {
+    const { buscador, armazem } = mundo();
+    let lotes = 0;
+    const extractor: ExtractorLike = {
+      async prepararLote() {
+        lotes++;
+      },
+      async extrair(doc) {
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+      simulacao: true,
+    });
+
+    expect(lotes).toBe(0);
+    expect(r.metricas.documentosMudados).toBe(3);
+  });
+
+  it("numa corrida a sério, os que mudaram são os que se pagam", async () => {
+    const { buscador, armazem } = mundo();
+    const r = await executarFonte({
+      fonte: fonteTres,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(r.metricas.documentosMudados).toBe(3);
+    expect(r.metricas.chamadasModelo).toBe(3);
   });
 });

@@ -111,6 +111,24 @@ export interface Fonte {
   lerDataset?(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[];
 
   /**
+   * Documents worth fetching that the dataset response only *names*.
+   *
+   * `lerDataset` answers «o que é que esta resposta já diz»; this answers «o que
+   * é que ela aponta e ainda não foi lido». The Portugal 2030 endpoint needed
+   * both: it gives every notice's code, title, dotação and deadline, and gives
+   * neither `medidas` nor `beneficiarios` — there is no field for either. Those
+   * live in the PDF the response names but does not carry.
+   *
+   * Optional, and separate from `lerDataset` on purpose. A source answering one
+   * of the two questions must not be forced to answer the other, and keeping them
+   * apart is what lets the catalogue fill from the cheap path while the expensive
+   * one runs behind its own gates.
+   *
+   * Pure, like every other reader here.
+   */
+  candidatosDoDataset?(bytes: Uint8Array, ctx: ContextoDataset): Candidato[];
+
+  /**
    * The entry response **is** the dataset. No listing, no second fetch.
    *
    * The spreadsheet path gets here in two hops: a listing page is parsed, it

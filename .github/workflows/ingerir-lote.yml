@@ -1,0 +1,107 @@
+name: Ingerir em lote
+
+# A primeira passagem sobre o arquivo de uma fonte, pela API de lotes.
+#
+# Separada da `ingerir.yml` de propósito, e não é uma bandeira a mais na mesma:
+# são dois trabalhos com formas diferentes. A corrida nocturna tem de acabar esta
+# noite e não pode esperar por um lote; esta espera horas e ninguém está à espera
+# dela. Misturá-las dava um único job com um tempo limite que ou é curto de mais
+# para o lote ou longo de mais para a noite.
+#
+# Só `workflow_dispatch`. Isto gasta dinheiro de uma vez, por decisão de quem
+# paga, e não há calendário nenhum em que isso deva acontecer sozinho.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Fonte a executar (id). Vazio = todas."
+        required: false
+        type: string
+      tecto_custo_usd:
+        description: "Tecto de custo para a corrida inteira, em dólares."
+        required: true
+        default: "11.50"
+        type: string
+      custo_esperado_usd:
+        description: "Custo esperado por chamada, em dólares. Divide o tecto para saber quantos documentos cabem."
+        required: true
+        default: "0.06"
+        type: string
+      dry_run:
+        description: "Exercita tudo menos a chamada ao modelo. Custa zero e diz quantos documentos iriam."
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ingerir-lote:
+    runs-on: ubuntu-latest
+    # Um lote acaba quase sempre dentro de uma hora, com 24h de tecto. Quatro
+    # horas cobrem a esmagadora maioria e cabem no limite de seis do runner.
+    #
+    # Se mesmo assim não chegar, o trabalho não se perde: o identificador do lote
+    # vai para o log no momento em que é submetido, e os resultados ficam
+    # disponíveis 29 dias.
+    timeout-minutes: 240
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODE: live
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GITHUB_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Executar pipeline em lote
+        run: |
+          pnpm ingerir --lote \
+            --tecto-custo-usd "${{ inputs.tecto_custo_usd }}" \
+            --custo-esperado-usd "${{ inputs.custo_esperado_usd }}" \
+            ${{ inputs.source && format('--source {0}', inputs.source) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Abrir issue se a corrida em lote falhou
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const titulo = "Ingestão em lote falhou";
+            const { data: existentes } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ingestao",
+            });
+            const jaAberta = existentes.find((i) => i.title === titulo);
+            const corpo =
+              `A execução [${context.runId}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) falhou.\n\n` +
+              `Se o lote chegou a ser submetido, o identificador está no log — ` +
+              `os resultados ficam disponíveis 29 dias e já foram pagos.`;
+            if (jaAberta) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: jaAberta.number,
+                body: corpo,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: titulo,
+                body: corpo,
+                labels: ["ingestao"],
+              });
+            }
