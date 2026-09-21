@@ -1,3 +1,4 @@
+import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type {
   DocumentoEntrada,
@@ -1056,5 +1057,216 @@ describe("tecto de custo", () => {
 
     expect(r.metricas.chamadasModelo).toBe(5);
     expect(r.metricas.extraccoesAdiadasPorTecto).toBe(0);
+  });
+});
+
+/**
+ * Os PDFs dos avisos do PT2030 passam a ser buscados, e o que não for um PDF
+ * não chega ao modelo.
+ *
+ * O endpoint dá tudo o que um cartão precisa e não dá nem `medidas` nem
+ * `beneficiarios` — não tem campo para nenhum dos dois. Um apoio sem medidas não
+ * casa com subscritor nenhum, porque as subscrições são por medida, e é isso que
+ * mantém o caminho de alerta em zero. As duas coisas estão no PDF.
+ */
+describe("fase de detalhe da listagem do PT2030", () => {
+  const QUERY = "https://portugal2030.pt/wp-json/avisos/query";
+
+  function respostaDaQuery(avisos: unknown[]): string {
+    return JSON.stringify({ status: 201, avisos });
+  }
+
+  function avisoCom(codigo: string, documentos: unknown[]): unknown {
+    return {
+      aviso: { codigoAviso: codigo, designacaoPT: `Aviso ${codigo}` },
+      estrutura: [],
+      calendario: { dataInicio: "2026-09-01T00:00:00" },
+      documentos,
+    };
+  }
+
+  const docAviso = (nome: string, path: string): unknown => ({
+    documentoDesignacao: nome,
+    tipoDocumentoDesignacao: "Aviso",
+    path,
+    container: "siag-prod-container",
+  });
+
+  const urlDe = (path: string): string =>
+    "https://portugal2030.pt/wp-json/avisos/download" +
+    `?path=${encodeURIComponent(path)}&container=siag-prod-container`;
+
+  /** Um PDF mínimo, com um stream de texto comprimido como os reais. */
+  function pdfMinimo(texto: string): Uint8Array {
+    const conteudo = `BT /F1 12 Tf (${texto}) Tj ET`;
+    const comprimido = deflateSync(Buffer.from(conteudo, "latin1"));
+    return Buffer.concat([
+      Buffer.from(
+        `%PDF-1.7\n1 0 obj\n<< /Length ${comprimido.length} /Filter /FlateDecode >>\nstream\n`,
+        "latin1",
+      ),
+      comprimido,
+      Buffer.from("\nendstream\nendobj\n%%EOF\n", "latin1"),
+    ]);
+  }
+
+  class BuscadorDaQuery implements Buscador {
+    readonly buscados: string[] = [];
+    constructor(
+      private readonly avisos: unknown[],
+      private readonly ficheiros: Map<string, Uint8Array>,
+    ) {}
+
+    async buscar(pedido: PedidoCondicional): Promise<RespostaHttp> {
+      const base = {
+        url: pedido.url,
+        status: 200,
+        naoModificado: false,
+        etag: null,
+        lastModified: null,
+        erro: null,
+      };
+
+      if (pedido.url.startsWith(QUERY)) {
+        const pagina = Number(
+          new URLSearchParams(pedido.corpo ?? "").get("page"),
+        );
+        return {
+          ...base,
+          corpo:
+            pagina === 0
+              ? respostaDaQuery(this.avisos)
+              : '{"code":404,"info":"No data found"}',
+          bytes: null,
+          contentType: "application/json",
+        };
+      }
+
+      this.buscados.push(pedido.url);
+      const bytes = this.ficheiros.get(pedido.url);
+      if (bytes === undefined) throw new Error(`sem fixture: ${pedido.url}`);
+      return {
+        ...base,
+        corpo: null,
+        bytes,
+        contentType: "application/octet-stream",
+      };
+    }
+  }
+
+  it("busca o PDF do aviso e manda-o ao modelo", async () => {
+    const buscador = new BuscadorDaQuery(
+      [avisoCom("ALT2030-2026-44", [docAviso("ALT2030-2026-44.pdf", "p/1")])],
+      new Map([[urlDe("p/1"), pdfMinimo("Candidaturas abertas")]]),
+    );
+    const armazem = new ArmazemMemoria();
+    let recebido: DocumentoEntrada | null = null;
+    const extractor: ExtractorLike = {
+      async extrair(doc) {
+        recebido = doc;
+        return extractorFixo().extrair(doc);
+      },
+    };
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem,
+      extractor,
+      agora: AGORA,
+    });
+
+    expect(buscador.buscados).toEqual([urlDe("p/1")]);
+    expect(r.metricas.chamadasModelo).toBe(1);
+    // Os bytes originais vão no pedido, e o texto — que é contra o que as
+    // citações são conferidas — sai de dentro do stream comprimido.
+    expect(recebido!.pdf).toBeDefined();
+    expect(recebido!.texto).toContain("Candidaturas abertas");
+  });
+
+  /**
+   * A armadilha medida: o PT2030 anuncia documentos cujo blob já não existe, e o
+   * Azure responde **HTTP 200** com 215 bytes de XML. Nem o código de estado nem
+   * o hash denunciam. Sem a guarda, isso ia à API dentro de um bloco `document`
+   * a dizer `application/pdf`.
+   */
+  it("não manda ao modelo um BlobNotFound servido com 200", async () => {
+    const erro = new TextEncoder().encode(
+      '﻿<?xml version="1.0" encoding="utf-8"?><Error>' +
+        "<Code>BlobNotFound</Code><Message>The specified blob does not exist." +
+        "</Message></Error>",
+    );
+    const buscador = new BuscadorDaQuery(
+      [
+        avisoCom("NORTE2030-2024-80", [docAviso("desaparecido.pdf", "p/1")]),
+        avisoCom("ALT2030-2026-44", [docAviso("existe.pdf", "p/2")]),
+      ],
+      new Map([
+        [urlDe("p/1"), erro],
+        [urlDe("p/2"), pdfMinimo("Candidaturas abertas")],
+      ]),
+    );
+    const armazem = new ArmazemMemoria();
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(r.metricas.documentosQueNaoSaoPdf).toBe(1);
+    // O outro passa: um documento em falta não leva a corrida atrás.
+    expect(r.metricas.chamadasModelo).toBe(1);
+  });
+
+  it("um aviso com várias versões não é buscado", async () => {
+    const buscador = new BuscadorDaQuery(
+      [
+        avisoCom("CENTRO2030-2024-11", [
+          docAviso("CENTRO2030-2024-11.pdf", "p/1"),
+          docAviso("CENTRO2030-2024-11_1.ª Alt.pdf", "p/2"),
+        ]),
+      ],
+      new Map(),
+    );
+
+    const r = await executarFonte({
+      fonte: pt2030AvisosListagem,
+      buscador,
+      armazem: new ArmazemMemoria(),
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect(buscador.buscados).toEqual([]);
+    expect(r.metricas.chamadasModelo).toBe(0);
+    // E o apoio do caminho barato entrou na mesma: o catálogo não fica à espera
+    // da decisão de versão para mostrar o aviso.
+    expect(r.apoiosNovos).toHaveLength(1);
+  });
+
+  it("o PDF inalterado não volta ao modelo na corrida seguinte", async () => {
+    const ficheiros = new Map([
+      [urlDe("p/1"), pdfMinimo("Candidaturas abertas")],
+    ]);
+    const avisos = [
+      avisoCom("ALT2030-2026-44", [docAviso("ALT2030-2026-44.pdf", "p/1")]),
+    ];
+    const armazem = new ArmazemMemoria();
+
+    const ctx = () => ({
+      fonte: pt2030AvisosListagem,
+      buscador: new BuscadorDaQuery(avisos, ficheiros),
+      armazem,
+      extractor: extractorFixo(),
+      agora: AGORA,
+    });
+
+    expect((await executarFonte(ctx())).metricas.chamadasModelo).toBe(1);
+    // É este portão que faz a actualização diária custar cêntimos: os bytes do
+    // PDF são estáveis (medidos byte a byte com quatro dias de intervalo).
+    expect((await executarFonte(ctx())).metricas.chamadasModelo).toBe(0);
   });
 });

@@ -109,6 +109,18 @@ export interface ResultadoExecucao {
   readonly saltouPorNaoModificado: boolean;
 }
 
+/** `%PDF-`, os cinco bytes que a norma obriga a estar no início do ficheiro. */
+function comecaPorPdf(bytes: Uint8Array): boolean {
+  if (bytes.length < 5) return false;
+  return (
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  );
+}
+
 function textoVisivel(html: string): string {
   return (
     decodificarEntidades(
@@ -353,6 +365,19 @@ export async function executarFonte(
         });
         rendeu = apoios.length;
         apoiosDaEntrada.push(...apoios);
+
+        // A mesma resposta responde a duas perguntas. O que ela já diz vira
+        // apoio aqui; o que ela só nomeia — os PDFs dos avisos, onde vivem as
+        // medidas e os beneficiários — vira candidato, e segue pelo caminho de
+        // detalhe normal, com o portão da mudança e o tecto de custo pelo meio.
+        if (fonte.candidatosDoDataset !== undefined) {
+          candidatos.push(
+            ...fonte.candidatosDoDataset(new TextEncoder().encode(html), {
+              urlOrigem: url,
+              entidade: fonte.entidade,
+            }),
+          );
+        }
       }
 
       const p = entrada.paginacao;
@@ -402,6 +427,7 @@ export async function executarFonte(
   let chamadasModelo = 0;
   let custoUsd = 0;
   let extraccoesAdiadasPorTecto = 0;
+  let documentosQueNaoSaoPdf = 0;
   // Um modelo sem preço fixado em `PRECOS` fecha o tecto. Ver abaixo.
   let precoEmFalta = false;
 
@@ -519,6 +545,30 @@ export async function executarFonte(
     }
 
     const ehPdf = candidato.tipoDocumento === "pdf" || resposta.corpo === null;
+
+    // Um PDF que não começa por `%PDF-` não é um PDF, e nada a jusante o vai
+    // descobrir sozinho.
+    //
+    // O PT2030 anuncia documentos cujo blob já não existe, e o Azure responde
+    // **HTTP 200** com 215 bytes de XML `BlobNotFound` — medido no
+    // `NORTE2030-2024-80`, três tentativas, três vezes o mesmo. Nem o código de
+    // estado nem o hash denunciam, que é a mesma armadilha do `erro-aspx-200.html`.
+    // Sem esta guarda, 215 bytes de XML iam para a API dentro de um bloco
+    // `document` a dizer `application/pdf`.
+    //
+    // Sem `marcarProcessado`, de propósito: o ficheiro pode voltar, e a corrida
+    // seguinte volta a tentar. Uma descarga de 215 bytes por noite é mais barata
+    // do que decidir por ele que desapareceu para sempre.
+    if (ehPdf && resposta.bytes !== null && !comecaPorPdf(resposta.bytes)) {
+      documentosQueNaoSaoPdf++;
+      console.warn(
+        `[${fonte.id}] ${candidato.urlDetalhe} devolveu ${resposta.bytes.length} ` +
+          `bytes que não começam por %PDF- (HTTP ${resposta.status}). ` +
+          `Não vai ao modelo.`,
+      );
+      continue;
+    }
+
     const hash = ehPdf
       ? resposta.bytes
         ? hashBytes(resposta.bytes)
@@ -786,6 +836,7 @@ export async function executarFonte(
       chamadasModelo,
       custoUsd,
       extraccoesAdiadasPorTecto,
+      documentosQueNaoSaoPdf,
       erro,
     },
     apoiosNovos,

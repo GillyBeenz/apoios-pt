@@ -34,6 +34,15 @@ export interface MetricasFonte {
    * retries them), but the catalogue is a night behind on exactly that many.
    */
   readonly extraccoesAdiadasPorTecto: number;
+  /**
+   * Candidates declared `pdf` whose bytes were not a PDF.
+   *
+   * Normally zero. The PT2030 listing announces documents whose blob is gone and
+   * Azure answers HTTP 200 with an XML error, so this counts the documents the
+   * run refused to send to the model. A number that climbs is the listing rotting,
+   * not the pipeline.
+   */
+  readonly documentosQueNaoSaoPdf: number;
   readonly erro: string | null;
 }
 

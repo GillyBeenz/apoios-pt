@@ -1,7 +1,8 @@
-import type { ApoioNovo } from "@apoios/core";
+import type { ApoioNovo, Candidato } from "@apoios/core";
 import type { ContextoDataset, Fonte } from "../tipos.ts";
 import { lerAvisos } from "./resposta.ts";
 import { avisoAbertoParaApoio } from "./paraApoio.ts";
+import { candidatosDeAvisos } from "./documentos.ts";
 import { corpoDoVarrimento, TIPO_CONTEUDO, URL_QUERY } from "./pedido.ts";
 
 /** A página humana. É para aqui que um leitor deve ser mandado. */
@@ -79,6 +80,24 @@ export const pt2030AvisosListagem: Fonte = {
   // Não há markup para analisar. O contrato do `Fonte` pede um `extrair`, e a
   // resposta honesta desta fonte a essa pergunta é uma lista vazia.
   extrair: () => [],
+
+  /**
+   * Os PDFs dos avisos, que é onde estão as medidas e a elegibilidade.
+   *
+   * O endpoint não tem campo de beneficiários nenhum, e nenhum de medidas. Um
+   * apoio sem medidas não casa com subscritor nenhum — as subscrições são por
+   * medida —, e é isso que mantém o caminho de alerta em zero desde o início.
+   *
+   * Só os avisos com um único documento «Aviso». Com vários há uma versão em
+   * vigor para escolher, e escolher mal é anunciar condições revogadas a quem se
+   * candidata. A escolha tem resposta (o `ModDate` do PDF, medido sobre os 127
+   * avisos multi-documento: 568 de 568 com data, zero empates), mas lê-la obriga
+   * a descarregar todas as versões de todos eles — uma segunda passagem, não uma
+   * bandeira nesta.
+   */
+  candidatosDoDataset(bytes: Uint8Array): Candidato[] {
+    return candidatosDeAvisos(new TextDecoder("utf-8").decode(bytes));
+  },
 
   lerDataset(bytes: Uint8Array, ctx: ContextoDataset): ApoioNovo[] {
     return lerAvisos(new TextDecoder("utf-8").decode(bytes)).map((a) =>
