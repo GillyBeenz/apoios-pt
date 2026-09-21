@@ -1,6 +1,6 @@
 {
   "sourceId": "pt2030-plano-anual-avisos",
-  "capturadoEm": "2026-09-07T09:34:03.291Z",
+  "capturadoEm": "2026-09-21T10:09:26.326Z",
   "erro": null,
   "entradas": [
     {
@@ -10,16 +10,16 @@
       "contentType": "text/html; charset=UTF-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-07T09:34:00.131Z"
+      "capturadoEm": "2026-09-21T10:09:23.558Z"
     },
     {
-      "url": "https://portugal2030.pt/wp-content/uploads/sites/3/2026/05/PlanoAnualAvisos_download_052026.xlsx",
-      "ficheiro": "PlanoAnualAvisos-download-052026-b402e08542.xlsx",
+      "url": "https://portugal2030.pt/wp-content/uploads/sites/3/2026/09/PlanoAnualAvisos_download_140926-1.xlsx",
+      "ficheiro": "PlanoAnualAvisos-download-140926-1-e31177726c.xlsx",
       "status": 200,
       "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "etag": "\"4a1fd-651b2ce80c472\"",
-      "lastModified": "Wed, 13 May 2026 13:17:50 GMT",
-      "capturadoEm": "2026-09-07T09:34:03.291Z"
+      "etag": "\"10083-65b731c6e9b47\"",
+      "lastModified": "Mon, 14 Sep 2026 15:30:16 GMT",
+      "capturadoEm": "2026-09-21T10:09:26.326Z"
     }
   ]
 }
