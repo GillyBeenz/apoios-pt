@@ -108,6 +108,24 @@ describe("textoDoPdf, contra um aviso a sério", () => {
   });
 });
 
+const BLOB_INEXISTENTE = new URL(
+  "../sources/comum/fixtures-permanentes/pt2030-download-blob-inexistente-200.xml",
+  import.meta.url,
+);
+
+describe("textoDoPdf, contra a resposta que finge ser um documento", () => {
+  it("não inventa texto a partir de um erro servido com HTTP 200", () => {
+    // O PT2030 lista um documento cujo blob não existe, e o Azure responde 200
+    // com 215 bytes de XML. Não é um caso hipotético: é o
+    // `NORTE2030-2024-80 … _Rep_março2025.pdf`, e repete-se em três tentativas.
+    // O que importa aqui é que o leitor devolve vazio em vez de raspar palavras
+    // da mensagem de erro — `BlobNotFound`, `RequestId` — e as dar por texto do
+    // aviso. Detectar a resposta é trabalho da fase de detalhe, não deste módulo.
+    expect(textoDoPdf(readFileSync(BLOB_INEXISTENTE))).toBe("");
+    expect(dataDoPdf(readFileSync(BLOB_INEXISTENTE))).toBeNull();
+  });
+});
+
 describe("dataDoPdf", () => {
   it("lê a data de dentro do object stream comprimido", () => {
     // O dicionário Info de um PDF moderno não está em texto claro. Procurar só

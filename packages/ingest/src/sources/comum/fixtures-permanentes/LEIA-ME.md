@@ -124,3 +124,32 @@ O que este ficheiro guarda, em concreto:
 
 Não é apagado pelo `capturar-fixtures.yml` pela mesma razão que os outros: o sítio
 serve o que serve hoje, e este ficheiro é uma prova de como os avisos eram feitos.
+
+## `pt2030-download-blob-inexistente-200.xml`
+
+215 bytes, e a mesma armadilha do `erro-aspx-200.html` noutro sítio: um erro
+servido com **HTTP 200**.
+
+A listagem do PT2030 anuncia o `Aviso_Competências qualificações ad. local
+(IT)_Rep_março2025.pdf` no `NORTE2030-2024-80`. O blob não existe, e o Azure
+responde 200 com este XML:
+
+```xml
+<Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.
+```
+
+Três tentativas seguidas a 21/09/2026 deram os três a mesma coisa, com
+`RequestId` diferente. Não é intermitência: o índice aponta para um ficheiro que
+já lá não está.
+
+É um de 570 documentos do tipo «Aviso» medidos nos 127 avisos multi-documento —
+raro, e exactamente por isso é que vale a pena estar guardado. Se o PT2030
+repuser o ficheiro amanhã, a prova desaparece, e a fase de detalhe fica sem o
+caso contra o qual se escrever.
+
+O que ele obriga a lembrar: **o tipo declarado não chega para decidir o que se
+descarregou.** Dos 673 documentos do tipo «Aviso» na listagem, 670 são `.pdf`,
+dois são `.docx` e um é um `.xlsx` — o `DOC4_Modelo_Mapa_orçamental.xlsx` do
+`CENTRO2030-2026-16`, um mapa orçamental arquivado como se fosse o aviso. Quem
+buscar o detalhe tem de olhar para os bytes, não para o rótulo nem para o código
+de estado.
