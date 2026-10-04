@@ -123,12 +123,23 @@ export class ErroCasseteEmFalta extends Error {
 export const BETA_FALLBACK = "server-side-fallback-2026-07-01" as const;
 
 /**
- * The request body, identical on the single and the batched path.
+ * The request body shared by the single and the batched path.
  *
  * Shared on purpose rather than duplicated: the cached prefix has to stay
  * byte-identical across both, and `chaveCassete` hashes the prompt. Two copies of
  * this object would drift, and the drift would show up as a tenfold bill and a
  * cassette that no longer matches, in that order.
+ *
+ * **`fallbacks` is deliberately not here**, and that is the one field the two
+ * paths do not share. The Batches API rejects it outright —
+ * `requests[0]: The 'fallbacks' parameter is not supported for batch requests`,
+ * HTTP 400, measured against a real submission — while the Messages API wants it.
+ * So the single-call path adds it and the batch does not.
+ *
+ * Worth writing down because the SDK's types do **not** catch this: the batch
+ * request type declares `fallbacks?: BetaFallbacksParam | null`, so a shared body
+ * carrying it typechecks and then fails at the server. The types are permissive
+ * here and the API is not; reading the type is not the same as reading the API.
  */
 export function corpoDoPedido(
   doc: DocumentoEntrada,
@@ -168,7 +179,6 @@ export function corpoDoPedido(
     // `format` is deliberately absent — see `contrato.ts`. `effort` stays:
     // it governs how hard the model thinks, not how the output is decoded.
     output_config: { effort: "high" },
-    fallbacks: "default",
     system: [
       {
         type: "text",
@@ -369,6 +379,8 @@ export class Extractor {
         // corpo partilhado declara `stream?: boolean` e isso sozinho deixa o
         // tipo de retorno na união com `Stream`.
         stream: false,
+        // Só aqui: a API de lotes recusa este campo. Ver `corpoDoPedido`.
+        fallbacks: "default",
         betas: [BETA_FALLBACK],
       });
       return interpretarResposta(resposta);
