@@ -61,6 +61,35 @@ function clienteFalso(opcoes: {
 
 const semEspera = { esperar: async () => {}, intervaloMs: 0 };
 
+describe("o corpo do pedido em lote", () => {
+  /**
+   * A API de lotes recusa o `fallbacks`, e os tipos do SDK não o dizem.
+   *
+   * Medido contra uma submissão a sério: HTTP 400, `requests[0]: The
+   * 'fallbacks' parameter is not supported for batch requests`. O tipo do pedido
+   * de lote declara `fallbacks?: BetaFallbacksParam | null`, por isso um corpo
+   * partilhado que o leve compila e só falha no servidor — 10 minutos de
+   * descargas depois.
+   *
+   * É este teste que impede que ele volte, porque o compilador não o faz.
+   */
+  it("não leva `fallbacks`, que o lote recusa", async () => {
+    const a = doc("aviso A");
+    const { cliente, criar } = clienteFalso({
+      linhas: [{ custom_id: chaveCassete(a), result: { type: "succeeded", message: mensagem() } }],
+    });
+    await new ExtractorLote({ cliente, ...semEspera }).prepararLote([a]);
+
+    const params = criar.mock.calls[0]?.[0]?.requests?.[0]?.params;
+    expect(params).toBeDefined();
+    expect(params).not.toHaveProperty("fallbacks");
+    // E o resto do corpo continua lá: o que muda é um campo, não o pedido.
+    expect(params.model).toBe("claude-opus-5");
+    expect(params.system).toBeDefined();
+    expect(params.thinking).toEqual({ type: "adaptive" });
+  });
+});
+
 describe("ExtractorLote", () => {
   it("submete tudo num pedido só e serve o que voltou", async () => {
     const a = doc("aviso A");
