@@ -32,6 +32,21 @@ export const DESCONTO_LOTE = 0.5;
 
 export interface OpcoesExtractorLote {
   readonly cliente?: Anthropic;
+  /**
+   * Recolher um lote que já foi submetido, em vez de submeter outro.
+   *
+   * Um lote é pago quando é processado, não quando é lido, e os resultados ficam
+   * disponíveis 29 dias. Sem esta opção, uma corrida que submeta e morra antes
+   * de recolher deixa trabalho pago sem forma de o ir buscar — e foi exactamente
+   * isso que aconteceu com o `msgbatch_01214cw6cBPuao8pscu5Ak8K`.
+   *
+   * Funciona porque o `custom_id` é o `chaveCassete`, que resume o modelo, o
+   * prompt, o esquema e o texto do documento. Buscar os mesmos PDFs outra vez
+   * produz as mesmas chaves, e as respostas encaixam. Se um documento tiver
+   * mudado desde a submissão, a sua chave muda e a resposta não aparece — fica
+   * registado como falha em vez de ser casado com o documento errado.
+   */
+  readonly loteExistente?: string;
   /** How long to wait for the batch before giving up, in milliseconds. */
   readonly tempoMaximoMs?: number;
   /** Seconds between polls. */
@@ -63,13 +78,25 @@ export class ExtractorLote implements ExtractorLike {
   #cliente: Anthropic | undefined;
   #respostas = new Map<string, ResultadoExtraccao>();
 
+  readonly #loteExistente: string | undefined;
+
   constructor(opcoes: OpcoesExtractorLote = {}) {
     this.#cliente = opcoes.cliente;
+    this.#loteExistente = opcoes.loteExistente;
     this.#tempoMaximoMs = opcoes.tempoMaximoMs ?? DUAS_HORAS;
     this.#intervaloMs = opcoes.intervaloMs ?? UM_MINUTO;
+    // Sem `.unref()`, e essa é a correcção. Um temporizador `unref`ed não conta
+    // para manter o ciclo de eventos vivo: com o lote submetido e nada mais
+    // pendente, o Node saía do ciclo, o processo terminava com código 0 e a
+    // promessa da espera nunca resolvia. O job dava `success`, o lote ficava
+    // submetido e pago, e ninguém recolhia nada — a pior combinação possível,
+    // porque «success» é o estado que ninguém vai ver.
+    //
+    // Medido: 117 pedidos submetidos às 16:54:27, processo terminado às
+    // 16:54:31, zero extracções escritas. A espera é precisamente o que tem de
+    // manter este processo vivo.
     this.#esperar =
-      opcoes.esperar ??
-      ((ms) => new Promise<void>((r) => setTimeout(r, ms).unref?.()));
+      opcoes.esperar ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
     this.#agora = opcoes.agora ?? Date.now;
   }
 
@@ -95,13 +122,19 @@ export class ExtractorLote implements ExtractorLike {
     for (const doc of docs) porChave.set(chaveCassete(doc), doc);
 
     const cliente = this.#obterCliente();
-    const lote = await cliente.beta.messages.batches.create({
-      betas: [BETA_FALLBACK],
-      requests: [...porChave].map(([chave, doc]) => ({
-        custom_id: chave,
-        params: corpoDoPedido(doc),
-      })),
-    });
+
+    // Com um lote indicado, não se submete nada: recolhe-se aquele. É a saída
+    // para trabalho já pago que ficou por recolher.
+    const lote =
+      this.#loteExistente !== undefined
+        ? await cliente.beta.messages.batches.retrieve(this.#loteExistente)
+        : await cliente.beta.messages.batches.create({
+            betas: [BETA_FALLBACK],
+            requests: [...porChave].map(([chave, doc]) => ({
+              custom_id: chave,
+              params: corpoDoPedido(doc),
+            })),
+          });
 
     // O identificador vai para o log antes de se esperar por ele, e isso é o
     // que torna o tempo de espera recuperável em vez de caro.
@@ -112,9 +145,12 @@ export class ExtractorLote implements ExtractorLike {
     // identificador escrito em lado nenhum, não há como ir buscá-lo e a corrida
     // seguinte paga tudo outra vez.
     console.log(
-      `[lote] ${lote.id} submetido com ${porChave.size} pedidos. ` +
-        `Os resultados ficam disponíveis 29 dias: se esta corrida morrer a ` +
-        `meio, é por este identificador que se recuperam.`,
+      this.#loteExistente !== undefined
+        ? `[lote] ${lote.id} recolhido (não submetido), ${porChave.size} ` +
+            `documentos à espera de resposta.`
+        : `[lote] ${lote.id} submetido com ${porChave.size} pedidos. ` +
+            `Os resultados ficam disponíveis 29 dias: se esta corrida morrer a ` +
+            `meio, é por este identificador que se recuperam.`,
     );
 
     const limite = this.#agora() + this.#tempoMaximoMs;
