@@ -6,15 +6,25 @@ import { normalizarEspacos } from "@apoios/core";
  * Reader for the Plano Anual de Avisos spreadsheet.
  *
  * Read directly rather than sent to the model: the sheet is already structured, so
- * parsing it is free, deterministic and testable offline, where 211 rows through
+ * parsing it is free, deterministic and testable offline, where every row through
  * Claude would cost real money and be less accurate than the columns already there.
  *
- * What the real file actually contains, measured rather than assumed — 211 planned
- * notices for May 2026 to April 2027, and `Tipo Ent. Beneficiária` taking exactly
- * three values: `Pública` (113), `Privada` (49), `Pública | Privada` (49). **Not one
- * row admits pessoas singulares.** Even the twenty housing rows are `Pública`, i.e.
- * municipal social housing. So this source can populate the catalogue with what is
- * coming, and can never legitimately produce a homeowner alert.
+ * What the real file contains, measured rather than assumed — on the capture
+ * committed here, `PlanoAnualAvisos-download-140926-1`, 177 planned notices opening
+ * between 2026-09-01 and 2027-07-02, and `Tipo Ent. Beneficiária` taking exactly
+ * three values: `Pública` (95), `Pública | Privada` (44), `Privada` (38).
+ *
+ * **Not one row admits pessoas singulares.** The 95 `Pública` rows say so outright
+ * (`admiteParticulares: "nao"`); the other 82 say `desconhecido`, because `Privada`
+ * means a private *entity* and the column does not claim anything about citizens
+ * either way. Guessing `nao` there would be an inference the document does not make,
+ * and guessing `sim` would be an alert somebody cannot use. The seven rows whose
+ * title mentions housing are all `Pública` — municipal social housing. So this source
+ * can populate the catalogue with what is coming, and can never legitimately produce
+ * a homeowner alert.
+ *
+ * The counts above describe that one capture and will drift when the plan is
+ * republished; the tests assert the shape, not these numbers, on purpose.
  */
 
 /** One planned notice, as the sheet describes it. Nothing here is a commitment. */

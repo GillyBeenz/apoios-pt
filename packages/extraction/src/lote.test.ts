@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { chaveCassete, type DocumentoEntrada } from "./cliente.ts";
@@ -60,6 +62,104 @@ function clienteFalso(opcoes: {
 }
 
 const semEspera = { esperar: async () => {}, intervaloMs: 0 };
+
+describe("a espera por omissão", () => {
+  /**
+   * Tinha `.unref()`, e isso fazia o processo sair antes de a espera resolver.
+   *
+   * Um temporizador `unref`ed não conta para manter o ciclo de eventos vivo. Com
+   * o lote submetido e nada mais pendente, o Node saía do ciclo, o processo
+   * terminava com código **0**, e a promessa nunca resolvia. O job dava
+   * `success`, o lote ficava submetido e pago, e ninguém recolhia nada.
+   *
+   * Medido em produção: 117 pedidos submetidos às 16:54:27, processo terminado
+   * às 16:54:31, zero extracções escritas, `msgbatch_01214cw6cBPuao8pscu5Ak8K`
+   * pago e por recolher.
+   *
+   * Este teste é o guarda, e é um teste sobre o ciclo de eventos e não sobre
+   * lotes: confere que a espera real resolve.
+   */
+  it("segura o processo, provado num processo à parte", () => {
+    // **Tem de ser um subprocesso.** Dentro do vitest o ciclo de eventos é
+    // mantido vivo pelo runner, por isso a avaria não se reproduz aqui:
+    // verifiquei que, com o `.unref()` reposto, os quinze testes deste ficheiro
+    // passavam todos. Um teste que não se vê falhar não é um guarda.
+    //
+    // E o que se confere é a **marca na saída**, não o código de saída. Em
+    // produção o processo saiu com 0 — o job deu `success` — e foi isso que
+    // tornou a avaria invisível.
+    const guiao = new URL("./teste/espera-em-subprocesso.ts", import.meta.url);
+    const r = spawnSync(
+      process.execPath,
+      ["--experimental-strip-types", fileURLToPath(guiao)],
+      { encoding: "utf8", timeout: 60_000 },
+    );
+
+    expect(r.stdout).toContain("ESPERA-SEGUROU");
+    // Duas sondagens: a espera correu mesmo, não foi saltada.
+    expect(r.stdout).toContain("sondagens=2");
+  });
+
+  it("o lote espera enquanto o estado não é `ended`, e chega ao fim", async () => {
+    // O teste que interessa: com a espera real (sem injecção), o ciclo de
+    // sondagem completa-se e as respostas são servidas. Antes da correcção, o
+    // processo saía no primeiro `await`.
+    const a = doc("aviso A");
+    const { cliente } = clienteFalso({
+      estados: ["in_progress", "ended"],
+      linhas: [{ custom_id: chaveCassete(a), result: { type: "succeeded", message: mensagem() } }],
+    });
+    const lote = new ExtractorLote({ cliente, intervaloMs: 1 });
+
+    await lote.prepararLote([a]);
+
+    expect((await lote.extrair(a)).extraccao).not.toBeNull();
+  });
+});
+
+describe("recolher um lote já submetido", () => {
+  /**
+   * A saída para trabalho pago que ficou por recolher. Um lote é pago quando é
+   * processado, não quando é lido, e os resultados ficam 29 dias.
+   */
+  it("recolhe em vez de submeter, e não cria nada", async () => {
+    const a = doc("aviso A");
+    const { cliente, criar } = clienteFalso({
+      linhas: [{ custom_id: chaveCassete(a), result: { type: "succeeded", message: mensagem() } }],
+    });
+    const lote = new ExtractorLote({
+      cliente,
+      ...semEspera,
+      loteExistente: "msgbatch_jaPago",
+    });
+
+    await lote.prepararLote([a]);
+
+    expect(criar).not.toHaveBeenCalled();
+    expect((await lote.extrair(a)).extraccao).not.toBeNull();
+  });
+
+  it("um documento que mudou desde a submissão vira falha, não casa com o errado", async () => {
+    // A chave é o `chaveCassete`, que inclui o texto do documento. Se o
+    // documento mudou, a chave mudou e a resposta do lote não lhe pertence.
+    const antigo = doc("aviso como estava");
+    const mudado = doc("aviso com texto novo");
+    const { cliente } = clienteFalso({
+      linhas: [{ custom_id: chaveCassete(antigo), result: { type: "succeeded", message: mensagem() } }],
+    });
+    const lote = new ExtractorLote({
+      cliente,
+      ...semEspera,
+      loteExistente: "msgbatch_jaPago",
+    });
+
+    await lote.prepararLote([mudado]);
+
+    const r = await lote.extrair(mudado);
+    expect(r.extraccao).toBeNull();
+    expect(r.erro).toContain("não devolveu");
+  });
+});
 
 describe("o corpo do pedido em lote", () => {
   /**

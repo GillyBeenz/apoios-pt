@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
+import { ficheiroDaFixture } from "../teste/fixtures.ts";
 import {
   dataDeSerieExcel,
   elegibilidadeDe,
@@ -8,12 +10,29 @@ import {
   mesesDoQuadrimestre,
 } from "./folha.ts";
 
-const FICHEIRO = join(
-  import.meta.dirname,
-  "fixtures",
-  "PlanoAnualAvisos-download-052026-b402e08542.xlsx",
+const FICHEIRO = ficheiroDaFixture(
+  join(import.meta.dirname, "fixtures"),
+  /PlanoAnualAvisos.*\.xlsx$/i,
 );
 const bytes = new Uint8Array(readFileSync(FICHEIRO));
+
+/**
+ * Data rows in the sheet, read from the XLSX rather than from the reader under test.
+ *
+ * Deliberately a second, dumber path to the same number: if `lerPlanoAnual` ever
+ * starts skipping rows, a test that counted with `lerPlanoAnual` would move its own
+ * goalposts and stay green.
+ */
+function linhasDeDadosDaFolha(xlsx: Uint8Array): number {
+  const zip = unzipSync(xlsx);
+  const nome = Object.keys(zip).find((n) =>
+    /xl\/worksheets\/sheet1\.xml$/.test(n),
+  );
+  if (nome === undefined) throw new Error("a folha não tem sheet1.xml");
+  const linhas = strFromU8(zip[nome]!).match(/<row[ >]/g)?.length ?? 0;
+  // Two header rows: a title band above the column names.
+  return linhas - 2;
+}
 
 describe("dataDeSerieExcel", () => {
   it("descodifica as datas reais do plano", () => {
@@ -75,19 +94,29 @@ describe("elegibilidadeDe", () => {
 describe("lerPlanoAnual — folha real", () => {
   const avisos = lerPlanoAnual(bytes);
 
-  it("lê todos os avisos previstos", () => {
-    expect(avisos).toHaveLength(211);
+  /**
+   * Counted against the sheet itself, not against a number written down here.
+   *
+   * This assertion used to read `toHaveLength(211)`, which was measured from the
+   * May 2026 capture and became false the moment the plan was republished for
+   * September — and because a sibling test still named the old file, the suite
+   * failed with ENOENT and never got as far as saying so. One row of the sheet
+   * must become one planned notice; how many rows there are is the plan's
+   * business, not this test's.
+   */
+  it("lê um aviso previsto por cada linha de dados da folha", () => {
+    expect(avisos).toHaveLength(linhasDeDadosDaFolha(bytes));
     expect(avisos.every((a) => a.titulo.length > 0 && a.id.length > 0)).toBe(
       true,
     );
   });
 
   it("NENHUM aviso previsto admite particulares", () => {
-    // The finding that decides what this source is for. All 211 rows are Pública or
-    // Privada — private *entities*, not citizens — including all twenty that mention
-    // housing, which are municipal social housing. Correctly gated, this source can
-    // populate the catalogue and can never produce a homeowner alert. If this ever
-    // fails, the plan has genuinely changed and the product gained a real feature.
+    // The finding that decides what this source is for. Every row is Pública or
+    // Privada — private *entities*, not citizens — including the housing rows, which
+    // are municipal social housing. Correctly gated, this source can populate the
+    // catalogue and can never produce a homeowner alert. If this ever fails, the plan
+    // has genuinely changed and the product gained a real feature.
     expect(avisos.filter((a) => a.admiteParticulares === "sim")).toHaveLength(
       0,
     );

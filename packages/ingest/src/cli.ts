@@ -26,6 +26,9 @@ apoios ingerir — executa o pipeline de recolha
                     pode demorar até 24h. Não serve a corrida nocturna, que tem
                     de acabar esta noite; serve a primeira passagem sobre o
                     arquivo de uma fonte, que ninguém está à espera.
+  --lote-id <id>    Recolhe um lote já submetido em vez de submeter outro. Para
+                    quando uma corrida submeteu e morreu antes de recolher: o
+                    lote está pago e os resultados ficam 29 dias. Exige --lote.
   --custo-esperado-usd <n>
                     Quanto se espera que custe uma chamada. Só é lido com
                     --lote, onde o tecto tem de cortar por contagem porque não
@@ -136,6 +139,7 @@ async function main(): Promise<number> {
       "tecto-custo-usd": { type: "string" },
       lote: { type: "boolean", default: false },
       "custo-esperado-usd": { type: "string" },
+      "lote-id": { type: "string" },
       list: { type: "boolean", default: false },
       redecidir: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -250,7 +254,14 @@ async function main(): Promise<number> {
   const buscador = values.fixtures
     ? new BuscadorReplay(values.fixtures)
     : new BuscadorHttp();
-  const extractor = emLote ? new ExtractorLote() : new Extractor();
+  const loteId = values["lote-id"];
+  if (loteId !== undefined && !emLote) {
+    console.error("--lote-id exige --lote.");
+    return 2;
+  }
+  const extractor = emLote
+    ? new ExtractorLote(loteId === undefined ? {} : { loteExistente: loteId })
+    : new Extractor();
   const agora = new Date();
 
   const armazenamento = escolherArmazem(simulacao);
