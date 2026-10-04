@@ -32,6 +32,11 @@ on:
         description: "Recolher um lote já submetido (msgbatch_...) em vez de submeter outro. Para recuperar trabalho pago que ficou por recolher."
         required: false
         type: string
+      espera_max_min:
+        description: "Minutos a esperar pelo lote antes de desistir. Tem de caber no limite de 240 do job, com margem para rebuscar os documentos e escrever o resultado."
+        required: true
+        default: "200"
+        type: string
       dry_run:
         description: "Exercita tudo menos a chamada ao modelo. Custa zero e diz quantos documentos iriam."
         required: false
@@ -73,6 +78,7 @@ jobs:
           pnpm ingerir --lote \
             --tecto-custo-usd "${{ inputs.tecto_custo_usd }}" \
             --custo-esperado-usd "${{ inputs.custo_esperado_usd }}" \
+            --espera-max-min "${{ inputs.espera_max_min }}" \
             ${{ inputs.source && format('--source {0}', inputs.source) || '' }} \
             ${{ inputs.lote_id && format('--lote-id {0}', inputs.lote_id) || '' }} \
             ${{ inputs.dry_run && '--dry-run' || '' }}

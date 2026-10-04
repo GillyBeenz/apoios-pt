@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { Extractor, ExtractorLote } from "@apoios/extraction";
+import { Extractor, ExtractorLote, estadoDoLote } from "@apoios/extraction";
 import { BuscadorHttp } from "./http/buscador.ts";
 import { BuscadorReplay } from "./http/replay.ts";
 import { ArmazemMemoria, type Armazem } from "./pipeline/armazem.ts";
@@ -29,6 +29,16 @@ apoios ingerir — executa o pipeline de recolha
   --lote-id <id>    Recolhe um lote já submetido em vez de submeter outro. Para
                     quando uma corrida submeteu e morreu antes de recolher: o
                     lote está pago e os resultados ficam 29 dias. Exige --lote.
+  --estado-lote <id>
+                    Pergunta o que um lote está a fazer e sai. Não submete, não
+                    recolhe, não escreve nada. Existe porque descobri-lo custava
+                    uma corrida de quatro horas, que é o preço errado para uma
+                    pergunta.
+  --espera-max-min <n>
+                    Quanto tempo esperar por um lote antes de desistir, em
+                    minutos. Por omissão 120. Desistir de esperar não é desistir
+                    do trabalho: o lote continua a ser processado e os
+                    resultados ficam 29 dias. Só é lido com --lote.
   --custo-esperado-usd <n>
                     Quanto se espera que custe uma chamada. Só é lido com
                     --lote, onde o tecto tem de cortar por contagem porque não
@@ -140,6 +150,8 @@ async function main(): Promise<number> {
       lote: { type: "boolean", default: false },
       "custo-esperado-usd": { type: "string" },
       "lote-id": { type: "string" },
+      "estado-lote": { type: "string" },
+      "espera-max-min": { type: "string" },
       list: { type: "boolean", default: false },
       redecidir: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -150,6 +162,23 @@ async function main(): Promise<number> {
   if (values.help) {
     console.log(AJUDA);
     return 0;
+  }
+
+  // Antes de tudo o resto, e de propósito: não precisa de base de dados, não
+  // precisa de fontes, não chama o modelo. É só uma pergunta.
+  const idParaConsultar = values["estado-lote"];
+  if (idParaConsultar !== undefined) {
+    try {
+      console.log(await estadoDoLote(idParaConsultar));
+      return 0;
+    } catch (erro) {
+      console.error(
+        `Não foi possível ler o lote ${idParaConsultar}: ${
+          erro instanceof Error ? erro.message : String(erro)
+        }`,
+      );
+      return 1;
+    }
   }
 
   if (values.list) {
@@ -259,8 +288,18 @@ async function main(): Promise<number> {
     console.error("--lote-id exige --lote.");
     return 2;
   }
+  const esperaMaxMin = values["espera-max-min"];
+  if (esperaMaxMin !== undefined && !Number.isFinite(Number(esperaMaxMin))) {
+    console.error(`--espera-max-min não é um número: ${esperaMaxMin}`);
+    return 2;
+  }
   const extractor = emLote
-    ? new ExtractorLote(loteId === undefined ? {} : { loteExistente: loteId })
+    ? new ExtractorLote({
+        ...(loteId === undefined ? {} : { loteExistente: loteId }),
+        ...(esperaMaxMin === undefined
+          ? {}
+          : { tempoMaximoMs: Number(esperaMaxMin) * 60_000 }),
+      })
     : new Extractor();
   const agora = new Date();
 

@@ -1,0 +1,40 @@
+name: Estado do lote
+
+# Pergunta o que um lote está a fazer. Não submete, não recolhe, não escreve.
+#
+# Existe porque descobri-lo custava uma corrida de `ingerir-lote.yml`: o
+# `--lote-id` rebusca todos os documentos para reconstruir as chaves antes de
+# olhar para o lote, por isso «ainda está a processar ou falhou?» custava um
+# lugar na fila e horas de espera. Esse é o preço errado para uma pergunta, e
+# pagá-lo é como se acaba a adivinhar em vez de perguntar.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lote_id:
+        description: "Identificador do lote (msgbatch_...)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  estado-lote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Perguntar o estado
+        run: pnpm ingerir --estado-lote "${{ inputs.lote_id }}"
