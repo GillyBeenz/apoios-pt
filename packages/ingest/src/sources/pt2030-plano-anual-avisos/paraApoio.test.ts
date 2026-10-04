@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ficheiroDaFixture } from "../teste/fixtures.ts";
 import {
   canonicalizarUrl,
   construirChaves,
@@ -10,20 +11,26 @@ import { lerPlanoAnual } from "./folha.ts";
 import { avisoPrevistoParaApoio, urlDoAviso } from "./paraApoio.ts";
 import { pt2030PlanoAnualAvisos } from "./index.ts";
 
-const FICHEIRO = join(
-  import.meta.dirname,
-  "fixtures",
-  "PlanoAnualAvisos-download-052026-b402e08542.xlsx",
+const FICHEIRO = ficheiroDaFixture(
+  join(import.meta.dirname, "fixtures"),
+  /PlanoAnualAvisos.*\.xlsx$/i,
 );
 const bytes = new Uint8Array(readFileSync(FICHEIRO));
 const URL_PLANO = "https://portugal2030.pt/plano-anual-de-avisos/";
 const OPCOES = { urlPlano: URL_PLANO, entidade: "Agência para o Desenvolvimento e Coesão" };
 
-const apoios = lerPlanoAnual(bytes).map((a) => avisoPrevistoParaApoio(a, OPCOES));
+const avisos = lerPlanoAnual(bytes);
+const apoios = avisos.map((a) => avisoPrevistoParaApoio(a, OPCOES));
 
 describe("avisoPrevistoParaApoio", () => {
-  it("lê o plano inteiro", () => {
-    expect(apoios.length).toBeGreaterThan(200);
+  /**
+   * Was `toBeGreaterThan(200)`, measured from the May 2026 capture, which the
+   * September republication (177 rows) made false. The claim worth testing is that
+   * the mapping drops nothing, and that holds whatever the plan's size.
+   */
+  it("mapeia o plano inteiro, sem perder linhas", () => {
+    expect(apoios).toHaveLength(avisos.length);
+    expect(apoios.length).toBeGreaterThan(0);
   });
 
   /**
@@ -69,12 +76,18 @@ describe("avisoPrevistoParaApoio", () => {
    */
   it("nunca se declara aberto, mesmo com a data de abertura já passada", () => {
     expect(apoios.every((a) => a.estado === "previsto")).toBe(true);
-    // The fixture plans 211 notices opening between 2026-05-01 and 2027-04-01, so
-    // this cut sits inside its range and the filter is never empty. Tied to the
-    // committed fixture rather than to the wall clock, which would make the test
-    // change meaning as time passed.
+    // The cut is derived from the fixture instead of written down. A hardcoded
+    // `2026-09-01` sat inside the May capture's range and exactly on the edge of the
+    // September one, which emptied the filter and left the assertion testing nothing.
+    // Tied to the committed fixture rather than to the wall clock, which would make
+    // the test change meaning as time passed.
+    const datas = [
+      ...new Set(apoios.map((a) => a.abreEm.iso).filter((d) => d !== null)),
+    ].sort();
+    expect(datas.length).toBeGreaterThan(1);
+    const corte = datas[Math.floor(datas.length / 2)]!;
     const jaDeviaTerAberto = apoios.filter(
-      (a) => a.abreEm.iso !== null && a.abreEm.iso < "2026-09-01",
+      (a) => a.abreEm.iso !== null && a.abreEm.iso < corte,
     );
     expect(jaDeviaTerAberto.length).toBeGreaterThan(0);
     expect(jaDeviaTerAberto.every((a) => a.estado === "previsto")).toBe(true);
@@ -151,8 +164,14 @@ describe("o plano inteiro sobrevive à resolução de identidade", () => {
     expect(criados).toBe(apoios.length);
   });
 
-  /** The same walk under the listing policy still loses nine — the bug, pinned. */
-  it("sob a política de listagem perderia nove", () => {
+  /**
+   * The same walk under the listing policy still loses rows — the bug, pinned.
+   *
+   * How many it loses is a property of the capture (nine in May 2026, six in
+   * September), so the count is not the thing to assert. That it loses any at all,
+   * while the sibling test above loses none, is.
+   */
+  it("sob a política de listagem perderia linhas", () => {
     const registado = new Map<string, string>();
     let criados = 0;
 
@@ -173,7 +192,7 @@ describe("o plano inteiro sobrevive à resolução de identidade", () => {
       }
     }
 
-    expect(criados).toBe(apoios.length - 9);
+    expect(criados).toBeLessThan(apoios.length);
   });
 });
 

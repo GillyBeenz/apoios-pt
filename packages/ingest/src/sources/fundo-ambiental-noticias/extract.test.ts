@@ -14,24 +14,46 @@ const CTX = {
 /**
  * Against markup captured from the live site, not anything invented.
  *
- * The captured listing carries ten notice-shaped links: four real notices, five
- * monthly payment reports, and one pagination control. Getting from ten to four is
- * the entire job of this extractor, and each of the two exclusions is worth a test
- * because each was a real defect or a real cost.
+ * The captured listing carries ten notice-shaped links: five monthly payment
+ * reports, one pagination control, and four the extractor keeps. Getting from ten to
+ * four is the entire job of this extractor, and each of the two exclusions is worth a
+ * test because each was a real defect or a real cost.
+ *
+ * Which four they are rotates with the feed, so nothing here is pinned to a
+ * particular notice. An earlier version named three slugs outright and went red when
+ * the capture was refreshed and two of them had scrolled off the front page — the
+ * assertions were measuring the fund's news cycle, not this code.
  */
 describe("extrair — notícias, markup real", () => {
   const candidatos = extrair(ler("listagem-noticias-88db803a6c.html"), CTX);
   const caminhos = candidatos.map((c) => new URL(c.urlDetalhe).pathname);
 
-  it("encontra as notícias de avisos reais", () => {
+  it("fica com os quatro links que não são relatórios nem paginação", () => {
     expect(candidatos).toHaveLength(4);
+    // Ten shaped links in, four out, and every survivor keeps the two-segment shape
+    // the extractor identifies by.
+    for (const c of caminhos) {
+      expect(c).toMatch(/^\/listagem-noticias\/[^/]+\.aspx$/);
+    }
+  });
+
+  it("encontra o aviso de abertura de concurso que a captura traz", () => {
     expect(caminhos.join("\n")).toContain(
       "aviso-de-abertura-de-concurso-n-032026",
     );
-    expect(caminhos.join("\n")).toContain(
-      "fundo-azul-aviso-convite-n-01faz2026",
+  });
+
+  it("deixa passar um comunicado, que é o preço da lista negativa", () => {
+    // Not a defect: `RE_TITULO_ADMINISTRATIVO` is a negative list by construction,
+    // so a press release it does not recognise costs one extraction rather than
+    // risking a real notice dropped by an allowlist. This capture contains exactly
+    // such a post — "Agência para o Clima cumpre 100% das metas do PRR" — and the
+    // test records the cost rather than letting it look accidental. Downstream it
+    // goes nowhere: with no deadline and no measures, the gate fails closed.
+    const comunicados = candidatos.filter(
+      (c) => c.referenciaLegalBruta === null && !/candidatura/i.test(c.titulo),
     );
-    expect(caminhos.join("\n")).toContain("aviso-convite-n-09c08-i01012026");
+    expect(comunicados.length).toBeGreaterThan(0);
   });
 
   it("não segue a paginação", () => {
@@ -46,11 +68,18 @@ describe("extrair — notícias, markup real", () => {
     expect(caminhos.join("\n")).not.toMatch(/pagamentos/i);
   });
 
-  it("lê a referência legal do título quando existe", () => {
+  it("lê a referência legal do título quando existe, e nunca a inventa", () => {
+    // Was `>= 3`, a count over a feed that rotates: true of the capture it was
+    // written against, false of the next one, and never a statement about the parser.
+    // What must hold for any capture is that a reference read is a reference present
+    // in the title, verbatim — the same evidence rule the model fields obey.
     const comReferencia = candidatos.filter(
       (c) => c.referenciaLegalBruta !== null,
     );
-    expect(comReferencia.length).toBeGreaterThanOrEqual(3);
+    expect(comReferencia.length).toBeGreaterThan(0);
+    for (const c of comReferencia) {
+      expect(c.titulo).toContain(c.referenciaLegalBruta);
+    }
   });
 
   it("não repete uma notícia ligada de dois sítios", () => {
