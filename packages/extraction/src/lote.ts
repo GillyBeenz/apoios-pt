@@ -226,3 +226,32 @@ function resultadoDaLinha(linha: Linha): ResultadoExtraccao {
       );
   }
 }
+
+/**
+ * Asks what a batch is doing, and nothing else.
+ *
+ * Exists because the only way to find out used to be a four-hour pipeline run:
+ * `--lote-id` re-fetches every document to rebuild the keys before it so much as
+ * looks at the batch, so «is it still processing or did it fail?» cost a job slot
+ * and an hour of waiting to answer. That is the wrong price for a question, and
+ * paying it is how you end up guessing instead of asking.
+ *
+ * Reads only. It never submits, never cancels and never writes to the database.
+ */
+export async function estadoDoLote(
+  id: string,
+  cliente: Anthropic = new Anthropic(),
+): Promise<string> {
+  const lote = await cliente.beta.messages.batches.retrieve(id);
+  const c = lote.request_counts;
+  return [
+    `[lote] ${lote.id}`,
+    `  estado: ${lote.processing_status}`,
+    `  pedidos: ${c.processing} a processar, ${c.succeeded} prontos, ` +
+      `${c.errored} com erro, ${c.canceled} cancelados, ${c.expired} expirados`,
+    `  criado: ${lote.created_at}`,
+    `  terminado: ${lote.ended_at ?? "(ainda não)"}`,
+    `  expira: ${lote.expires_at}`,
+    `  resultados: ${lote.results_url ?? "(ainda não)"}`,
+  ].join("\n");
+}

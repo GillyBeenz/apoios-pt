@@ -3,7 +3,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { chaveCassete, type DocumentoEntrada } from "./cliente.ts";
-import { DESCONTO_LOTE, ErroLoteNaoPreparado, ExtractorLote } from "./lote.ts";
+import {
+  DESCONTO_LOTE,
+  ErroLoteNaoPreparado,
+  estadoDoLote,
+  ExtractorLote,
+} from "./lote.ts";
 import { extraccaoSolar } from "./teste/extraccoes.ts";
 import { custoDaChamada } from "./precos.ts";
 
@@ -354,5 +359,78 @@ describe("ExtractorLote", () => {
     const { cliente, criar } = clienteFalso({ linhas: [] });
     await new ExtractorLote({ cliente, ...semEspera }).prepararLote([]);
     expect(criar).not.toHaveBeenCalled();
+  });
+});
+
+describe("estadoDoLote", () => {
+  const loteCru = {
+    id: "msgbatch_abc",
+    processing_status: "in_progress",
+    request_counts: {
+      processing: 7,
+      succeeded: 110,
+      errored: 0,
+      canceled: 0,
+      expired: 0,
+    },
+    created_at: "2026-10-04T16:54:27Z",
+    ended_at: null,
+    expires_at: "2026-10-05T16:54:27Z",
+    results_url: null,
+  };
+
+  function clienteDeEstado(lote: unknown): {
+    cliente: Anthropic;
+    retrieve: ReturnType<typeof vi.fn>;
+    criar: ReturnType<typeof vi.fn>;
+  } {
+    const retrieve = vi.fn(async () => lote);
+    const criar = vi.fn();
+    return {
+      cliente: {
+        beta: { messages: { batches: { retrieve, create: criar } } },
+      } as unknown as Anthropic,
+      retrieve,
+      criar,
+    };
+  }
+
+  it("diz o estado e as contagens de um lote a meio", async () => {
+    const { cliente, retrieve } = clienteDeEstado(loteCru);
+    const saida = await estadoDoLote("msgbatch_abc", cliente);
+
+    expect(retrieve).toHaveBeenCalledWith("msgbatch_abc");
+    expect(saida).toContain("msgbatch_abc");
+    expect(saida).toContain("in_progress");
+    expect(saida).toContain("7 a processar");
+    expect(saida).toContain("110 prontos");
+    // Um lote a meio não tem fim nem resultados, e dizer «null» a quem lê o log
+    // não ajuda ninguém.
+    expect(saida).toContain("(ainda não)");
+    expect(saida).not.toContain("null");
+  });
+
+  it("não submete nem cancela nada: é uma pergunta", async () => {
+    // O guarda que importa. Esta função existe para substituir uma corrida de
+    // quatro horas por uma pergunta; se escrevesse algo, era outra coisa.
+    const { cliente, criar } = clienteDeEstado(loteCru);
+    await estadoDoLote("msgbatch_abc", cliente);
+    expect(criar).not.toHaveBeenCalled();
+  });
+
+  it("mostra o fim e o URL dos resultados quando o lote acabou", async () => {
+    const { cliente } = clienteDeEstado({
+      ...loteCru,
+      processing_status: "ended",
+      request_counts: { ...loteCru.request_counts, processing: 0, succeeded: 117 },
+      ended_at: "2026-10-04T18:10:00Z",
+      results_url: "https://api.anthropic.com/v1/.../results",
+    });
+    const saida = await estadoDoLote("msgbatch_abc", cliente);
+
+    expect(saida).toContain("ended");
+    expect(saida).toContain("2026-10-04T18:10:00Z");
+    expect(saida).toContain("/results");
+    expect(saida).not.toContain("(ainda não)");
   });
 });
