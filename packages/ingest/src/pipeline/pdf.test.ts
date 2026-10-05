@@ -54,11 +54,46 @@ describe("textoDoPdf", () => {
     expect(textoDoPdf(pdf)).toBe("a alínea a) do artigo");
   });
 
-  it("separa o que foi impresso em posições diferentes", () => {
+  it("separa o que foi impresso em linhas diferentes", () => {
+    // y diferente (700, 680): linha nova, logo espaço.
     const pdf = pdfComStream(
       "BT 1 0 0 1 50 700 Tm (Prazo) Tj 1 0 0 1 50 680 Tm (30 dias) Tj ET",
     );
     expect(textoDoPdf(pdf)).toBe("Prazo 30 dias");
+  });
+
+  it("NÃO separa o que foi posicionado na mesma linha", () => {
+    // O defeito que custou 123 de 123 extracções as suas provas. Um aviso a
+    // sério traz um `Tm` por cada `TJ` — 82 de cada na fixture do PT2030 —
+    // porque o gerador posiciona cada pedaço ao x exacto. Com um espaço por
+    // cada `Tm`, um código partido em pedaços saía partido.
+    const pdf = pdfComStream(
+      "BT 1 0 0 1 50 700 Tm (LISBOA2030) Tj 1 0 0 1 90 700 Tm (-2023-1) Tj " +
+        "1 0 0 1 130 700 Tm (2) Tj ET",
+    );
+    expect(textoDoPdf(pdf)).toBe("LISBOA2030-2023-12");
+  });
+
+  it("não separa quando o `Td` anda na horizontal, só quando muda de linha", () => {
+    // `Td tx ty` é relativo: `ty` é um delta, e só um delta não-nulo é linha
+    // nova. Ler o `ty` como um y absoluto foi um erro do primeiro rascunho
+    // desta correcção.
+    const mesmaLinha = pdfComStream(
+      "BT 50 700 Td (29/) Tj 20 0 Td (12/2023) Tj ET",
+    );
+    expect(textoDoPdf(mesmaLinha)).toBe("29/12/2023");
+
+    const linhaNova = pdfComStream(
+      "BT 50 700 Td (Prazo) Tj 0 -20 Td (30 dias) Tj ET",
+    );
+    expect(textoDoPdf(linhaNova)).toBe("Prazo 30 dias");
+  });
+
+  it("confia nos espaços que o documento escreve, em vez de os inventar", () => {
+    // Os espaços verdadeiros vêm explícitos nos literais: `(s)7( )6(Fundos)`.
+    // Inferir mais do que a mudança de linha é inventar.
+    const pdf = pdfComStream("BT [(de)-5( )6(si)] TJ ET");
+    expect(textoDoPdf(pdf)).toBe("de si");
   });
 
   it("ignora os operandos dos operadores que não são de texto", () => {
@@ -105,6 +140,24 @@ describe("textoDoPdf, contra um aviso a sério", () => {
     // comparação não serve para nada, por muito legível que pareça.
     const citacao = "A Comissão Diretiva deliberou proceder à alteração do aviso";
     expect(formaComparavel(texto)).toContain(formaComparavel(citacao));
+  });
+
+  it("não parte um código nem uma data, que é onde as provas morriam", () => {
+    // A asserção acima passava enquanto a coisa real falhava 123 de 123, porque
+    // a citação escolhida era prosa: só palavras, sem dígitos, sem hífenes, sem
+    // barras. O gerador parte as corridas nos limites das palavras, por isso na
+    // prosa o defeito era invisível. Ele vivia exactamente nos campos que o
+    // portão precisa — a referência e os prazos — onde o código saía
+    // `LISBOA2030 - 2023 - 1 2` e a data `29 / 12 /2023`.
+    expect(texto).toContain("LISBOA2030-2023-12");
+    expect(texto).toContain("29/12/2023");
+    expect(texto).toContain("ensino pré-escolar");
+  });
+
+  it("não cola palavras umas às outras ao deixar de inventar espaços", () => {
+    // O outro lado do risco: confiar nos espaços do documento não pode
+    // significar texto sem espaços nenhuns.
+    expect(texto.match(/[A-Za-zÀ-ÿ]{25,}/g)).toBeNull();
   });
 });
 
