@@ -18,7 +18,6 @@ import {
 } from "@apoios/extraction";
 import type { Buscador, PedidoCondicional, RespostaHttp } from "../http/tipos.ts";
 import {
-  decodificarEntidades,
   hashBytes,
   hashConteudo,
   normalizarConteudo,
@@ -27,6 +26,7 @@ import type { Fonte, Paginacao } from "../sources/tipos.ts";
 import type { Armazem } from "./armazem.ts";
 import type { MetricasFonte } from "./saude.ts";
 import { textoDoPdf } from "./pdf.ts";
+import { comecaPorPdf, textoVisivel } from "./texto.ts";
 import {
   atingiuOTecto,
   chaveDePagina,
@@ -134,6 +134,8 @@ interface Preparado {
   readonly candidato: Candidato;
   readonly hash: string;
   readonly doc: DocumentoEntrada;
+  /** O snapshot de onde o texto saiu, para a extracção poder nomeá-lo. */
+  readonly snapshotId: string | null;
 }
 
 /**
@@ -162,33 +164,6 @@ export function quantosCabemNoTecto(
   // não passa: zero, e o alarme do tecto diz quantos ficaram de fora.
   if (custoEsperadoUsd === undefined || custoEsperadoUsd <= 0) return 0;
   return Math.max(0, Math.min(disponiveis, Math.floor(tectoUsd / custoEsperadoUsd)));
-}
-
-/** `%PDF-`, os cinco bytes que a norma obriga a estar no início do ficheiro. */
-function comecaPorPdf(bytes: Uint8Array): boolean {
-  if (bytes.length < 5) return false;
-  return (
-    bytes[0] === 0x25 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x44 &&
-    bytes[3] === 0x46 &&
-    bytes[4] === 0x2d
-  );
-}
-
-function textoVisivel(html: string): string {
-  return (
-    decodificarEntidades(
-      normalizarConteudo(html)
-        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-        .replace(/<[^>]+>/g, " "),
-    )
-      // Entities are decoded before the whitespace collapse, so a `&#160;` that
-      // became a space is folded like any other.
-      .replace(/\s+/g, " ")
-      .trim()
-  );
 }
 
 /**
@@ -660,7 +635,7 @@ export async function executarFonte(
       continue;
     }
 
-    await armazem.guardarSnapshot(
+    const snapshotId = await armazem.guardarSnapshot(
       candidato.urlDetalhe,
       {
         hashConteudo: hash,
@@ -674,6 +649,7 @@ export async function executarFonte(
     preparados.push({
       candidato,
       hash,
+      snapshotId,
       doc: {
         urlFonte: candidato.urlDetalhe,
         entidade: fonte.entidade,
@@ -709,7 +685,7 @@ export async function executarFonte(
   }
 
   // --- 7. Model extraction, only on genuinely changed documents --------------
-  for (const { candidato, hash, doc } of preparados) {
+  for (const { candidato, hash, doc, snapshotId } of preparados) {
     const texto = doc.texto;
     // O tecto é conferido aqui, e não antes da descarga: só se sabe que um
     // documento precisa de uma chamada depois de ele ser buscado e comparado. O
@@ -877,6 +853,7 @@ export async function executarFonte(
         tokensCacheEscritos: resultado.tokensCacheEscritos,
         custoUsd: resultado.custoUsd,
         stopReason: resultado.stopReason,
+        snapshotId,
       });
     };
 
