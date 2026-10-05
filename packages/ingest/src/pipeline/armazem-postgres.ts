@@ -13,6 +13,7 @@ import {
 } from "@apoios/core";
 
 import { mudou, redecidir } from "./redecidir.ts";
+import { textoDoDocumento } from "./texto.ts";
 import {
   gerarSlug,
   type Armazem,
@@ -70,6 +71,14 @@ export interface RelatorioRedecisao {
   alterados: number;
   publicadosAgora: number;
   despublicadosAgora: number;
+  /**
+   * Quantas tiveram as citações conferidas outra vez contra o documento.
+   *
+   * Separado de `lidos` de propósito: uma extracção cujo `snapshot_id` é nulo
+   * só pode repetir o veredicto guardado, e dizer «reli 400» quando se releram
+   * 123 era a mentira mais cara que este relatório podia contar.
+   */
+  reverificados: number;
   readonly ilegiveis: string[];
   readonly simulacao: boolean;
 }
@@ -167,8 +176,8 @@ export class ArmazemPostgres implements Armazem {
     url: string,
     estado: EstadoSnapshot,
     conteudo: Uint8Array,
-  ): Promise<void> {
-    await this.#consulta(
+  ): Promise<string | null> {
+    const inserido = await this.#consulta<{ id: string }>(
       `insert into snapshots
          (source_id, url, url_canonica, hash_conteudo, etag, last_modified,
           capturado_em, bytes, conteudo)
@@ -176,7 +185,8 @@ export class ArmazemPostgres implements Armazem {
        -- Mirrors snapshots_dedup. Re-running the pipeline on an unchanged page
        -- must not write a second row: that is what keeps this table's growth
        -- proportional to how often the sources actually change.
-       on conflict (url_canonica, hash_conteudo) do nothing`,
+       on conflict (url_canonica, hash_conteudo) do nothing
+       returning id`,
       [
         this.#fonteId,
         url,
@@ -192,6 +202,20 @@ export class ArmazemPostgres implements Armazem {
       ],
       `guardarSnapshot(${url})`,
     );
+    const id = inserido[0]?.id;
+    if (id !== undefined) return id;
+
+    // `do nothing` devolve zero linhas quando o snapshot já existia, e isso é o
+    // caso normal: a mesma corrida volta a ver o mesmo conteúdo. O id continua a
+    // ser preciso, por isso procura-se — pela mesma chave do `on conflict`, não
+    // pela linha mais recente, que numa página que mudou a meio da corrida não é
+    // o conteúdo que foi extraído.
+    const existente = await this.#consulta<{ id: string }>(
+      `select id from snapshots where url_canonica = $1 and hash_conteudo = $2`,
+      [canonicalizar(url), estado.hashConteudo],
+      `guardarSnapshot/existente(${url})`,
+    );
+    return existente[0]?.id ?? null;
   }
 
   async marcarProcessado(url: string, hashConteudo: string): Promise<void> {
@@ -267,13 +291,33 @@ export class ArmazemPostgres implements Armazem {
   /**
    * Re-run the publication gate over every fund's most recent extraction.
    *
-   * Reads only `fund_extractions` and writes only the four decision columns on
-   * `funds`. No model call, no network beyond Postgres — the whole point is that
-   * the model's answer has not changed; our reading of it has.
+   * Reads `fund_extractions` and the snapshot each one names, and writes only the
+   * four decision columns on `funds`. No model call, no network beyond Postgres —
+   * the whole point is that the model's answer has not changed; our reading of it
+   * has.
+   *
+   * The snapshot is joined in so the evidence quotes can be checked against the
+   * document again, because "our reading of it" includes the reader that turns a
+   * PDF into text. A row whose `snapshot_id` is null — the ones that predate
+   * migration 0018 — keeps the verdict stored at extraction time, and
+   * `reverificados` says how many did not.
    *
    * `simulacao` reports what would change and writes nothing. A gate change is
    * exactly the moment to look before writing across the live catalogue.
    */
+  /** O corpo de um snapshot, um de cada vez, para a memória ficar constante. */
+  static async #conteudoDeSnapshot(
+    pool: Pool,
+    id: string,
+  ): Promise<Uint8Array | null> {
+    const { rows } = await pool.query<{ conteudo: Buffer | null }>(
+      `select conteudo from snapshots where id = $1`,
+      [id],
+    );
+    const c = rows[0]?.conteudo;
+    return c === null || c === undefined ? null : new Uint8Array(c);
+  }
+
   static async redecidir(
     pool: Pool,
     simulacao: boolean,
@@ -288,13 +332,24 @@ export class ArmazemPostgres implements Armazem {
       stop_reason: string | null;
       publicado: boolean;
       alertavel: boolean;
+      snapshot_id: string | null;
     }>(
       // `distinct on` takes the newest extraction per fund. A fund re-extracted
       // after a document changed has several, and only the last one describes
       // what the catalogue currently shows.
+      //
+      // Só o `snapshot_id`, e o corpo vai-se buscar um a um dentro do ciclo.
+      //
+      // Trazer `s.conteudo` nesta query era o que estava escrito no primeiro
+      // rascunho, e é precisamente o que o comentário antigo deste método dava
+      // como razão para não reler nada: «o preço de ter todos os snapshots em
+      // memória». Medido hoje: 99 MB para 174 apoios, ~570 KB cada. Tolerável
+      // agora e mais de 1 GB aos dois mil — numa tabela que só cresce, e no
+      // único comando a que se recorre quando o portão está errado. Uma ida ao
+      // Postgres por apoio é mais barata do que isso, e o custo fica constante.
       `select distinct on (fe.fund_id)
               fe.fund_id, fe.bruto, fe.confianca_campos, fe.evidencia_falhou,
-              fe.stop_reason, f.publicado, f.alertavel
+              fe.stop_reason, f.publicado, f.alertavel, fe.snapshot_id
          from fund_extractions fe
          join funds f on f.id = fe.fund_id
         where fe.fund_id is not null
@@ -307,6 +362,7 @@ export class ArmazemPostgres implements Armazem {
       alterados: 0,
       publicadosAgora: 0,
       despublicadosAgora: 0,
+      reverificados: 0,
       ilegiveis: [],
       simulacao,
     };
@@ -318,12 +374,25 @@ export class ArmazemPostgres implements Armazem {
         confiancaCampos: linha.confianca_campos ?? {},
         evidenciaFalhou: linha.evidencia_falhou ?? [],
         stopReason: linha.stop_reason,
+        // Mesma derivação que o pipeline usa, pelo mesmo módulo: duas
+        // derivações teriam a mesma avaria em movimento mais lento.
+        texto:
+          linha.snapshot_id === null
+            ? null
+            : textoDoDocumento(
+                await ArmazemPostgres.#conteudoDeSnapshot(
+                  pool,
+                  linha.snapshot_id,
+                ),
+              ),
       }, hoje);
 
       if (r.estado === "ilegivel") {
         relatorio.ilegiveis.push(`${r.fundId}: ${r.motivo}`);
         continue;
       }
+
+      if (r.verificacao === "recalculada") relatorio.reverificados++;
 
       const actual = { publicado: linha.publicado, alertavel: linha.alertavel };
       if (!mudou(actual, r.decisao)) continue;
@@ -497,9 +566,10 @@ export class ArmazemPostgres implements Armazem {
       `insert into fund_extractions
          (fund_id, modelo, prompt_version, schema_version, bruto,
           confianca_campos, evidencia_falhou, tokens_entrada, tokens_saida,
-          tokens_cache_lidos, tokens_cache_escritos, custo_usd, stop_reason)
+          tokens_cache_lidos, tokens_cache_escritos, custo_usd, stop_reason,
+          snapshot_id)
        values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::text[], $8, $9, $10, $11,
-               $12, $13)`,
+               $12, $13, $14)`,
       [
         e.fundId,
         e.modelo,
@@ -514,6 +584,7 @@ export class ArmazemPostgres implements Armazem {
         e.tokensCacheEscritos,
         e.custoUsd,
         e.stopReason,
+        e.snapshotId,
       ],
       "guardarExtraccao",
     );
