@@ -1,6 +1,6 @@
 {
   "sourceId": "fundo-ambiental-noticias",
-  "capturadoEm": "2026-09-28T11:08:50.042Z",
+  "capturadoEm": "2026-10-05T11:44:12.593Z",
   "erro": null,
   "entradas": [
     {
@@ -10,7 +10,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-28T11:08:38.097Z"
+      "capturadoEm": "2026-10-05T11:44:00.374Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/orientacao-tecnica-n-03c08-i01012022-operacoes-integradas-de-gestao-da-paisagem-5-republicacao.aspx",
@@ -19,7 +19,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-28T11:08:40.944Z"
+      "capturadoEm": "2026-10-05T11:44:03.455Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/agencia-para-o-clima-cumpre-100-das-metas-do-prr-sob-sua-gestao.aspx",
@@ -28,7 +28,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-28T11:08:44.032Z"
+      "capturadoEm": "2026-10-05T11:44:06.438Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/aviso-de-abertura-de-concurso-n-032026-apoio-a-conversao-de-matos-em-novas-pastagens-abertura-do-periodo-de-candidaturas.aspx",
@@ -37,7 +37,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-28T11:08:47.059Z"
+      "capturadoEm": "2026-10-05T11:44:09.486Z"
     },
     {
       "url": "https://www.fundoambiental.pt/listagem-noticias/candidaturas-a-medida-de-auxilio-a-custos-indiretos-do-cele-2026.aspx",
@@ -46,7 +46,7 @@
       "contentType": "text/html; charset=utf-8",
       "etag": null,
       "lastModified": null,
-      "capturadoEm": "2026-09-28T11:08:50.042Z"
+      "capturadoEm": "2026-10-05T11:44:12.592Z"
     }
   ]
 }
