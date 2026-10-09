@@ -753,7 +753,14 @@ export async function executarFonte(
       // error — and dropping that here left the run with no way to say what went
       // wrong. Deduplicated because thirty identical messages are one fact.
       extraccoesFalhadas++;
-      errosExtraccao.add(resultado.erro ?? "sem erro reportado");
+      // O `request_id` muda em cada chamada e desfazia a deduplicação: a 09/10
+      // o mesmo «credit balance is too low» ficou gravado 94 vezes numa fonte.
+      errosExtraccao.add(
+        (resultado.erro ?? "sem erro reportado").replace(
+          /,?\s*"request_id"\s*:\s*"[^"]*"/g,
+          "",
+        ),
+      );
       continue;
     }
 
