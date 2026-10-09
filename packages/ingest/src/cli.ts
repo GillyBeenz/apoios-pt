@@ -419,6 +419,12 @@ async function main(): Promise<number> {
         // `fund_identities` nem em `alertas_operador`. Um apoio perdido em
         // silêncio é o mesmo defeito do plano anual, noutro sítio.
         conflitos: r.conflitos,
+        // Pela mesma razão: o motivo de uma extracção falhada só existia na
+        // consola. De 22/09 a 09/10 todas as chamadas da nocturna falharam, o
+        // `resumo` dizia `extraccoesFalhadas: 94` e o porquê estava num log do
+        // Actions que só se lê com sessão iniciada e que expira. Uma falha cujo
+        // motivo não fica em lado nenhum não se diagnostica sem a repetir.
+        errosExtraccao: m.errosExtraccao,
         erro: m.erro,
       });
 
