@@ -57,6 +57,11 @@ melhor apagares a afirmação errada do que deixá-la lá. Uma página com uma l
   gastar dez mil euros num apoio a que nunca teve direito.
 - **Nunca inventar um campo que o documento não diz.** `desconhecido` é uma
   resposta válida e honesta. Uma inferência plausível não é.
+- **Cada tabela nova traz as suas concessões.** Desde 30 de outubro de 2026 a
+  Supabase deixou de dar acesso automático à Data API às tabelas novas de `public`.
+  A migração que cria uma tabela lida pelo site inclui o `grant` mínimo de que o
+  site precisa (ver `0018_concessoes_explicitas.sql`); sem ele, a página responde
+  "permission denied" — e uma reconstrução da base a partir das migrações também.
 - **Comentários dizem porquê, não o quê.** Quando uma decisão é surpreendente, a
   razão fica escrita ao lado dela — senão volta a ser desfeita por alguém que não
   sabia porque estava assim.
