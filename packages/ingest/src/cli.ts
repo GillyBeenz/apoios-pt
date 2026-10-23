@@ -47,8 +47,9 @@ apoios ingerir — executa o pipeline de recolha
                     --tecto-custo-usd, sem isto não se submete nada.
   --list            Lista as fontes conhecidas
   --redecidir       Volta a aplicar o portão de publicação às extracções já
-                    guardadas. Não chama o modelo nem vai à rede. Use com
-                    --dry-run primeiro.
+                    guardadas, e volta a conferir as citações contra o documento
+                    de cada uma quando ela o sabe nomear. Não chama o modelo nem
+                    vai à rede. Use com --dry-run primeiro.
 
 Fontes activas: ${FONTES_ACTIVAS.map((f) => f.id).join(", ")}
 Em captura (ignoradas sem --source): ${FONTES.filter(
@@ -203,6 +204,11 @@ async function main(): Promise<number> {
       const r = await ArmazemPostgres.redecidir(pool, simulacao);
       console.log(
         `${simulacao ? "[simulação] " : ""}extracções lidas=${r.lidos}  ` +
+          // Dito ao lado de `lidas` de propósito. Uma extracção cujo
+          // `snapshot_id` é nulo só pode repetir o veredicto guardado, e um
+          // relatório que não separasse as duas coisas deixava quem lê a pensar
+          // que releu tudo.
+          `provas reverificadas=${r.reverificados}  ` +
           `alterados=${r.alterados}  a publicar=${r.publicadosAgora}  ` +
           `a despublicar=${r.despublicadosAgora}`,
       );

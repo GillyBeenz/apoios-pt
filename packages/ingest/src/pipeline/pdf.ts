@@ -124,6 +124,10 @@ function textoDoStream(t: string): string {
   };
 
   let pendentes: string[] = [];
+  // Operands pile up before their operator in PostScript order, so the scanner
+  // has to keep them to read `Tm`'s `e f` and `Td`'s `tx ty`.
+  let operandos: number[] = [];
+  let linhaAnterior: number | null = null;
   let i = 0;
   const n = t.length;
 
@@ -156,9 +160,11 @@ function textoDoStream(t: string): string {
         if ((d >= 48 && d <= 57) || d === 45 || d === 46) j++;
         else break;
       }
-      if (pendentes.length > 0 && Number(t.slice(i, j)) < RECUO_QUE_VALE_ESPACO) {
+      const valor = Number(t.slice(i, j));
+      if (pendentes.length > 0 && valor < RECUO_QUE_VALE_ESPACO) {
         pendentes.push(" ");
       }
+      if (Number.isFinite(valor)) operandos.push(valor);
       i = j;
       continue;
     }
@@ -188,24 +194,68 @@ function textoDoStream(t: string): string {
       if (op === "Tj" || op === "TJ") {
         emitir(pendentes.join(""));
         pendentes = [];
+        operandos = [];
       } else if (op === "'" || op === '"') {
         // Both move to the next line before showing the string.
         espaco();
         emitir(pendentes.join(""));
         pendentes = [];
-      } else if (
-        op === "Td" ||
-        op === "TD" ||
-        op === "Tm" ||
-        op === "T*" ||
-        op === "ET"
-      ) {
-        // The pen moved without printing: a line or a cell boundary.
+      } else if (op === "Tm" || op === "Td" || op === "TD") {
+        // A pen move is only a word break when it changes LINE.
+        //
+        // This branch used to emit a space for every `Td`/`Tm`/`ET`, on the
+        // reasoning that "the pen moved without printing: a line or a cell
+        // boundary". A line break is one reason the pen moves; it is not the
+        // only one, and treating it as the only one cost 123 of 123 extractions
+        // their evidence. Real avisos are laid out with one `Tm` per `TJ` — 82
+        // of each in the PT2030 fixture — because the generator positions every
+        // run exactly. So the old rule fired between every pair of runs, and
+        // wherever a run was split mid-token it split the token:
+        // `LISBOA2030-2023-12` came out as `LISBOA2030 - 2023 - 1 2` and
+        // `29/12/2023` as `29 / 12 /2023`. The model reads those correctly and
+        // quotes them whole, so every quote containing a reference or a date
+        // failed the verbatim check — and `verificarProvas` failing is a field
+        // forced to `baixa`, which is the alert gate shut.
+        //
+        // Intra-line spaces need no inferring: the generator writes them as
+        // literal space characters inside the array — `(s)7( )6(Fundos)` is
+        // "s Fundos". Trusting those and inferring only the line break is why
+        // this reads the document instead of shredding it.
+        // `Tm a b c d e f` sets the matrix outright, so `f` is an absolute y.
+        // `Td tx ty` / `TD` move *relative* to the start of the current line, so
+        // `ty` is a delta and a non-zero one is itself the line change — there
+        // is no absolute y to compare. Reading `ty` as an absolute coordinate
+        // was a bug in the first draft of this fix.
+        if (op === "Tm") {
+          const y = operandos.length >= 6 ? operandos[operandos.length - 1] : undefined;
+          if (y === undefined || y !== linhaAnterior) espaco();
+          if (y !== undefined) linhaAnterior = y;
+        } else {
+          const ty = operandos.length >= 2 ? operandos[operandos.length - 1] : undefined;
+          if (ty === undefined || ty !== 0) {
+            espaco();
+            // The absolute line is no longer known from here on.
+            if (linhaAnterior !== null && ty !== undefined) linhaAnterior += ty;
+            else linhaAnterior = null;
+          }
+        }
         pendentes = [];
+        operandos = [];
+      } else if (op === "T*") {
+        // Explicitly the next line, no operands to read.
         espaco();
+        linhaAnterior = null;
+        pendentes = [];
+        operandos = [];
+      } else if (op === "ET") {
+        // End of a text object. Not a line break on its own: avisos wrap every
+        // single run in its own `BT`…`ET`, so spacing here was the same defect.
+        pendentes = [];
+        operandos = [];
       } else {
         // Any other operator consumed its operands; they are not text.
         pendentes = [];
+        operandos = [];
       }
       i = j;
       continue;
